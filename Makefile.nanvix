@@ -266,4 +266,90 @@ else
 	make install DESTDIR="$(DESTDIR)"
 endif
 
-.PHONY: all configure build clean distclean test install
+# --------------------------------------------------------------------------
+# ramfs target: build a FAT32 filesystem image containing the trimmed Python
+# stdlib suitable for loading into a NanVix VM via nanvixd -ramfs.
+#
+# Pipeline: install → trim aggressively → mkramfs → cpython-ramfs.img
+#
+# The resulting image is used by the MXC NanVix backend to run Python scripts
+# inside a NanVix microkernel VM.  Scripts are piped via stdin; the ramfs
+# provides the stdlib so that Python can initialise (encodings, io, etc.).
+# --------------------------------------------------------------------------
+
+# mkramfs: native tool that creates FAT32 images from a directory.
+# If MKRAMFS is not set, try to find it next to nanvixd in NANVIX_HOME/bin,
+# or fall back to a PATH lookup.
+MKRAMFS ?= $(firstword $(wildcard $(abspath $(NANVIX_HOME))/bin/mkramfs.exe) \
+                        $(wildcard $(abspath $(NANVIX_HOME))/bin/mkramfs) \
+                        $(shell command -v mkramfs 2>/dev/null))
+
+RAMFS_STAGING = $(CURDIR)/.nanvix/_ramfs_staging
+RAMFS_SYSROOT = $(RAMFS_STAGING)/sysroot
+RAMFS_OUTPUT  = $(CURDIR)/cpython-ramfs.img
+
+ramfs: build
+	@echo "=== Building CPython ramfs image ==="
+	@# --- Step 1: Install into a clean staging area ---
+	@rm -rf $(RAMFS_STAGING)
+ifdef CONFIG_NANVIX_DOCKER
+	$(DOCKER_RUN) make install DESTDIR="$(DOCKER_WORKSPACE_PATH)/.nanvix/_ramfs_staging"
+else
+	make install DESTDIR="$(RAMFS_STAGING)"
+endif
+	@test -d "$(RAMFS_SYSROOT)" || { echo "error: install did not produce $(RAMFS_SYSROOT)"; exit 1; }
+	@# --- Step 2: Strip debug symbols from the python binary (51MB → ~9MB) ---
+	@echo "  Stripping debug symbols..."
+	@if [ -x "$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip" ]; then \
+		find "$(RAMFS_SYSROOT)" -name 'python3.*' -type f -executable \
+			-exec "$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip" --strip-debug {} \; 2>/dev/null || true; \
+	fi
+	@# --- Step 3: Aggressive stdlib trimming ---
+	@# Remove modules that are not needed at runtime inside a NanVix VM.
+	@# Each removal is commented with the reason.
+	@echo "  Trimming stdlib..."
+	@# __pycache__: bytecode cache dirs — not useful in a read-only ramfs
+	find "$(RAMFS_SYSROOT)" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+	@# test / tests: test suites — not needed at runtime
+	find "$(RAMFS_SYSROOT)" -type d -name 'test' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
+	find "$(RAMFS_SYSROOT)" -type d -name 'tests' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
+	@# idlelib: IDLE GUI editor — requires tkinter, no display on NanVix
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/idlelib" 2>/dev/null || true
+	@# tkinter: Tk GUI bindings — no display server on NanVix
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/tkinter" 2>/dev/null || true
+	@# ensurepip: pip bootstrapper — pip not available on NanVix (no network/subprocess)
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/ensurepip" 2>/dev/null || true
+	@# lib2to3: Python 2→3 conversion tool — not needed at runtime
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/lib2to3" 2>/dev/null || true
+	@# distutils: deprecated build system — not needed at runtime
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/distutils" 2>/dev/null || true
+	@# unittest: test framework — not needed for script execution
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/unittest" 2>/dev/null || true
+	@# config-3.12-*: build configuration for C extensions — not needed at runtime
+	find "$(RAMFS_SYSROOT)" -type d -name 'config-3.12-*' -exec rm -rf {} + 2>/dev/null || true
+	@# turtledemo: turtle graphics demos — requires tkinter
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/turtledemo" 2>/dev/null || true
+	@# pydoc_data: pydoc documentation data — not needed for execution
+	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/pydoc_data" 2>/dev/null || true
+	@# .pyc files: bytecode files — will be regenerated if needed
+	find "$(RAMFS_SYSROOT)" -name '*.pyc' -delete 2>/dev/null || true
+	@# .pyo files: optimised bytecode — same reason
+	find "$(RAMFS_SYSROOT)" -name '*.pyo' -delete 2>/dev/null || true
+	@# --- Step 4: Report what remains ---
+	@file_count=$$(find "$(RAMFS_SYSROOT)" -type f | wc -l); \
+		dir_size=$$(du -sh "$(RAMFS_SYSROOT)" 2>/dev/null | cut -f1); \
+		echo "  Trimmed stdlib: $$file_count files, $$dir_size"
+	@# --- Step 5: Create the FAT32 ramfs image ---
+	@if [ -z "$(MKRAMFS)" ]; then \
+		echo "error: mkramfs not found. Set MKRAMFS=/path/to/mkramfs or ensure it is in NANVIX_HOME/bin/"; \
+		exit 1; \
+	fi
+	@echo "  Creating FAT32 image with $(MKRAMFS)..."
+	"$(MKRAMFS)" -o "$(RAMFS_OUTPUT)" "$(RAMFS_SYSROOT)"
+	@img_size=$$(du -sh "$(RAMFS_OUTPUT)" 2>/dev/null | cut -f1); \
+		echo "  ramfs image created: $(RAMFS_OUTPUT) ($$img_size)"
+	@# --- Cleanup staging ---
+	@rm -rf $(RAMFS_STAGING)
+	@echo "=== ramfs build complete ==="
+
+.PHONY: all configure build clean distclean test install ramfs
