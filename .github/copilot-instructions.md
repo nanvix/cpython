@@ -19,6 +19,27 @@ cd /tmp/cpython-build
 Previous successful build (March 19, 2026) used `/tmp/cpython-build/` on WSL2 ext4.
 See `A:\Work\NanVix\What-We-Did-CPython.md` for the full build journey.
 
+### CRITICAL: Pin libposix.a After `./z setup` (March 25, 2026)
+
+`./z setup` downloads the **latest** NanVix sysroot from GitHub releases. If the
+downloaded `libposix.a` is newer than the kernel/nanvixd at `A:\Repos\NanVix\bin\`,
+the resulting binary will fail silently (zero syscalls, no output, exits 0).
+
+**After `./z setup`, always pin libposix.a:**
+```bash
+cp /mnt/a/Repos/NanVix/registry-extract/lib/libposix.a \
+   .nanvix/extracted/nanvix/lib/libposix.a
+```
+
+See `C:\Users\modanish\.copilot\research\NanVix-CPython\pptx-build-root-cause.md`
+for the full investigation (LLM council, 8 hypotheses tested, runtime traces).
+
+### env.sh Hardcodes NANVIX_HOME Path
+
+`.nanvix/env.sh` stores the **absolute path** to the sysroot from the original
+repo checkout. When building from a `/tmp/` copy, Docker still mounts the
+ORIGINAL repo's sysroot. Pin libposix in the ORIGINAL path, not the copy.
+
 ### Known Cross-Compilation Issues (March 24, 2026)
 
 When building via `make -f Makefile.nanvix` (as opposed to `./z build`), three issues arise:
@@ -102,9 +123,11 @@ Detailed research is stored at:
 - `C:\Users\modanish\.copilot\research\sandbox-architecture\07-cpython-on-nanvix.md`
 - `C:\Users\modanish\.copilot\research\nanvix-cpython\council-space-support.md`
 - `C:\Users\modanish\.copilot\research\NanVix-CPython\python-pptx-enablement-plan.md` — Plan for enabling python-pptx (lxml + Pillow static linking via nanvix-python pattern)
+- `C:\Users\modanish\.copilot\research\NanVix-CPython\pptx-build-root-cause.md` — Root cause investigation: libposix.a mismatch, LLM council analysis, 8 hypotheses tested
 - `A:\Work\NanVix\What-We-Did-CPython.md`
 - `A:\Work\NanVix\code-review-findings.md`
 - `A:\Work\NanVix\council-review-364dc9152a7.md` — LLM council review of commit 364dc9152a7 (config.site trimming, stubs.c, build.sh issues)
+- `A:\Work\NanVix\handoff-python-pptx-build.md` — Current handoff state for python-pptx build
 - `A:\Work\NanVix\mxc-architecture.md`
 - `A:\Work\NanVix\windows-build-instructions.md`
 - `A:\Work\NanVix\patches\` — Ready-to-use patch files for lxml/Pillow static builtin integration

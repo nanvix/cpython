@@ -88,3 +88,19 @@ pid_t getppid(void) {
 void PyOS_BeforeFork(void) { }
 void PyOS_AfterFork_Parent(void) { }
 void PyOS_AfterFork_Child(void) { }
+
+/* GCC CRT frame registration — frame_dummy (in crtbegin.o .init) calls
+ * __register_frame_info if the pointer is non-NULL. On NanVix we don't
+ * need DWARF unwinding, so provide no-op stubs. This lets us keep CRT
+ * .init/.fini code (instead of discarding it) for any legitimate
+ * initialisation the toolchain may embed there. */
+void __register_frame_info(const void *begin, void *ob) {
+    (void)begin; (void)ob;
+}
+void __deregister_frame_info(const void *begin) {
+    (void)begin;
+}
+void *__deregister_frame_info_bases(const void *begin) {
+    (void)begin;
+    return (void *)0;
+}

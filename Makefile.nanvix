@@ -326,8 +326,9 @@ endif
 	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/distutils" 2>/dev/null || true
 	@# unittest: test framework — not needed for script execution
 	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/unittest" 2>/dev/null || true
-	@# config-3.12-*: build configuration for C extensions — not needed at runtime
-	find "$(RAMFS_SYSROOT)" -type d -name 'config-3.12-*' -exec rm -rf {} + 2>/dev/null || true
+	@# config-3.12*: build configuration for C extensions — not needed at runtime
+	@# (includes config-3.12/ which contains libpython3.12.a at ~55MB)
+	find "$(RAMFS_SYSROOT)" -type d -name 'config-3.12*' -exec rm -rf {} + 2>/dev/null || true
 	@# turtledemo: turtle graphics demos — requires tkinter
 	rm -rf "$(RAMFS_SYSROOT)/lib/python3.12/turtledemo" 2>/dev/null || true
 	@# pydoc_data: pydoc documentation data — not needed for execution
