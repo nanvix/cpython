@@ -281,6 +281,7 @@ endif
 # If MKRAMFS is not set, try to find it next to nanvixd in NANVIX_HOME/bin,
 # or fall back to a PATH lookup.
 MKRAMFS ?= $(firstword $(wildcard $(abspath $(NANVIX_HOME))/bin/mkramfs.exe) \
+                        $(wildcard $(abspath $(NANVIX_HOME))/bin/mkramfs.elf) \
                         $(wildcard $(abspath $(NANVIX_HOME))/bin/mkramfs) \
                         $(shell command -v mkramfs 2>/dev/null))
 

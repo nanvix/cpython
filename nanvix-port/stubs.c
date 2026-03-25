@@ -80,3 +80,11 @@ int setpgid(pid_t pid, pid_t pgid) {
 pid_t getppid(void) {
     return 1;
 }
+
+/* CPython fork lifecycle hooks (Python/pylifecycle.c).
+ * These are only defined when HAVE_FORK is set, but _posixsubprocess.c
+ * references them unconditionally. Since fork() returns ENOSYS on NanVix,
+ * these are never actually called — they only satisfy the linker. */
+void PyOS_BeforeFork(void) { }
+void PyOS_AfterFork_Parent(void) { }
+void PyOS_AfterFork_Child(void) { }
