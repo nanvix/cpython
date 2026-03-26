@@ -124,7 +124,7 @@ jobs:
 
   release:
     needs: [get-nanvix-info, build-and-test]
-    if: github.event_name != 'pull_request'
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     env:
       NANVIX_SHA: ${{ needs.get-nanvix-info.outputs.sha }}
