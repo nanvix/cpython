@@ -376,9 +376,6 @@ cmd_release() {
     find "$release_sysroot" -name 'python3.*' -type f -executable -exec "$strip_cmd" --strip-debug {} \; 2>/dev/null || true
   fi
 
-  # Remove __pycache__ directories to slim down the package
-  find "$release_sysroot" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-
   # Remove test directories from stdlib (not needed at runtime)
   find "$release_sysroot" -type d -name 'test' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
   find "$release_sysroot" -type d -name 'tests' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
@@ -394,6 +391,10 @@ cmd_release() {
     log "precompiling stdlib"
     "$host_python" -m compileall -q "$release_sysroot/lib/python3.12/" 2>/dev/null || true
   fi
+
+  # Remove __pycache__ directories AFTER precompilation to keep the ramfs lean.
+  # NanVix CPython imports from .py source files, not .pyc bytecode caches.
+  find "$release_sysroot" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 
   # Include python.elf binary (built by ./z build in the repo root)
   local python_elf="$ROOT_DIR/python.elf"
