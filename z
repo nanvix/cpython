@@ -380,6 +380,37 @@ cmd_release() {
   find "$release_sysroot" -type d -name 'test' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
   find "$release_sysroot" -type d -name 'tests' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
 
+  # Trim packages that cannot work on NanVix (no display, no pip, no fork/exec)
+  local trim_dirs=(
+    idlelib           # GUI IDE — requires tkinter/display
+    ensurepip         # pip bootstrapper — no network, no fork
+    tkinter           # GUI toolkit — no display server
+    turtle            # Graphics — depends on tkinter
+    turtledemo        # Demo scripts for turtle
+    config-3.12-*     # Build config — not needed at runtime
+    distutils         # Package building — not needed at runtime
+    lib2to3           # Python 2→3 converter
+    multiprocessing   # Requires fork()
+    concurrent        # Requires multiprocessing
+    venv              # Virtual envs — no fork/exec
+    curses            # Terminal UI — no terminal in VM
+    dbm               # Database manager — unnecessary
+    xmlrpc            # XML-RPC — no network
+    wsgiref           # WSGI server — no network
+  )
+  local pylib="$release_sysroot/lib/python3.12"
+  for dir in "${trim_dirs[@]}"; do
+    rm -rf "$pylib/$dir" 2>/dev/null || true
+  done
+  # Remove .a static libraries and headers (not needed at runtime)
+  rm -rf "$release_sysroot/lib/libpython3"* 2>/dev/null || true
+  rm -rf "$release_sysroot/lib/pkgconfig" 2>/dev/null || true
+  rm -rf "$release_sysroot/include" 2>/dev/null || true
+  rm -rf "$release_sysroot/bin" 2>/dev/null || true
+  local trimmed_count
+  trimmed_count=$(find "$pylib" -name '*.py' -type f | wc -l)
+  log "trimmed sysroot to $trimmed_count .py files"
+
   # Precompile stdlib .py files to .pyc for faster startup
   local host_python=""
   if [[ -n "$NANVIX_TOOLCHAIN" && -x "$NANVIX_TOOLCHAIN/bin/python3" ]]; then
