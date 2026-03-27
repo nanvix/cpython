@@ -443,9 +443,11 @@ cmd_release() {
   # Build cpython-ramfs.img from the sysroot using mkramfs.
   # Pass $release_staging (not $release_sysroot) so the image mounts as
   # /sysroot/lib/python3.12/... matching PYTHONHOME=/sysroot.
+  # Write to /tmp first to avoid mkramfs including its own output in the image.
   local mkramfs="${NANVIX_HOME:-}/bin/mkramfs.elf"
   if [[ -x "$mkramfs" && -d "$release_sysroot" ]]; then
-    "$mkramfs" -o "$release_staging/cpython-ramfs.img" "$release_staging"
+    "$mkramfs" -o /tmp/cpython-ramfs.img "$release_staging"
+    mv /tmp/cpython-ramfs.img "$release_staging/cpython-ramfs.img"
     log "built cpython-ramfs.img ($(du -h "$release_staging/cpython-ramfs.img" | cut -f1))"
   else
     log "warning: mkramfs.elf not available — cpython-ramfs.img will not be included in release"
