@@ -101,16 +101,24 @@ jobs:
           curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages
           ./z setup
 
-      - name: Build PPTX Dependencies
+      - name: Build PPTX Dependencies (C libraries)
         run: |
           if [[ -f nanvix-port/build-pptx-deps.sh ]]; then
-            echo "Building python-pptx dependencies (libxml2, libxslt, lxml, Pillow)..."
+            echo "Phase 1: Building C libraries (libxml2, libxslt, Pillow)..."
             bash nanvix-port/build-pptx-deps.sh
-          else
-            echo "No PPTX deps script found — skipping"
           fi
 
-      - name: Build
+      - name: Build CPython (pass 1 — generates pyconfig.h)
+        run: ./z build
+
+      - name: Build PPTX Dependencies (C extensions — needs pyconfig.h)
+        run: |
+          if [[ -f nanvix-port/build-pptx-deps.sh ]]; then
+            echo "Phase 2: Building C extensions (_lxml_etree, _imaging)..."
+            bash nanvix-port/build-pptx-deps.sh
+          fi
+
+      - name: Build CPython (pass 2 — links C extensions)
         run: ./z build
 
       - name: Test
