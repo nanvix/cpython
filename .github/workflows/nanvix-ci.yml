@@ -101,6 +101,15 @@ jobs:
           curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages
           ./z setup
 
+      - name: Build PPTX Dependencies
+        run: |
+          if [[ -f nanvix-port/build-pptx-deps.sh ]]; then
+            echo "Building python-pptx dependencies (libxml2, libxslt, lxml, Pillow)..."
+            bash nanvix-port/build-pptx-deps.sh
+          else
+            echo "No PPTX deps script found — skipping"
+          fi
+
       - name: Build
         run: ./z build
 

@@ -367,6 +367,20 @@ cmd_release() {
 
   [[ -d "$release_sysroot" ]] || die "install did not produce a sysroot at $release_sysroot"
 
+  # Copy third-party site-packages (pptx, lxml, PIL) from NANVIX_HOME if available.
+  # These are installed by build-pptx-deps.sh into NANVIX_HOME/lib/python3.12/site-packages/.
+  local src_site_packages="${NANVIX_HOME:-}/lib/python3.12/site-packages"
+  local dst_site_packages="$release_sysroot/lib/python3.12/site-packages"
+  if [[ -d "$src_site_packages" ]]; then
+    local pkg_count
+    pkg_count=$(find "$src_site_packages" -mindepth 1 -maxdepth 1 -type d | wc -l)
+    if [[ "$pkg_count" -gt 0 ]]; then
+      mkdir -p "$dst_site_packages"
+      cp -r "$src_site_packages"/* "$dst_site_packages/" 2>/dev/null || true
+      log "copied $pkg_count site-packages from $src_site_packages"
+    fi
+  fi
+
   # Strip debug symbols from the python binary to reduce size
   local strip_cmd=""
   if [[ -n "$NANVIX_TOOLCHAIN" && -x "$NANVIX_TOOLCHAIN/bin/i686-nanvix-strip" ]]; then
