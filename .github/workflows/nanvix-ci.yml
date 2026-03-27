@@ -119,7 +119,12 @@ jobs:
           fi
 
       - name: Build CPython (pass 2 — links C extensions)
-        run: ./z build
+        run: |
+          # Setup.local was updated by build-pptx-deps.sh with new module entries.
+          # Force regeneration of Modules/config.c so the new modules are registered
+          # in the CPython init table (builtin_module_names).
+          rm -f Modules/config.c Modules/config.o
+          ./z build
 
       - name: Test
         if: matrix.process-mode != 'standalone'
