@@ -58,7 +58,7 @@ STRIP="${NANVIX_TOOLCHAIN}/bin/i686-nanvix-strip"
 
 SYSROOT="${NANVIX_HOME}"
 COMMON_CFLAGS="-m32 -march=pentiumpro -Os -fdata-sections -ffunction-sections -I${SYSROOT}/include"
-COMMON_LDFLAGS="-static -L${SYSROOT}/lib"
+COMMON_LDFLAGS="-static -T${SYSROOT}/lib/user.ld -L${SYSROOT}/lib -lposix -Wl,--allow-multiple-definition"
 
 # Verify toolchain
 [[ -x "$CC" ]] || die "Cross-compiler not found at $CC. Is NANVIX_TOOLCHAIN correct?"
