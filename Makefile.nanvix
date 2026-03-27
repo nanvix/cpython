@@ -320,6 +320,66 @@ endif
 	@rm -rf $(TEST_STAGING) /tmp/cpython_test.log
 	@echo "		*** CPython tests PASSED ***"
 
+# ===========================================================================
+# Package — create portable release tarball in dist/
+# ===========================================================================
+# Translates the release logic from the former bash `z` script into a Make
+# target so that z.py can delegate via `_make_args("package")`.
+
+PACKAGE_STAGING = $(CURDIR)/.nanvix/_release_staging
+ARTIFACT_NAME  = cpython-$(PLATFORM)-$(PROCESS_MODE)-$(MEMORY_SIZE)
+
+package: build
+	@echo "=== Packaging cpython release ==="
+	rm -rf $(PACKAGE_STAGING)
+ifdef CONFIG_NANVIX_DOCKER
+	$(DOCKER_RUN) make install DESTDIR="$(patsubst $(CURDIR)%,$(DOCKER_WORKSPACE_PATH)%,$(abspath $(PACKAGE_STAGING)))"
+else
+	make install DESTDIR="$(PACKAGE_STAGING)"
+endif
+	@# Strip debug symbols from the python binary
+	@if [ -x "$(NANVIX_TOOLCHAIN)/bin/i686-nanvix-strip" ]; then \
+		find "$(PACKAGE_STAGING)/sysroot" -name 'python3.*' -type f -executable \
+			-exec "$(NANVIX_TOOLCHAIN)/bin/i686-nanvix-strip" --strip-debug {} \; 2>/dev/null || true; \
+	fi
+	@# Remove __pycache__ directories
+	find "$(PACKAGE_STAGING)/sysroot" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+	@# Remove test directories from stdlib
+	find "$(PACKAGE_STAGING)/sysroot" -type d -name 'test'  -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
+	find "$(PACKAGE_STAGING)/sysroot" -type d -name 'tests' -path '*/lib/python3.12/*' -exec rm -rf {} + 2>/dev/null || true
+	@# Precompile stdlib .py files to .pyc for faster startup
+	@if command -v python3 >/dev/null 2>&1; then \
+		echo "Precompiling stdlib..."; \
+		python3 -m compileall -q "$(PACKAGE_STAGING)/sysroot/lib/python3.12/" 2>/dev/null || true; \
+	fi
+	@# Create the release tarball
+	mkdir -p dist
+	tar -cjf dist/$(ARTIFACT_NAME).tar.bz2 -C $(PACKAGE_STAGING) sysroot
+	rm -rf $(PACKAGE_STAGING)
+	@echo "  Package: dist/$(ARTIFACT_NAME).tar.bz2"
+	@du -h dist/$(ARTIFACT_NAME).tar.bz2
+
+# ===========================================================================
+# Verify Package
+# ===========================================================================
+
+verify-package:
+	@echo "=== Verifying cpython package ==="
+	$(eval ARTIFACT_NAME_V := cpython-$(PLATFORM)-$(PROCESS_MODE)-$(MEMORY_SIZE))
+	@TARBALL="dist/$(ARTIFACT_NAME_V).tar.bz2"; \
+	if [ ! -f "$$TARBALL" ]; then \
+		echo "FAIL: Package tarball not found: $$TARBALL"; exit 1; \
+	fi; \
+	echo "Package contents:"; \
+	tar tjf "$$TARBALL" | head -20; \
+	if ! tar tjf "$$TARBALL" | grep -q 'sysroot/bin/python3'; then \
+		echo "FAIL: Package missing sysroot/bin/python3"; exit 1; \
+	fi; \
+	if ! tar tjf "$$TARBALL" | grep -q 'sysroot/lib/python3.12/'; then \
+		echo "FAIL: Package missing sysroot/lib/python3.12/ entries"; exit 1; \
+	fi; \
+	echo "  PASS: cpython package verification"
+
 # Clean target
 clean:
 	-make clean 2>/dev/null || true
@@ -344,4 +404,4 @@ else
 	make install DESTDIR="$(DESTDIR)"
 endif
 
-.PHONY: all configure build clean distclean test install
+.PHONY: all configure build clean distclean test install package verify-package
