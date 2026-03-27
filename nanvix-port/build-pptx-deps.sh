@@ -590,9 +590,13 @@ ls -d "$SITE_PKG_STAGING"/*/ 2>/dev/null | while read d; do
 done
 log ""
 log "Setup.local entries:"
-grep -E '^_lxml|^_imaging' "$SETUP_LOCAL" 2>/dev/null | while read line; do
-  log "  $line"
-done
+if [[ -n "${SETUP_LOCAL:-}" ]] && [[ -f "${SETUP_LOCAL:-}" ]]; then
+  grep -E '^_lxml|^_imaging' "$SETUP_LOCAL" 2>/dev/null | while read line; do
+    log "  $line"
+  done
+else
+  log "  (skipped — C extensions not built yet, run ./z build then re-run this script)"
+fi
 log ""
 log "Next steps:"
 log "  1. Run: ./z build"
