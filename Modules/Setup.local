@@ -1,5 +1,2 @@
 # Edit this file for local setup changes
-
-# --- lxml (python-pptx dependency, built by build-pptx-deps.sh) ---
-_lxml_etree lxml_etree_builtin.c -llxml_etree -lxslt -lexslt -lxml2 -lz
-_lxml_elementpath lxml_elementpath_builtin.c -llxml_elementpath -lxml2 -lz
+# lxml entries are added by build-pptx-deps.sh Phase 4 after ./z build pass 1
