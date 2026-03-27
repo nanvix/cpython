@@ -387,7 +387,7 @@ cmd_release() {
     tkinter           # GUI toolkit — no display server
     turtle            # Graphics — depends on tkinter
     turtledemo        # Demo scripts for turtle
-    config-3.12-*     # Build config — not needed at runtime
+    config-3.12*      # Build config — not needed at runtime
     distutils         # Package building — not needed at runtime
     lib2to3           # Python 2→3 converter
     multiprocessing   # Requires fork()
@@ -440,10 +440,12 @@ cmd_release() {
     log "warning: python.elf not found at $python_elf — binary will not be included in release"
   fi
 
-  # Build cpython-ramfs.img from the sysroot using mkramfs
+  # Build cpython-ramfs.img from the sysroot using mkramfs.
+  # Pass $release_staging (not $release_sysroot) so the image mounts as
+  # /sysroot/lib/python3.12/... matching PYTHONHOME=/sysroot.
   local mkramfs="${NANVIX_HOME:-}/bin/mkramfs.elf"
   if [[ -x "$mkramfs" && -d "$release_sysroot" ]]; then
-    "$mkramfs" -o "$release_staging/cpython-ramfs.img" "$release_sysroot"
+    "$mkramfs" -o "$release_staging/cpython-ramfs.img" "$release_staging"
     log "built cpython-ramfs.img ($(du -h "$release_staging/cpython-ramfs.img" | cut -f1))"
   else
     log "warning: mkramfs.elf not available — cpython-ramfs.img will not be included in release"
