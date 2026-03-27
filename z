@@ -387,7 +387,6 @@ cmd_release() {
     tkinter           # GUI toolkit — no display server
     turtle            # Graphics — depends on tkinter
     turtledemo        # Demo scripts for turtle
-    config-3.12*      # Build config — not needed at runtime
     distutils         # Package building — not needed at runtime
     lib2to3           # Python 2→3 converter
     multiprocessing   # Requires fork()
@@ -402,6 +401,8 @@ cmd_release() {
   for dir in "${trim_dirs[@]}"; do
     rm -rf "$pylib/$dir" 2>/dev/null || true
   done
+  # config-3.12 variants (glob must expand against pylib, not cwd)
+  rm -rf "$pylib"/config-3.12* 2>/dev/null || true
   # Remove .a static libraries and headers (not needed at runtime)
   rm -rf "$release_sysroot/lib/libpython3"* 2>/dev/null || true
   rm -rf "$release_sysroot/lib/pkgconfig" 2>/dev/null || true
