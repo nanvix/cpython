@@ -327,7 +327,7 @@ endif
 # target so that z.py can delegate via `_make_args("package")`.
 
 PACKAGE_STAGING = $(CURDIR)/.nanvix/_release_staging
-ARTIFACT_NAME  = cpython-$(PLATFORM)-$(PROCESS_MODE)-$(MEMORY_SIZE)
+ARTIFACT_NAME = cpython-$(PLATFORM)-$(PROCESS_MODE)-$(MEMORY_SIZE)
 
 package: build
 	@echo "=== Packaging cpython release ==="
@@ -365,8 +365,7 @@ endif
 
 verify-package:
 	@echo "=== Verifying cpython package ==="
-	$(eval ARTIFACT_NAME_V := cpython-$(PLATFORM)-$(PROCESS_MODE)-$(MEMORY_SIZE))
-	@TARBALL="dist/$(ARTIFACT_NAME_V).tar.bz2"; \
+	@TARBALL="dist/$(ARTIFACT_NAME).tar.bz2"; \
 	if [ ! -f "$$TARBALL" ]; then \
 		echo "FAIL: Package tarball not found: $$TARBALL"; exit 1; \
 	fi; \
