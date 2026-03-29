@@ -136,13 +136,9 @@ CONFIGURE_ENV = \
 	CFLAGS="-L$(SYSROOT_PATH)/lib -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="-T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -Wl,-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -lffi -Wl,--end-group" \
-	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
-	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
+	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lz -lffi -Wl,--end-group" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
 	ZLIB_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	BZIP2_LIBS="-L$(SYSROOT_PATH)/lib -lbz2" \
-	BZIP2_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	LIBFFI_LIBS="-L$(SYSROOT_PATH)/lib -lffi" \
 	LIBFFI_CFLAGS="-I$(SYSROOT_PATH)/include"
 
@@ -160,7 +156,6 @@ CONFIGURE_OPTS = \
 	--exec-prefix="$(INSTALL_PREFIX)" \
 	--with-ensurepip=no \
 	--with-pkg-config=no \
-	--with-openssl="$(SYSROOT_PATH)" \
 	--disable-ipv6 \
 	ac_cv_file__dev_ptmx=no \
 	ac_cv_file__dev_ptc=no \
@@ -168,7 +163,25 @@ CONFIGURE_OPTS = \
 	ac_cv_pthread=yes \
 	ac_cv_kthread=no \
 	ac_cv_func_dlopen=yes \
-	ac_cv_header_dlfcn_h=yes
+	ac_cv_header_dlfcn_h=yes \
+	ac_cv_sizeof_double=8 \
+	ac_cv_sizeof_float=4 \
+	ac_cv_sizeof_fpos_t=4 \
+	ac_cv_sizeof_int=4 \
+	ac_cv_sizeof_long=4 \
+	ac_cv_sizeof_long_double=12 \
+	ac_cv_sizeof_long_long=8 \
+	ac_cv_sizeof_off_t=8 \
+	ac_cv_sizeof_pid_t=4 \
+	ac_cv_sizeof_pthread_key_t=4 \
+	ac_cv_sizeof_pthread_t=4 \
+	ac_cv_sizeof_short=2 \
+	ac_cv_sizeof_size_t=4 \
+	ac_cv_sizeof_time_t=8 \
+	ac_cv_sizeof_uintptr_t=4 \
+	ac_cv_sizeof_void_p=4 \
+	ac_cv_sizeof_wchar_t=4 \
+	ac_cv_sizeof__bool=1
 
 # Marker file to track if configure has been run
 CONFIGURED_MARKER = .nanvix-configured
@@ -192,6 +205,10 @@ endif
 build: $(CONFIGURED_MARKER)
 ifdef CONFIG_NANVIX_DOCKER
 	@echo "Building inside Docker..."
+	@# Compile nanvix snapshot helper (outside LTO, so it survives optimization)
+	$(DOCKER_RUN) $(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-gcc -c Modules/nanvix_snapshot.S -o Modules/nanvix_snapshot.o
+	@# Inject the snapshot object into the generated Makefile's link objects
+	$(DOCKER_RUN) sh -c 'grep -q "nanvix_snapshot.o" Makefile || sed -i "/Modules\/main\.o/s|$$| Modules/nanvix_snapshot.o|" Makefile'
 	$(DOCKER_RUN) make -j$$(nproc) all
 	@# Rename python to python.elf for consistency (always use the latest build)
 	@if [ -f python ]; then mv -f python python$(EXE); fi
