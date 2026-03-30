@@ -87,9 +87,6 @@ ifdef CONFIG_NANVIX
     LIBM := $(DOCKER_TOOLCHAIN_PATH)/i686-nanvix/lib/libm.a
     LIBPOSIX := $(DOCKER_SYSROOT_PATH)/lib/libposix.a
     LIBZ := $(DOCKER_SYSROOT_PATH)/lib/libz.a
-    LIBSQLITE3 := $(DOCKER_SYSROOT_PATH)/lib/libsqlite3.a
-    LIBSSL := $(DOCKER_SYSROOT_PATH)/lib/libssl.a
-    LIBCRYPTO := $(DOCKER_SYSROOT_PATH)/lib/libcrypto.a
     BUILD_PYTHON := $(DOCKER_TOOLCHAIN_PATH)/bin/python3
   else
     # Native toolchain paths
@@ -101,9 +98,6 @@ ifdef CONFIG_NANVIX
     LIBM := $(NANVIX_TOOLCHAIN)/i686-nanvix/lib/libm.a
     LIBPOSIX := $(abspath $(NANVIX_HOME))/lib/libposix.a
     LIBZ := $(abspath $(NANVIX_HOME))/lib/libz.a
-    LIBSQLITE3 := $(abspath $(NANVIX_HOME))/lib/libsqlite3.a
-    LIBSSL := $(abspath $(NANVIX_HOME))/lib/libssl.a
-    LIBCRYPTO := $(abspath $(NANVIX_HOME))/lib/libcrypto.a
     BUILD_PYTHON := $(NANVIX_TOOLCHAIN)/bin/python3
   endif
 
@@ -136,13 +130,9 @@ CONFIGURE_ENV = \
 	CFLAGS="-L$(SYSROOT_PATH)/lib -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="-T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -Wl,-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -lffi -Wl,--end-group" \
-	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
-	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
+	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lz -lffi -Wl,--end-group" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
 	ZLIB_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	BZIP2_LIBS="-L$(SYSROOT_PATH)/lib -lbz2" \
-	BZIP2_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	LIBFFI_LIBS="-L$(SYSROOT_PATH)/lib -lffi" \
 	LIBFFI_CFLAGS="-I$(SYSROOT_PATH)/include"
 
@@ -160,7 +150,6 @@ CONFIGURE_OPTS = \
 	--exec-prefix="$(INSTALL_PREFIX)" \
 	--with-ensurepip=no \
 	--with-pkg-config=no \
-	--with-openssl="$(SYSROOT_PATH)" \
 	--disable-ipv6 \
 	ac_cv_file__dev_ptmx=no \
 	ac_cv_file__dev_ptc=no \
