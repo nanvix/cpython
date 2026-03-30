@@ -192,6 +192,14 @@ endif
 build: $(CONFIGURED_MARKER)
 ifdef CONFIG_NANVIX_DOCKER
 	@echo "Building inside Docker..."
+	@# Compile nanvix snapshot helper (outside LTO, so it survives optimization)
+	$(DOCKER_RUN) $(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-gcc -c Modules/nanvix_snapshot.S -o Modules/nanvix_snapshot.o
+	@# Inject the snapshot object into the generated Makefile's MODULE_OBJS
+	$(DOCKER_RUN) sh -c '\
+		grep -q "nanvix_snapshot.o" Makefile || \
+		{ sed -i "/Modules\/main\.o/s|$$| Modules/nanvix_snapshot.o|" Makefile && \
+		  grep -q "nanvix_snapshot.o" Makefile || \
+		  { echo "Error: failed to inject nanvix_snapshot.o into Makefile"; exit 1; }; }'
 	$(DOCKER_RUN) make -j$$(nproc) all
 	@# Rename python to python.elf for consistency (always use the latest build)
 	@if [ -f python ]; then mv -f python python$(EXE); fi
@@ -206,6 +214,13 @@ ifdef CONFIG_NANVIX_DOCKER
 				echo "Error: failed to strip debug symbols from python$(EXE) inside Docker."; exit 1; }; \
 		fi'
 else
+	@# Compile nanvix snapshot helper (outside LTO, so it survives optimization)
+	$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-gcc -c Modules/nanvix_snapshot.S -o Modules/nanvix_snapshot.o
+	@# Inject the snapshot object into the generated Makefile's MODULE_OBJS
+	@grep -q "nanvix_snapshot.o" Makefile || \
+		{ sed -i "/Modules\/main\.o/s|$$| Modules/nanvix_snapshot.o|" Makefile && \
+		  grep -q "nanvix_snapshot.o" Makefile || \
+		  { echo "Error: failed to inject nanvix_snapshot.o into Makefile"; exit 1; }; }
 	make -j$$(nproc) all
 	@# Rename python to python.elf for consistency (always use the latest build)
 	@if [ -f python ]; then mv -f python python$(EXE); fi

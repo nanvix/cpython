@@ -10,6 +10,11 @@
 
 /* Includes for exit_sigint() */
 #include <stdio.h>                // perror()
+
+#ifdef __nanvix__
+/* Defined in Modules/nanvix_snapshot.S — separate .S file survives LTO. */
+extern void nanvix_snapshot(void);
+#endif
 #ifdef HAVE_SIGNAL_H
 #  include <signal.h>             // SIGINT
 #endif
@@ -735,6 +740,12 @@ pymain_main(_PyArgv *args)
     if (_PyStatus_EXCEPTION(status)) {
         pymain_exit_error(status);
     }
+
+#ifdef __nanvix__
+    /* Trigger a VM snapshot after initialization.
+     * On restore, execution resumes after this call and proceeds to Py_RunMain(). */
+    nanvix_snapshot();
+#endif
 
     return Py_RunMain();
 }
