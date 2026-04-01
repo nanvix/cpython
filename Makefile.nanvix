@@ -47,7 +47,11 @@ NANVIX_TEST_LIST ?= \
     test_float test_complex test_bool test_struct \
     test_int test_range test_slice test_memoryview test_bytes test_tuple \
     test_builtin test_operator test_binop test_unary \
-    test_compare test_richcmp test_augassign test_contains
+    test_compare test_richcmp test_augassign test_contains \
+    test_grammar test_syntax test_compile test_compiler_assemble \
+    test_compiler_codegen test_ast test_symtable test_opcache \
+    test_peepholer test_dis test_code test_keyword test_tokenize \
+    test_perf_profiler
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

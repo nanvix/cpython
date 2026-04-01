@@ -30,7 +30,16 @@ These modules or tests skip automatically via existing guards:
 |--------|-----------|-------|
 | test_bytes | Import-time skip | `No module named '_testcapi'` |
 | test_perf_profiler | Module-level `SkipTest` | `has_subprocess_support` is `False` |
+| test_tokenize | `@requires_subprocess()` methods | `run_python_until_end`, `run_test_script` auto-skip |
 | Various subprocess tests | `@requires_subprocess()` | Auto-skips on Nanvix via `has_subprocess_support` |
+
+## Platform Fixes (Code Changes)
+
+Changes to test infrastructure to allow importing on Nanvix:
+
+| File | Change | Reason |
+|------|--------|--------|
+| `Lib/test/support/bytecode_helper.py` | Wrapped `from _testinternalcapi import ...` in try/except; added `_HAS_INTERNAL_CAPI` flag | Top-level unconditional import would crash on import for any module that uses `BytecodeTestCase`. |
 
 ## Manual Skips
 
@@ -61,6 +70,13 @@ These modules or tests skip automatically via existing guards:
 | test_tuple | `TupleTest.test_pickle` | Pickle corruption | Inherited from `seq_tests.CommonTest`. `pickle.dumps((4, 5, 6, 7))` → `'zd\n'` → `ValueError`. |
 | test_tuple | `TupleTest.test_iterator_pickle` | Pickle corruption | `pickle.dumps(iter((4, 5, 6, 7)))` → corrupt data. |
 | test_tuple | `TupleTest.test_reversed_pickle` | Pickle corruption | `pickle.dumps(reversed((4, 5, 6, 7)))` → corrupt data. |
+| test_ast | `ASTHelpers_Test.test_pickling` | Pickle corruption | `pickle.dumps(ast.parse(...))` → corrupt data on 32-bit Nanvix. |
+| test_ast | `ASTHelpers_Test.test_ast_recursion_limit` | Deep recursion crash | `crash_depth=100_000` may exhaust stack on 32-bit VM. |
+| test_ast | `ASTHelpers_Test.test_subinterpreter` | Missing `_testcapi` | Calls `support.run_in_subinterp()` which imports `_testcapi`. |
+| test_code | `CodeTest.test_newempty` | Missing `_testcapi` | Method body imports `_testcapi` directly (`import _testcapi`). |
+| test_compiler_assemble | `IsolatedAssembleTests` (class) | Missing `_testinternalcapi` | Entire class requires `_testinternalcapi` for low-level assembler introspection. |
+| test_compiler_codegen | `IsolatedCodeGenTests` (class) | Missing `_testinternalcapi` | Entire class requires `_testinternalcapi` for code-gen introspection. |
+| test_peepholer | `DirectCfgOptimizerTests` (class) | Missing `_testinternalcapi` | Requires `_testinternalcapi` for direct CFG optimizer access. |
 
 ## Clean-Pass Modules
 
@@ -69,3 +85,5 @@ These modules pass with zero skips needed:
 - test_augassign, test_binop, test_bool, test_compare, test_complex,
   test_contains, test_float, test_memoryview, test_richcmp, test_struct,
   test_unary
+- test_grammar, test_syntax, test_compile, test_symtable, test_opcache,
+  test_dis, test_keyword
