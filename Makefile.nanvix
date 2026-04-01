@@ -45,7 +45,9 @@ NANVIX_RELEASE ?= no
 #             test_io
 NANVIX_TEST_LIST ?= \
     test_float test_complex test_bool test_struct \
-    test_int test_range test_slice test_memoryview test_bytes test_tuple
+    test_int test_range test_slice test_memoryview test_bytes test_tuple \
+    test_builtin test_operator test_binop test_unary \
+    test_compare test_richcmp test_augassign test_contains
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
