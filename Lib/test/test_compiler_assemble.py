@@ -2,14 +2,13 @@ import ast
 import types
 import unittest
 
-from test import support
 from test.support.bytecode_helper import AssemblerTestCase, _HAS_INTERNAL_CAPI
 
 
 # Tests for the code-object creation stage of the compiler.
 
 
-@unittest.skipUnless(_HAS_INTERNAL_CAPI, "Nanvix: _testinternalcapi not available")
+@unittest.skipUnless(_HAS_INTERNAL_CAPI, "requires _testinternalcapi")
 class IsolatedAssembleTests(AssemblerTestCase):
     def complete_metadata(self, metadata, filename="myfile.py"):
         if metadata is None:

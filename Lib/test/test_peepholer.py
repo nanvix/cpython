@@ -1162,7 +1162,7 @@ class TestMarkingVariablesAsUnKnown(BytecodeTestCase):
         self.assertNotInBytecode(f, "LOAD_FAST_CHECK")
 
 
-@unittest.skipUnless(_HAS_INTERNAL_CAPI, "Nanvix: _testinternalcapi not available")
+@unittest.skipUnless(_HAS_INTERNAL_CAPI, "requires _testinternalcapi")
 class DirectCfgOptimizerTests(CfgOptimizationTestCase):
     def cfg_optimization_test(
         self, insts, expected_insts, consts=None, expected_consts=None, nlocals=0
