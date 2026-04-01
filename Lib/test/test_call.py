@@ -1,5 +1,12 @@
 import unittest
-from test.support import cpython_only, requires_limited_api, skip_on_s390x, is_wasi, Py_DEBUG
+from test.support import (
+    cpython_only,
+    requires_limited_api,
+    skip_on_s390x,
+    is_wasi,
+    Py_DEBUG,
+)
+
 try:
     import _testcapi
 except ImportError:
@@ -16,17 +23,17 @@ import types
 class BadStr(str):
     def __eq__(self, other):
         return True
+
     def __hash__(self):
         # Guaranteed different hash
         return str.__hash__(self) ^ 3
 
 
 class FunctionCalls(unittest.TestCase):
-
     def test_kwargs_order(self):
         # bpo-34320:  **kwargs should preserve order of passed OrderedDict
-        od = collections.OrderedDict([('a', 1), ('b', 2)])
-        od.move_to_end('a')
+        od = collections.OrderedDict([("a", 1), ("b", 2)])
+        od.move_to_end("a")
         expected = list(od.items())
 
         def fn(**kw):
@@ -41,6 +48,7 @@ class FunctionCalls(unittest.TestCase):
         # recovering from failed calls:
         def f():
             pass
+
         for _ in range(1000):
             try:
                 f(None)
@@ -51,7 +59,6 @@ class FunctionCalls(unittest.TestCase):
 
 @cpython_only
 class CFunctionCallsErrorMessages(unittest.TestCase):
-
     def test_varargs0(self):
         msg = r"__contains__\(\) takes exactly one argument \(0 given\)"
         self.assertRaisesRegex(TypeError, msg, {}.__contains__)
@@ -62,7 +69,7 @@ class CFunctionCallsErrorMessages(unittest.TestCase):
 
     def test_varargs3(self):
         msg = r"^from_bytes\(\) takes at most 2 positional arguments \(3 given\)"
-        self.assertRaisesRegex(TypeError, msg, int.from_bytes, b'a', 'little', False)
+        self.assertRaisesRegex(TypeError, msg, int.from_bytes, b"a", "little", False)
 
     def test_varargs1min(self):
         msg = r"get expected at least 1 argument, got 0"
@@ -125,7 +132,9 @@ class CFunctionCallsErrorMessages(unittest.TestCase):
 
     def test_varargs11_kw(self):
         msg = r"^Struct[.]pack\(\) takes no keyword arguments$"
-        self.assertRaisesRegex(TypeError, msg, struct.Struct.pack, struct.Struct(""), x=2)
+        self.assertRaisesRegex(
+            TypeError, msg, struct.Struct.pack, struct.Struct(""), x=2
+        )
 
     def test_varargs12_kw(self):
         msg = r"^staticmethod\(\) takes no keyword arguments$"
@@ -137,35 +146,35 @@ class CFunctionCallsErrorMessages(unittest.TestCase):
 
     def test_varargs14_kw(self):
         msg = r"^product\(\) takes at most 1 keyword argument \(2 given\)$"
-        self.assertRaisesRegex(TypeError, msg,
-                               itertools.product, 0, repeat=1, foo=2)
+        self.assertRaisesRegex(TypeError, msg, itertools.product, 0, repeat=1, foo=2)
 
     def test_varargs15_kw(self):
         msg = r"^ImportError\(\) takes at most 3 keyword arguments \(4 given\)$"
-        self.assertRaisesRegex(TypeError, msg,
-                               ImportError, 0, name=1, path=2, name_from=3, foo=3)
+        self.assertRaisesRegex(
+            TypeError, msg, ImportError, 0, name=1, path=2, name_from=3, foo=3
+        )
 
     def test_varargs16_kw(self):
         msg = r"^min\(\) takes at most 2 keyword arguments \(3 given\)$"
-        self.assertRaisesRegex(TypeError, msg,
-                               min, 0, default=1, key=2, foo=3)
+        self.assertRaisesRegex(TypeError, msg, min, 0, default=1, key=2, foo=3)
 
     def test_varargs17_kw(self):
         msg = r"'foo' is an invalid keyword argument for print\(\)$"
-        self.assertRaisesRegex(TypeError, msg,
-                               print, 0, sep=1, end=2, file=3, flush=4, foo=5)
+        self.assertRaisesRegex(
+            TypeError, msg, print, 0, sep=1, end=2, file=3, flush=4, foo=5
+        )
 
     def test_varargs18_kw(self):
         # _PyArg_UnpackKeywordsWithVararg()
         msg = r"invalid keyword argument for print\(\)$"
         with self.assertRaisesRegex(TypeError, msg):
-            print(0, 1, **{BadStr('foo'): ','})
+            print(0, 1, **{BadStr("foo"): ","})
 
     def test_varargs19_kw(self):
         # _PyArg_UnpackKeywords()
         msg = r"invalid keyword argument for round\(\)$"
         with self.assertRaisesRegex(TypeError, msg):
-            round(1.75, **{BadStr('foo'): 1})
+            round(1.75, **{BadStr("foo"): 1})
 
     def test_oldargs0_1(self):
         msg = r"keys\(\) takes no arguments \(1 given\)"
@@ -230,12 +239,15 @@ class CFunctionCallsErrorMessages(unittest.TestCase):
         self.assertRaisesRegex(TypeError, msg, mod)
 
     def test_module_not_callable_suggestion(self):
-        msg = r"^'module' object is not callable\. Did you mean: 'mod\.mod\(\.\.\.\)'\?$"
+        msg = (
+            r"^'module' object is not callable\. Did you mean: 'mod\.mod\(\.\.\.\)'\?$"
+        )
         mod = types.ModuleType("mod")
         mod.mod = lambda: ...
         self.assertRaisesRegex(TypeError, msg, mod)
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestCallingConventions(unittest.TestCase):
     """Test calling using various C calling conventions (METH_*) from Python
 
@@ -265,19 +277,21 @@ class TestCallingConventions(unittest.TestCase):
     def test_varargs_error_kw(self):
         msg = r"meth_varargs\(\) takes no keyword arguments"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_varargs(k=1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_varargs(k=1),
         )
 
     def test_varargs_keywords(self):
         self.assertEqual(
             self.obj.meth_varargs_keywords(1, 2, a=3, b=4),
-            (self.expected_self, (1, 2), {'a': 3, 'b': 4})
+            (self.expected_self, (1, 2), {"a": 3, "b": 4}),
         )
 
     def test_varargs_keywords_ext(self):
         self.assertEqual(
-            self.obj.meth_varargs_keywords(*[1, 2], **{'a': 3, 'b': 4}),
-            (self.expected_self, (1, 2), {'a': 3, 'b': 4})
+            self.obj.meth_varargs_keywords(*[1, 2], **{"a": 3, "b": 4}),
+            (self.expected_self, (1, 2), {"a": 3, "b": 4}),
         )
 
     def test_o(self):
@@ -293,25 +307,33 @@ class TestCallingConventions(unittest.TestCase):
     def test_o_error_two_args(self):
         msg = r"meth_o\(\) takes exactly one argument \(2 given\)"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_o(1, 2),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_o(1, 2),
         )
 
     def test_o_error_ext(self):
         msg = r"meth_o\(\) takes exactly one argument \(3 given\)"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_o(*(1, 2, 3)),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_o(*(1, 2, 3)),
         )
 
     def test_o_error_kw(self):
         msg = r"meth_o\(\) takes no keyword arguments"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_o(k=1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_o(k=1),
         )
 
     def test_o_error_arg_kw(self):
         msg = r"meth_o\(\) takes no keyword arguments"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_o(k=1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_o(k=1),
         )
 
     def test_noargs(self):
@@ -323,25 +345,33 @@ class TestCallingConventions(unittest.TestCase):
     def test_noargs_error_arg(self):
         msg = r"meth_noargs\(\) takes no arguments \(1 given\)"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_noargs(1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_noargs(1),
         )
 
     def test_noargs_error_arg2(self):
         msg = r"meth_noargs\(\) takes no arguments \(2 given\)"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_noargs(1, 2),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_noargs(1, 2),
         )
 
     def test_noargs_error_ext(self):
         msg = r"meth_noargs\(\) takes no arguments \(3 given\)"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_noargs(*(1, 2, 3)),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_noargs(*(1, 2, 3)),
         )
 
     def test_noargs_error_kw(self):
         msg = r"meth_noargs\(\) takes no keyword arguments"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_noargs(k=1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_noargs(k=1),
         )
 
     def test_fastcall(self):
@@ -359,22 +389,25 @@ class TestCallingConventions(unittest.TestCase):
     def test_fastcall_error_kw(self):
         msg = r"meth_fastcall\(\) takes no keyword arguments"
         self.assertRaisesRegex(
-            TypeError, msg, lambda: self.obj.meth_fastcall(k=1),
+            TypeError,
+            msg,
+            lambda: self.obj.meth_fastcall(k=1),
         )
 
     def test_fastcall_keywords(self):
         self.assertEqual(
             self.obj.meth_fastcall_keywords(1, 2, a=3, b=4),
-            (self.expected_self, (1, 2), {'a': 3, 'b': 4})
+            (self.expected_self, (1, 2), {"a": 3, "b": 4}),
         )
 
     def test_fastcall_keywords_ext(self):
         self.assertEqual(
-            self.obj.meth_fastcall_keywords(*(1, 2), **{'a': 3, 'b': 4}),
-            (self.expected_self, (1, 2), {'a': 3, 'b': 4})
+            self.obj.meth_fastcall_keywords(*(1, 2), **{"a": 3, "b": 4}),
+            (self.expected_self, (1, 2), {"a": 3, "b": 4}),
         )
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestCallingConventionsInstance(TestCallingConventions):
     """Test calling instance methods using various calling conventions"""
 
@@ -382,6 +415,7 @@ class TestCallingConventionsInstance(TestCallingConventions):
         self.obj = self.expected_self = _testcapi.MethInstance()
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestCallingConventionsClass(TestCallingConventions):
     """Test calling class methods using various calling conventions"""
 
@@ -389,6 +423,7 @@ class TestCallingConventionsClass(TestCallingConventions):
         self.obj = self.expected_self = _testcapi.MethClass
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestCallingConventionsClassInstance(TestCallingConventions):
     """Test calling class methods on instance"""
 
@@ -397,6 +432,7 @@ class TestCallingConventionsClassInstance(TestCallingConventions):
         self.expected_self = _testcapi.MethClass
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestCallingConventionsStatic(TestCallingConventions):
     """Test calling static methods using various calling conventions"""
 
@@ -433,85 +469,116 @@ PYTHON_INSTANCE = PythonClass()
 
 NULL_OR_EMPTY = object()
 
+
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class FastCallTests(unittest.TestCase):
-    """Test calling using various callables from C
-    """
+    """Test calling using various callables from C"""
 
     # Test calls with positional arguments
     CALLS_POSARGS = [
         # (func, args: tuple, result)
-
         # Python function with 2 arguments
         (pyfunc, (1, 2), [1, 2]),
-
         # Python function without argument
         (pyfunc_noarg, (), "noarg"),
-
         # Python class methods
         (PythonClass.class_method, (), "classmethod"),
         (PythonClass.static_method, (), "staticmethod"),
-
         # Python instance methods
         (PYTHON_INSTANCE.method, (1, 2), [1, 2]),
         (PYTHON_INSTANCE.method_noarg, (), "noarg"),
         (PYTHON_INSTANCE.class_method, (), "classmethod"),
         (PYTHON_INSTANCE.static_method, (), "staticmethod"),
-
         # C callables are added later
     ]
 
     # Test calls with positional and keyword arguments
     CALLS_KWARGS = [
         # (func, args: tuple, kwargs: dict, result)
-
         # Python function with 2 arguments
-        (pyfunc, (1,), {'arg2': 2}, [1, 2]),
-        (pyfunc, (), {'arg1': 1, 'arg2': 2}, [1, 2]),
-
+        (pyfunc, (1,), {"arg2": 2}, [1, 2]),
+        (pyfunc, (), {"arg1": 1, "arg2": 2}, [1, 2]),
         # Python instance methods
-        (PYTHON_INSTANCE.method, (1,), {'arg2': 2}, [1, 2]),
-        (PYTHON_INSTANCE.method, (), {'arg1': 1, 'arg2': 2}, [1, 2]),
-
+        (PYTHON_INSTANCE.method, (1,), {"arg2": 2}, [1, 2]),
+        (PYTHON_INSTANCE.method, (), {"arg1": 1, "arg2": 2}, [1, 2]),
         # C callables are added later
     ]
 
     # Add all the calling conventions and variants of C callables
-    _instance = _testcapi.MethInstance()
-    for obj, expected_self in (
-        (_testcapi, _testcapi),  # module-level function
-        (_instance, _instance),  # bound method
-        (_testcapi.MethClass, _testcapi.MethClass),  # class method on class
-        (_testcapi.MethClass(), _testcapi.MethClass),  # class method on inst.
-        (_testcapi.MethStatic, None),  # static method
-    ):
-        CALLS_POSARGS.extend([
-            (obj.meth_varargs, (1, 2), (expected_self, (1, 2))),
-            (obj.meth_varargs_keywords,
-                (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall, (1, 2), (expected_self, (1, 2))),
-            (obj.meth_fastcall, (), (expected_self, ())),
-            (obj.meth_fastcall_keywords,
-                (1, 2), (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall_keywords,
-                (), (expected_self, (), NULL_OR_EMPTY)),
-            (obj.meth_noargs, (), expected_self),
-            (obj.meth_o, (123, ), (expected_self, 123)),
-        ])
+    if _testcapi is not None:
+        _instance = _testcapi.MethInstance()
+        for obj, expected_self in (
+            (_testcapi, _testcapi),  # module-level function
+            (_instance, _instance),  # bound method
+            (_testcapi.MethClass, _testcapi.MethClass),  # class method on class
+            (_testcapi.MethClass(), _testcapi.MethClass),  # class method on inst.
+            (_testcapi.MethStatic, None),  # static method
+        ):
+            CALLS_POSARGS.extend(
+                [
+                    (obj.meth_varargs, (1, 2), (expected_self, (1, 2))),
+                    (
+                        obj.meth_varargs_keywords,
+                        (1, 2),
+                        (expected_self, (1, 2), NULL_OR_EMPTY),
+                    ),
+                    (obj.meth_fastcall, (1, 2), (expected_self, (1, 2))),
+                    (obj.meth_fastcall, (), (expected_self, ())),
+                    (
+                        obj.meth_fastcall_keywords,
+                        (1, 2),
+                        (expected_self, (1, 2), NULL_OR_EMPTY),
+                    ),
+                    (
+                        obj.meth_fastcall_keywords,
+                        (),
+                        (expected_self, (), NULL_OR_EMPTY),
+                    ),
+                    (obj.meth_noargs, (), expected_self),
+                    (obj.meth_o, (123,), (expected_self, 123)),
+                ]
+            )
 
-        CALLS_KWARGS.extend([
-            (obj.meth_varargs_keywords,
-                (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
-            (obj.meth_varargs_keywords,
-                (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
-            (obj.meth_varargs_keywords,
-                (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
-            (obj.meth_fastcall_keywords,
-                (1, 2), {'x': 'y'}, (expected_self, (1, 2), {'x': 'y'})),
-            (obj.meth_fastcall_keywords,
-                (), {'x': 'y'}, (expected_self, (), {'x': 'y'})),
-            (obj.meth_fastcall_keywords,
-                (1, 2), {}, (expected_self, (1, 2), NULL_OR_EMPTY)),
-        ])
+            CALLS_KWARGS.extend(
+                [
+                    (
+                        obj.meth_varargs_keywords,
+                        (1, 2),
+                        {"x": "y"},
+                        (expected_self, (1, 2), {"x": "y"}),
+                    ),
+                    (
+                        obj.meth_varargs_keywords,
+                        (),
+                        {"x": "y"},
+                        (expected_self, (), {"x": "y"}),
+                    ),
+                    (
+                        obj.meth_varargs_keywords,
+                        (1, 2),
+                        {},
+                        (expected_self, (1, 2), NULL_OR_EMPTY),
+                    ),
+                    (
+                        obj.meth_fastcall_keywords,
+                        (1, 2),
+                        {"x": "y"},
+                        (expected_self, (1, 2), {"x": "y"}),
+                    ),
+                    (
+                        obj.meth_fastcall_keywords,
+                        (),
+                        {"x": "y"},
+                        (expected_self, (), {"x": "y"}),
+                    ),
+                    (
+                        obj.meth_fastcall_keywords,
+                        (1, 2),
+                        {},
+                        (expected_self, (1, 2), NULL_OR_EMPTY),
+                    ),
+                ]
+            )
 
     def check_result(self, result, expected):
         if isinstance(expected, tuple) and expected[-1] is NULL_OR_EMPTY:
@@ -585,12 +652,15 @@ class FastCallTests(unittest.TestCase):
         # does not crash.
         class IntWithDict:
             __slots__ = ["kwargs"]
+
             def __init__(self, **kwargs):
                 self.kwargs = kwargs
+
             def __index__(self):
                 self.kwargs.clear()
                 gc.collect()
                 return 0
+
         x = IntWithDict(optimize=IntWithDict())
         # We test the argument handling of "compile" here, the compilation
         # itself is not relevant. When we pass flags=x below, x.__index__() is
@@ -615,10 +685,11 @@ def testfunction_kw(self, *, kw):
 ADAPTIVE_WARMUP_DELAY = 2
 
 
+@unittest.skipUnless(_testcapi, "requires _testcapi")
 class TestPEP590(unittest.TestCase):
-
     def test_method_descriptor_flag(self):
         import functools
+
         cached = functools.lru_cache(1)(testfunction)
 
         self.assertFalse(type(repr).__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
@@ -627,25 +698,41 @@ class TestPEP590(unittest.TestCase):
         self.assertTrue(type(testfunction).__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
         self.assertTrue(type(cached).__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
 
-        self.assertTrue(_testcapi.MethodDescriptorBase.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
-        self.assertTrue(_testcapi.MethodDescriptorDerived.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
-        self.assertFalse(_testcapi.MethodDescriptorNopGet.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
+        self.assertTrue(
+            _testcapi.MethodDescriptorBase.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR
+        )
+        self.assertTrue(
+            _testcapi.MethodDescriptorDerived.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR
+        )
+        self.assertFalse(
+            _testcapi.MethodDescriptorNopGet.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR
+        )
 
         # Mutable heap types should not inherit Py_TPFLAGS_METHOD_DESCRIPTOR
         class MethodDescriptorHeap(_testcapi.MethodDescriptorBase):
             pass
+
         self.assertFalse(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_METHOD_DESCRIPTOR)
 
     def test_vectorcall_flag(self):
-        self.assertTrue(_testcapi.MethodDescriptorBase.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
-        self.assertTrue(_testcapi.MethodDescriptorDerived.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
-        self.assertFalse(_testcapi.MethodDescriptorNopGet.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
-        self.assertTrue(_testcapi.MethodDescriptor2.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
+        self.assertTrue(
+            _testcapi.MethodDescriptorBase.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL
+        )
+        self.assertTrue(
+            _testcapi.MethodDescriptorDerived.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL
+        )
+        self.assertFalse(
+            _testcapi.MethodDescriptorNopGet.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL
+        )
+        self.assertTrue(
+            _testcapi.MethodDescriptor2.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL
+        )
 
         # Mutable heap types should inherit Py_TPFLAGS_HAVE_VECTORCALL,
         # but should lose it when __call__ is overridden
         class MethodDescriptorHeap(_testcapi.MethodDescriptorBase):
             pass
+
         self.assertTrue(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
         MethodDescriptorHeap.__call__ = print
         self.assertFalse(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
@@ -655,6 +742,7 @@ class TestPEP590(unittest.TestCase):
         class MethodDescriptorHeap(_testcapi.MethodDescriptorBase):
             def __call__(self):
                 pass
+
         self.assertFalse(MethodDescriptorHeap.__flags__ & Py_TPFLAGS_HAVE_VECTORCALL)
 
     def test_vectorcall_override(self):
@@ -680,6 +768,7 @@ class TestPEP590(unittest.TestCase):
     def test_vectorcall_override_with_subclass(self):
         """Setting __call__ on a superclass should disable vectorcall"""
         SuperType = _testcapi.make_vectorcall_class()
+
         class DerivedType(SuperType):
             pass
 
@@ -718,7 +807,6 @@ class TestPEP590(unittest.TestCase):
         self.assertEqual(_testcapi.has_vectorcall_flag(UnaffectedType1), True)
         self.assertEqual(_testcapi.has_vectorcall_flag(UnaffectedType2), True)
 
-
     def test_vectorcall(self):
         # Test a bunch of different ways to call objects:
         # 1. vectorcall using PyVectorcall_Call()
@@ -729,15 +817,17 @@ class TestPEP590(unittest.TestCase):
         # 5. call using functools.partial
 
         # A list of (function, args, kwargs, result) calls to test
-        calls = [(len, (range(42),), {}, 42),
-                 (list.append, ([], 0), {}, None),
-                 ([].append, (0,), {}, None),
-                 (sum, ([36],), {"start":6}, 42),
-                 (testfunction, (42,), {}, 42),
-                 (testfunction_kw, (42,), {"kw":None}, 42),
-                 (_testcapi.MethodDescriptorBase(), (0,), {}, True),
-                 (_testcapi.MethodDescriptorDerived(), (0,), {}, True),
-                 (_testcapi.MethodDescriptor2(), (0,), {}, False)]
+        calls = [
+            (len, (range(42),), {}, 42),
+            (list.append, ([], 0), {}, None),
+            ([].append, (0,), {}, None),
+            (sum, ([36],), {"start": 6}, 42),
+            (testfunction, (42,), {}, 42),
+            (testfunction_kw, (42,), {"kw": None}, 42),
+            (_testcapi.MethodDescriptorBase(), (0,), {}, True),
+            (_testcapi.MethodDescriptorDerived(), (0,), {}, True),
+            (_testcapi.MethodDescriptor2(), (0,), {}, False),
+        ]
 
         from _testcapi import pyobject_vectorcall, pyvectorcall_call
         from types import MethodType
@@ -748,7 +838,7 @@ class TestPEP590(unittest.TestCase):
             kwnames = tuple(kwargs)
             return pyobject_vectorcall(func, args, kwnames)
 
-        for (func, args, kwargs, expected) in calls:
+        for func, args, kwargs, expected in calls:
             with self.subTest(str(func)):
                 if not kwargs:
                     self.assertEqual(expected, pyvectorcall_call(func, args))
@@ -762,7 +852,7 @@ class TestPEP590(unittest.TestCase):
 
         class MethodDescriptorOverridden(_testcapi.MethodDescriptorBase):
             def __call__(self, n):
-                return 'new'
+                return "new"
 
         class SuperBase:
             def __call__(self, *args):
@@ -773,14 +863,14 @@ class TestPEP590(unittest.TestCase):
                 return super().__call__(*args)
 
         calls += [
-            (dict.update, ({},), {"key":True}, None),
-            ({}.update, ({},), {"key":True}, None),
+            (dict.update, ({},), {"key": True}, None),
+            ({}.update, ({},), {"key": True}, None),
             (MethodDescriptorHeap(), (0,), {}, True),
-            (MethodDescriptorOverridden(), (0,), {}, 'new'),
+            (MethodDescriptorOverridden(), (0,), {}, "new"),
             (MethodDescriptorSuper(), (0,), {}, True),
         ]
 
-        for (func, args, kwargs, expected) in calls:
+        for func, args, kwargs, expected in calls:
             with self.subTest(str(func)):
                 args1 = args[1:]
                 meth = MethodType(func, args[0])
@@ -797,7 +887,10 @@ class TestPEP590(unittest.TestCase):
 
     def test_setvectorcall(self):
         from _testcapi import function_setvectorcall
-        def f(num): return num + 1
+
+        def f(num):
+            return num + 1
+
         assert_equal = self.assertEqual
         num = 10
         assert_equal(11, f(num))
@@ -846,6 +939,7 @@ class TestPEP590(unittest.TestCase):
     @requires_limited_api
     def test_vectorcall_limited_incoming(self):
         from _testcapi import pyobject_vectorcall
+
         obj = _testcapi.LimitedVectorCallClass()
         self.assertEqual(pyobject_vectorcall(obj, (), ()), "vectorcall called")
 
@@ -882,6 +976,7 @@ class TestPEP590(unittest.TestCase):
         self.assertEqual(args_captured, [("foo",)])
         self.assertEqual(kwargs_captured, [{"baz": "bar"}])
 
+
 class A:
     def method_two_args(self, x, y):
         pass
@@ -894,9 +989,9 @@ class A:
     def positional_only(arg, /):
         pass
 
+
 @cpython_only
 class TestErrorMessagesUseQualifiedName(unittest.TestCase):
-
     @contextlib.contextmanager
     def check_raises_type_error(self, message):
         with self.assertRaises(TypeError) as cm:
@@ -928,26 +1023,27 @@ class TestErrorMessagesUseQualifiedName(unittest.TestCase):
         with self.check_raises_type_error(msg):
             A().method_two_args("x", "y", x="oops")
 
-@cpython_only
-class TestRecursion(unittest.TestCase):
 
+@cpython_only
+@unittest.skipUnless(_testcapi, "requires _testcapi")
+class TestRecursion(unittest.TestCase):
     @skip_on_s390x
     @unittest.skipIf(is_wasi and Py_DEBUG, "requires deep stack")
     def test_super_deep(self):
 
         def recurse(n):
             if n:
-                recurse(n-1)
+                recurse(n - 1)
 
         def py_recurse(n, m):
             if n:
-                py_recurse(n-1, m)
+                py_recurse(n - 1, m)
             else:
-                c_py_recurse(m-1)
+                c_py_recurse(m - 1)
 
         def c_recurse(n):
             if n:
-                _testcapi.pyobject_fastcall(c_recurse, (n-1,))
+                _testcapi.pyobject_fastcall(c_recurse, (n - 1,))
 
         def c_py_recurse(m):
             if m:
@@ -968,15 +1064,16 @@ class TestRecursion(unittest.TestCase):
         finally:
             sys.setrecursionlimit(depth)
 
+
 class TestFunctionWithManyArgs(unittest.TestCase):
     def test_function_with_many_args(self):
         for N in (10, 500, 1000):
             with self.subTest(N=N):
                 args = ",".join([f"a{i}" for i in range(N)])
-                src = f"def f({args}) : return a{N//2}"
+                src = f"def f({args}) : return a{N // 2}"
                 l = {}
                 exec(src, {}, l)
-                self.assertEqual(l['f'](*range(N)), N//2)
+                self.assertEqual(l["f"](*range(N)), N // 2)
 
 
 if __name__ == "__main__":

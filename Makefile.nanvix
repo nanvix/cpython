@@ -51,7 +51,9 @@ NANVIX_TEST_LIST ?= \
     test_grammar test_syntax test_compile test_compiler_assemble \
     test_compiler_codegen test_ast test_symtable test_opcache \
     test_peepholer test_dis test_code test_keyword test_tokenize \
-    test_perf_profiler
+    test_perf_profiler \
+    test_call test_extcall test_positional_only_arg \
+    test_scope test_global test_dynamic test_with
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

@@ -77,6 +77,14 @@ Changes to test infrastructure to allow importing on Nanvix:
 | test_compiler_assemble | `IsolatedAssembleTests` (class) | Missing `_testinternalcapi` | Entire class requires `_testinternalcapi` for low-level assembler introspection. |
 | test_compiler_codegen | `IsolatedCodeGenTests` (class) | Missing `_testinternalcapi` | Entire class requires `_testinternalcapi` for code-gen introspection. |
 | test_peepholer | `DirectCfgOptimizerTests` (class) | Missing `_testinternalcapi` | Requires `_testinternalcapi` for direct CFG optimizer access. |
+| test_call | `TestCallingConventions` (class) | Missing `_testcapi` | Class calls C callable methods (`meth_varargs`, `meth_o`, etc.) on `_testcapi` module. |
+| test_call | `TestCallingConventionsInstance` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing bound methods on `_testcapi.MethInstance`. |
+| test_call | `TestCallingConventionsClass` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing class methods on `_testcapi.MethClass`. |
+| test_call | `TestCallingConventionsClassInstance` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing class methods on `_testcapi.MethClass()`. |
+| test_call | `TestCallingConventionsStatic` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing static methods on `_testcapi.MethStatic`. |
+| test_call | `FastCallTests` (class) | Missing `_testcapi` | Class body creates `_testcapi.MethInstance()` at definition time; all methods call `_testcapi.pyobject_fastcall` etc. |
+| test_call | `TestPEP590` (class) | Missing `_testcapi` | All tests use `_testcapi.MethodDescriptorBase`, `MethodDescriptorDerived`, etc. |
+| test_call | `TestRecursion` (class) | Missing `_testcapi` | `test_super_deep` calls `_testcapi.pyobject_fastcall` inside nested closures. |
 
 ## Clean-Pass Modules
 
@@ -87,3 +95,5 @@ These modules pass with zero skips needed:
   test_unary
 - test_grammar, test_syntax, test_compile, test_symtable, test_opcache,
   test_dis, test_keyword
+- test_extcall, test_positional_only_arg, test_scope, test_global,
+  test_dynamic, test_with
