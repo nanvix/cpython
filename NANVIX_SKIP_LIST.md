@@ -82,9 +82,9 @@ Changes to test infrastructure to allow importing on Nanvix:
 | test_call | `TestCallingConventionsClass` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing class methods on `_testcapi.MethClass`. |
 | test_call | `TestCallingConventionsClassInstance` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing class methods on `_testcapi.MethClass()`. |
 | test_call | `TestCallingConventionsStatic` (class) | Missing `_testcapi` | Subclass of `TestCallingConventions` testing static methods on `_testcapi.MethStatic`. |
-| test_call | `FastCallTests` (class) | Missing `_testcapi` | Class body creates `_testcapi.MethInstance()` at definition time; all methods call `_testcapi.pyobject_fastcall` etc. |
+| test_call | `FastCallTests` (class) | Missing `_testcapi` | All test methods call `_testcapi.pyobject_fastcall`, `pyobject_vectorcall`, etc. Class body also guarded with `if _testcapi is not None:` to prevent `AttributeError` at definition time. |
 | test_call | `TestPEP590` (class) | Missing `_testcapi` | All tests use `_testcapi.MethodDescriptorBase`, `MethodDescriptorDerived`, etc. |
-| test_call | `TestRecursion` (class) | Missing `_testcapi` | `test_super_deep` calls `_testcapi.pyobject_fastcall` inside nested closures. |
+| test_call | `TestRecursion` (class) | Missing `_testcapi` | `test_super_deep` defines closures `c_recurse`/`c_py_recurse` that call `_testcapi.pyobject_fastcall`; the class has no other tests. |
 
 ## Clean-Pass Modules
 
