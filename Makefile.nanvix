@@ -374,12 +374,12 @@ else
 endif
 ifneq ($(NANVIX_RELEASE),yes)
 	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, batched)..."
-	@# Clean up any leftover /tmp/test_python_* and /tmp/tmp* directories from prior
-	@# runs; the Nanvix VM shares the host /tmp and each run leaves garbled-name or
-	@# regular temp dirs that cause tempfile.mkdtemp() to fail in later batches
+	@# Clean up any leftover /tmp/test_python_* directories from prior
+	@# runs; the Nanvix VM shares the host /tmp and each run leaves garbled-name
+	@# temp dirs that cause tempfile.mkdtemp() to fail in later batches
 	@# with EEXIST "No usable temporary directory name found" (the fixed random
 	@# seed means the same candidate names are always tried first).
-	@rm -rf /tmp/test_python_* /tmp/tmp* 2>/dev/null || true
+	@rm -rf /tmp/test_python_* 2>/dev/null || true
 ifeq ($(PROCESS_MODE),standalone)
 	@echo "  SKIP: regrtest skipped for standalone mode (ramfs memory limit)"
 else
@@ -398,10 +398,12 @@ else
 				batch_count=$$(echo $$batch | wc -w); \
 				echo "  Batch $$batch_num ($$batch_count modules): $$batch"; \
 				: > /tmp/cpython_regrtest_batch.log; \
+				set +e; \
 				timeout 300 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
 				  $$batch \
 				  < /dev/null > /tmp/cpython_regrtest_batch.log 2>&1; \
 				batch_status=$$?; \
+				set -e; \
 				if [ $$batch_status -ne 0 ]; then \
 					echo "  FAIL: batch $$batch_num exited with status $$batch_status"; \
 					cat /tmp/cpython_regrtest_batch.log; \

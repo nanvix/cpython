@@ -199,6 +199,11 @@ After a successful build, you will have:
 make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 ```
 
+> **Note:** The `.nanvix/_test_staging/sysroot` directory is ephemeral — it is
+> created by `make test` and removed automatically at the end of a successful
+> run. To use the interactive or individual-module commands below, run
+> `make test` first (or interrupt it after the staging step completes).
+
 ### Running Interactively
 
 To run Python interactively on Nanvix:

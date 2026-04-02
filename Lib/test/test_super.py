@@ -4,6 +4,7 @@ import textwrap
 import unittest
 from unittest.mock import patch
 from test.support import import_helper
+from test import support
 
 
 ADAPTIVE_WARMUP_DELAY = 2
@@ -46,7 +47,7 @@ class G(A):
     pass
 
 
-@unittest.skip("Nanvix: VM crash when running multiple tests due to nonlocal __class__ cell corruption")
+@unittest.skipIf(support.is_nanvix, "Nanvix: VM crash when running multiple tests due to nonlocal __class__ cell corruption")
 class TestSuper(unittest.TestCase):
 
     def tearDown(self):

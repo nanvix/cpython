@@ -1,7 +1,6 @@
 # Nanvix Test Skip List
 
-Tests skipped with `@unittest.skipIf(support.is_nanvix, ...)` decorators due to
-genuine Nanvix platform limitations. See
+Tests that are skipped on Nanvix due to genuine platform limitations. See
 [#321](https://github.com/nanvix/cpython/issues/321) for the tracking issue.
 
 ## Platform Limitations
