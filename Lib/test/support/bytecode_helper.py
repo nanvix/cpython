@@ -3,17 +3,14 @@
 import unittest
 import dis
 import io
-
 try:
     from _testinternalcapi import compiler_codegen, optimize_cfg, assemble_code_object
-
     _HAS_INTERNAL_CAPI = True
 except ImportError:
     compiler_codegen = optimize_cfg = assemble_code_object = None
     _HAS_INTERNAL_CAPI = False
 
 _UNSPECIFIED = object()
-
 
 class BytecodeTestCase(unittest.TestCase):
     """Custom assertion methods for inspecting bytecode."""
@@ -32,9 +29,9 @@ class BytecodeTestCase(unittest.TestCase):
                     return instr
         disassembly = self.get_disassembly_as_string(x)
         if argval is _UNSPECIFIED:
-            msg = "%s not found in bytecode:\n%s" % (opname, disassembly)
+            msg = '%s not found in bytecode:\n%s' % (opname, disassembly)
         else:
-            msg = "(%s,%r) not found in bytecode:\n%s"
+            msg = '(%s,%r) not found in bytecode:\n%s'
             msg = msg % (opname, argval, disassembly)
         self.fail(msg)
 
@@ -45,15 +42,15 @@ class BytecodeTestCase(unittest.TestCase):
             if instr.opname == opname:
                 disassembly = self.get_disassembly_as_string(x)
                 if argval is _UNSPECIFIED:
-                    msg = "%s occurs in bytecode:\n%s" % (opname, disassembly)
+                    msg = '%s occurs in bytecode:\n%s' % (opname, disassembly)
                     self.fail(msg)
                 elif instr.argval == argval:
-                    msg = "(%s,%r) occurs in bytecode:\n%s"
+                    msg = '(%s,%r) occurs in bytecode:\n%s'
                     msg = msg % (opname, argval, disassembly)
                     self.fail(msg)
 
-
 class CompilationStepTestCase(unittest.TestCase):
+
     HAS_ARG = set(dis.hasarg)
     HAS_TARGET = set(dis.hasjrel + dis.hasjabs + dis.hasexc)
     HAS_ARG_OR_TARGET = HAS_ARG.union(HAS_TARGET)
@@ -82,7 +79,7 @@ class CompilationStepTestCase(unittest.TestCase):
             self.assertIsInstance(act, tuple)
             # crop comparison to the provided expected values
             if len(act) > len(exp):
-                act = act[: len(exp)]
+                act = act[:len(exp)]
             self.assertEqual(exp, act)
 
     def resolveAndRemoveLabels(self, insts):
@@ -99,8 +96,8 @@ class CompilationStepTestCase(unittest.TestCase):
         return res
 
     def normalize_insts(self, insts):
-        """Map labels to instruction index.
-        Map opcodes to opnames.
+        """ Map labels to instruction index.
+            Map opcodes to opnames.
         """
         insts = self.resolveAndRemoveLabels(insts)
         res = []
@@ -130,20 +127,22 @@ class CompilationStepTestCase(unittest.TestCase):
 
 
 class CodegenTestCase(CompilationStepTestCase):
+
     def generate_code(self, ast):
         insts, _ = compiler_codegen(ast, "my_file.py", 0)
         return insts
 
 
 class CfgOptimizationTestCase(CompilationStepTestCase):
+
     def get_optimized(self, insts, consts, nlocals=0):
         insts = self.normalize_insts(insts)
         insts = self.complete_insts_info(insts)
         insts = optimize_cfg(insts, consts, nlocals)
         return insts, consts
 
-
 class AssemblerTestCase(CompilationStepTestCase):
+
     def get_code_object(self, filename, insts, metadata):
         co = assemble_code_object(filename, insts, metadata)
         return co
