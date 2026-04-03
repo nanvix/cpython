@@ -214,6 +214,27 @@ The test target verifies:
 - Arithmetic operations work
 - Core module imports work (e.g., `sys`)
 
+#### Enabled test modules
+
+| Module | Status | Notes |
+|--------|--------|-------|
+| `test_float` | ✅ pass | |
+| `test_complex` | ✅ pass | |
+| `test_bool` | ✅ pass | |
+| `test_struct` | ✅ pass | |
+| `test_thread` | ✅ pass | `test_forkinthread` auto-skipped (no fork on Nanvix) |
+| `test_threading` | ✅ pass | Fork/subprocess/assert_python tests auto-skipped |
+| `test_threading_local` | ✅ pass | |
+| `test_threadedtempfile` | ✅ pass | |
+| `test_queue` | ✅ pass | |
+| `test_context` | ✅ pass | Uses `ThreadPoolExecutor`; pthreads available |
+| `test_coroutines` | ✅ pass | Subprocess-dependent tests auto-skipped |
+| `test_asyncgen` | ⏭ skip | Entire module skipped: `requires_working_socket` (no sockets on Nanvix) |
+| `test_threadsignals` | ⏭ skip | Entire module skipped: SIGUSR1/SIGUSR2/SIGALRM delivery to threads unreliable on Nanvix |
+
+See [NANVIX_SKIP_LIST.md](NANVIX_SKIP_LIST.md) for a complete list of individual
+tests skipped within each module and the rationale for each skip.
+
 ---
 
 ## Changes Summary
@@ -252,6 +273,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
+| `NANVIX_SKIP_LIST.md` | Catalogue of skipped tests and rationale |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -268,9 +290,12 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules** | Test suite modules not built |
+| **No test modules in release** | `--disable-test-modules` used for release builds only; test builds include `_testcapi` etc. |
 | **Static linking only** | All executables are statically linked |
 | **Limited I/O** | Some file and network operations may be limited |
+| **No fork/exec** | `os.fork()` and subprocess not available; related tests auto-skip |
+| **No sockets** | Networking disabled; socket-dependent tests auto-skip |
+| **No SIGUSR1/SIGUSR2/SIGALRM to threads** | Signal delivery to non-main threads unreliable; `test_threadsignals` skipped |
 
 ---
 
