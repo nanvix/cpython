@@ -37,6 +37,7 @@ This document describes the port of [CPython](https://www.python.org/) interpret
 2. [Prerequisites](#prerequisites)
 3. [Building](#building)
 4. [Testing](#testing)
+   - [Test Suite Status](#test-suite-status)
 5. [Changes Summary](#changes-summary)
 6. [Known Limitations](#known-limitations)
 7. [CI/CD](#cicd)
@@ -198,46 +199,78 @@ After a successful build, you will have:
 make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 ```
 
-### Running Individual Tests
+> **Note:** The `.nanvix/_test_staging/sysroot` directory is ephemeral — it is
+> created by `make test` and removed automatically at the end of a successful
+> run. To use the interactive or individual-module commands below, run
+> `make test` first (or interrupt it after the staging step completes).
 
-To run Python interactively:
+### Running Interactively
 
-```bash
-cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path/to/python.elf
-```
-
-### Test Coverage
-
-The `test` target verifies:
-- Python interpreter starts correctly
-- Basic print functionality works
-- Arithmetic operations work
-- Core module imports work (e.g., `sys`)
-
-In addition, the `test-external-libs` target runs the external-library
-regression suite (tracked in issue [#329](https://github.com/nanvix/cpython/issues/329)):
-
-| Module | Library | Notes |
-|--------|---------|-------|
-| `test_zlib` | zlib 1.3.1 | Compression/decompression |
-| `test_gzip` | zlib 1.3.1 | gzip file format; `TestCommandLine` auto-skipped (no subprocess) |
-| `test_bz2` | bzip2 1.0.8 | bzip2 compression |
-| `test_hashlib` | OpenSSL 3.5.0 | Hash algorithms; `LargeFileTests` auto-skipped (32-bit) |
-| `test_hmac` | OpenSSL 3.5.0 | HMAC authentication codes |
-| `test_sqlite3` | SQLite 3.49.0 | All 10 sub-modules; `MultiprocessTests` auto-skipped (no subprocess) |
-| `test_ssl` | OpenSSL 3.5.0 | Context/cert/BIO/SSLObject tests; socket-based tests skipped (no socket support) |
-
-`test_lzma` is **not** included: liblzma is absent from the Nanvix sysroot.
-
-For a full list of skipped tests and the reasons, see
-[`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md).
-
-To run the external-library tests:
+To run Python interactively on Nanvix:
 
 ```bash
-# Using Make directly
-make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test-external-libs
+cd .nanvix/_test_staging/sysroot && \
+  echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- ./bin/python3.12
 ```
+
+### Running Individual Modules
+
+To run a single test module inside the Nanvix VM:
+
+```bash
+cd .nanvix/_test_staging/sysroot && \
+  ./bin/nanvixd.elf -- ./bin/python3.12 -m test --verbose test_int
+```
+
+### Test Suite Status
+
+The `./z test` target runs **64 CPython stdlib test modules** on Nanvix
+(i686, microvm, multi-process, 128 MB RAM). Tests are split into batches of 4
+modules per VM invocation to stay within the 128 MB memory limit.
+
+| Metric | Value |
+|--------|-------|
+| **Modules enabled** | 64 |
+| **Total tests run** | 3,699 |
+| **Tests passed** | 3,351 (90.6%) |
+| **Tests skipped** | 348 (9.4%) |
+| **Tests failed** | 0 |
+| **Batches** | 16 |
+| **Skip decorators added** | 73 |
+
+#### Enabled Modules
+
+| Group | Modules |
+|-------|---------|
+| Built-in Types | test_int, test_range, test_slice, test_memoryview, test_bytes, test_tuple |
+| Operators & Expressions | test_builtin, test_operator, test_binop, test_unary, test_compare, test_richcmp, test_augassign, test_contains |
+| Grammar, Syntax & Compiler | test_grammar, test_syntax, test_compile, test_compiler_assemble, test_compiler_codegen, test_ast, test_symtable, test_opcache, test_peepholer, test_dis, test_code, test_keyword, test_tokenize, test_perf_profiler |
+| Function Calls & Control Flow | test_call, test_extcall, test_positional_only_arg, test_scope, test_global, test_dynamic, test_with |
+| Data Types & Type System | test_types, test_typechecks, test_isinstance, test_hash, test_index, test_super, test_property |
+| Math & Numerics | test_math, test_cmath, test_decimal, test_fractions, test_statistics, test_random, test_numeric_tower |
+| Exceptions & Tracebacks | test_exception_group, test_exceptions, test_raise, test_traceback |
+| Stdlib & Containers | test_frame, test_contextlib, test_contextlib_async, test_pprint, test_reprlib, test_list, test_dict |
+
+#### Excluded Modules
+
+| Module | Reason |
+|--------|--------|
+| test_exception_hierarchy | Crashes at import — `errno.ESHUTDOWN` missing on Nanvix |
+| test_inspect | VM hangs — asyncio event loop setup before skip; module too large for 128 MB |
+
+#### Skip Categories
+
+| Category | Count | % of Skips |
+|----------|-------|------------|
+| Pickle corruption (32-bit) | 33 | 45% |
+| Missing `_testcapi`/`_testinternalcapi` | 18 | 25% |
+| No subprocess/fork | 6 | 8% |
+| VM crash / deep recursion | 4 | 5% |
+| Traceback formatting | 3 | 4% |
+| Other (rounding, float precision, filesystem, 32-bit args) | 9 | 12% |
+
+See [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md) for the full per-test skip
+inventory with failure descriptions.
 
 ---
 
@@ -277,6 +310,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
+| `NANVIX_SKIP_LIST.md` | Per-test inventory of `@skipIf(is_nanvix)` decorators |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -293,12 +327,13 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **Test modules disabled in release builds** | Test C extension modules not built when `NANVIX_RELEASE=yes` |
-| **No socket support** | TCP/UDP socket operations unavailable; socket-based tests skipped |
-| **No subprocess/fork** | `subprocess` and `fork()` unavailable; related tests auto-skipped |
-| **No liblzma** | `lzma` module unavailable; `test_lzma` excluded from test suite |
 | **Static linking only** | All executables are statically linked |
-| **Limited I/O** | Some file and network operations may be limited |
+| **No sockets** | `socketpair()` unavailable; asyncio event loop cannot start |
+| **No subprocess/fork** | `os.fork()`, `subprocess.Popen()` not supported |
+| **Pickle corruption** | `pickle` produces corrupt data on 32-bit Nanvix; likely C accelerator issue |
+| **Missing C test extensions** | `_testcapi` and `_testinternalcapi` not built |
+| **128 MB memory limit** | Tests batched (4 modules/VM); some large modules excluded |
+| **Round-half-up** | C library uses round-half-up instead of IEEE 754 round-half-to-even |
 
 ---
 

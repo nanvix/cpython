@@ -1,6 +1,7 @@
 import sys
 from test import list_tests
 from test.support import cpython_only
+from test import support
 import pickle
 import unittest
 
@@ -119,6 +120,7 @@ class ListTest(list_tests.CommonTest):
         check(10)       # check our checking code
         check(1000000)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_iterator_pickle(self):
         orig = self.type2test([4, 5, 6, 7])
         data = [10, 11, 12, 13, 14, 15]
@@ -155,6 +157,7 @@ class ListTest(list_tests.CommonTest):
             a[:] = data
             self.assertEqual(list(it), [])
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_reversed_pickle(self):
         orig = self.type2test([4, 5, 6, 7])
         data = [10, 11, 12, 13, 14, 15]
@@ -269,6 +272,10 @@ class ListTest(list_tests.CommonTest):
         lst = [X(), X()]
         X() in lst
 
+
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    def test_pickle(self):
+        super().test_pickle()
 
 if __name__ == "__main__":
     unittest.main()
