@@ -226,7 +226,7 @@ modules per VM invocation to stay within the 128 MB memory limit.
 | Metric | Value |
 |--------|-------|
 | **Modules enabled** | 33 |
-| **Skip decorators added** | 35 |
+| **Skip decorators added** | 32 |
 
 #### Enabled Modules
 
@@ -248,10 +248,11 @@ modules per VM invocation to stay within the 128 MB memory limit.
 
 | Category | Count |
 |----------|-------|
-| Pickle corruption (32-bit) | 29 |
+| Pickle corruption (32-bit) — individual decorators | 26 |
+| Pickle corruption (32-bit) — `pickle_deprecated` wrapper (covers 27 methods) | 1 |
+| Pickle corruption (32-bit) — `check_pickle` helper no-op | 1 |
 | Missing `_testcapi` | 3 |
-| No asyncio event loop | 1 (class) |
-| `check_pickle` helper no-op | 1 (helper) |
+| No asyncio event loop | 1 (class-level) |
 
 See [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md) for the full per-test skip
 inventory with failure descriptions.

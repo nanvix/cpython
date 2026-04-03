@@ -55,7 +55,7 @@ These tests skip automatically via existing guards:
 | test_array | `BaseTest.test_pickle` | Pickle corruption | `pickle.dumps(array.array(...))` → corrupt bytes. Affects all typed test subclasses. |
 | test_array | `BaseTest.test_pickle_for_empty_array` | Pickle corruption | `pickle.dumps(array.array(typecode))` → corrupt bytes. |
 | test_array | `BaseTest.test_iterator_pickle` | Pickle corruption | `pickle.dumps(iter(array))` → corrupt bytes. |
-| test_array | `BaseTest.test_reverse_iterator_picking` | Pickle corruption | `pickle.dumps(reversed(iter(array)))` → corrupt bytes. |
+| test_array | `BaseTest.test_reverse_iterator_pickling` | Pickle corruption | `pickle.dumps(reversed(iter(array)))` → corrupt bytes. |
 | test_weakref | `ReferencesTestCase.test_cfunction` | Missing `_testcapi` | Directly imports `_testcapi` → `ImportError` on Nanvix (raises error rather than SkipTest). |
 | test_iter | `TestCase.test_mutating_seq_class_iter_pickle` | Pickle corruption | Direct `pickle.dumps/loads` of iterator+sequence pairs. |
 | test_iter | `check_pickle` helper | Pickle corruption | Made no-op on Nanvix; all `check_iterator`/`check_for_loop` callers that pass `pickle=True` (the default) thereby skip the pickle sub-check while still exercising iterator behaviour. |
