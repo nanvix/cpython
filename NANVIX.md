@@ -198,6 +198,29 @@ After a successful build, you will have:
 make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 ```
 
+### Running External Library Tests
+
+A separate target runs test modules that exercise sysroot-linked C extension
+modules (zlib, bzip2, OpenSSL, SQLite).  `test_ssl` is invoked as a second
+pass with `-u network` to enable loopback TLS tests:
+
+```bash
+# Using nanvix-zutil (pass target name after --)
+./z test -- test-external-libs
+
+# Or directly via Make
+make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix \
+     PLATFORM=microvm PROCESS_MODE=multi-process MEMORY_SIZE=128mb \
+     NANVIX_RELEASE=no test-external-libs
+```
+
+The set of modules is controlled by the `NANVIX_TEST_LIST_EXTERNAL` variable
+(default: `test_zlib test_gzip test_bz2 test_hashlib test_hmac test_sqlite3`).
+Known per-test skips are documented in [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md).
+
+> **Note:** The `test-external-libs` target is skipped automatically in
+> `standalone` process mode (ramfs memory limit) and when `NANVIX_RELEASE=yes`.
+
 ### Running Individual Tests
 
 To run Python interactively:
@@ -208,11 +231,23 @@ cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path
 
 ### Test Coverage
 
-The test target verifies:
+The `test` target verifies:
 - Python interpreter starts correctly
 - Basic print functionality works
 - Arithmetic operations work
 - Core module imports work (e.g., `sys`)
+- Pure-Python stdlib modules: `test_float`, `test_complex`, `test_bool`, `test_struct`
+
+The `test-external-libs` target additionally verifies:
+- Compression: `test_zlib`, `test_gzip`, `test_bz2`
+- Hashing / HMAC: `test_hashlib`, `test_hmac`
+- Database: `test_sqlite3` (10 sub-modules)
+- TLS / SSL: `test_ssl` (loopback, with `-u network`)
+
+Tests that cannot pass due to Nanvix platform constraints (no `fork`, no
+subprocess, no sockets) are automatically skipped via existing `@requires_*`
+decorators in `Lib/test/support/__init__.py`.  Additional per-test skips are
+documented in [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md).
 
 ---
 
@@ -234,6 +269,7 @@ The following changes were made to support Nanvix.
 | Linker flags | Added Nanvix-specific flags (`-T user.ld -static`) |
 | Shared libraries | Disabled (not supported on Nanvix) |
 | Test target | Modified to run via `nanvixd.elf` |
+| External lib test target | `test-external-libs` runs zlib/bzip2/hashlib/sqlite3/ssl tests (issue #329) |
 | Package targets | `package` and `verify-package` for release tarball creation |
 
 ### Configuration Options
@@ -252,6 +288,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
+| `NANVIX_SKIP_LIST.md` | Known/anticipated test skips with rationale (issue #329) |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -268,9 +305,10 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules** | Test suite modules not built |
+| **No test modules in release** | Test suite modules disabled with `NANVIX_RELEASE=yes`; enabled in dev builds |
 | **Static linking only** | All executables are statically linked |
 | **Limited I/O** | Some file and network operations may be limited |
+| **No liblzma** | `test_lzma` / `lzma` module not available (library not in sysroot) |
 
 ---
 

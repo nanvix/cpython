@@ -45,6 +45,16 @@ NANVIX_RELEASE ?= no
 #             test_io
 NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
 
+# Space-separated list of test modules that exercise sysroot-linked C extension
+# modules (zlib, bzip2, OpenSSL, SQLite).  Kept separate from NANVIX_TEST_LIST
+# so that the heavier external-library suite can be run independently via the
+# 'test-external-libs' target.  test_ssl is NOT included here — it is invoked
+# separately with '-u network' inside that target.
+#
+# Validated against: zlib 1.3.1, bzip2 1.0.8, OpenSSL 3.5.0, SQLite 3.49.0.
+# Known skips are tracked in NANVIX_SKIP_LIST.md (see issue #329).
+NANVIX_TEST_LIST_EXTERNAL ?= test_zlib test_gzip test_bz2 test_hashlib test_hmac test_sqlite3
+
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
   NANVIX_TOOLCHAIN ?= /opt/nanvix
@@ -367,6 +377,67 @@ endif
 	@rm -rf $(TEST_STAGING) /tmp/cpython_test.log /tmp/cpython_regrtest.log
 	@echo "		*** CPython tests PASSED ***"
 
+# test-external-libs: run CPython test modules that exercise sysroot-linked C
+# extension modules (zlib, bzip2, OpenSSL, SQLite).  test_ssl is run as a
+# second, separate invocation with '-u network' so that loopback SSL tests are
+# enabled while keeping the main batch hermetic.
+#
+# Skipped in standalone mode (ramfs memory limit) and when NANVIX_RELEASE=yes.
+# Known per-module skips are documented in NANVIX_SKIP_LIST.md (issue #329).
+test-external-libs: build
+	@echo "Running CPython external library tests on Nanvix..."
+	@rm -rf $(TEST_STAGING)
+	@# Install python and stdlib into a test staging area
+ifdef CONFIG_NANVIX_DOCKER
+	$(DOCKER_RUN) make install DESTDIR="$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging"
+else
+	make install DESTDIR="$(TEST_STAGING)"
+endif
+	@# Copy Nanvix binaries into the staging sysroot
+	@mkdir -p $(TEST_STAGING)/sysroot/bin
+	@cp "$(abspath $(NANVIX_HOME))/bin/nanvixd.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/kernel.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/linuxd.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/uservm.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+ifeq ($(PROCESS_MODE),standalone)
+	@echo "Test: external library tests skipped for standalone mode (ramfs memory limit)"
+else
+ifneq ($(NANVIX_RELEASE),yes)
+	@echo "Test: external library tests ($(words $(NANVIX_TEST_LIST_EXTERNAL)) modules)..."
+	@# Wall-clock budget: 6 modules × 120 s per-module timeout + startup overhead
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_exttest.log; \
+			timeout 900 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
+			  --timeout=120 $(NANVIX_TEST_LIST_EXTERNAL) \
+			  < /dev/null > /tmp/cpython_exttest.log 2>&1; \
+			exttest_status=$$?; \
+			if [ $$exttest_status -ne 0 ]; then \
+				echo "  FAIL: external library tests exited with status $$exttest_status"; cat /tmp/cpython_exttest.log; exit 1; \
+			fi; \
+			echo "  PASS: external library tests completed"; \
+		}
+	@echo "Test: SSL tests (network resources enabled)..."
+	@# Single module; shorter budget than the main batch
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_ssltest.log; \
+			timeout 300 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
+			  -u network --timeout=120 test_ssl \
+			  < /dev/null > /tmp/cpython_ssltest.log 2>&1; \
+			ssltest_status=$$?; \
+			if [ $$ssltest_status -ne 0 ]; then \
+				echo "  FAIL: SSL tests exited with status $$ssltest_status"; cat /tmp/cpython_ssltest.log; exit 1; \
+			fi; \
+			echo "  PASS: SSL tests completed"; \
+		}
+else
+	@echo "Test: external library tests skipped (NANVIX_RELEASE=yes)"
+endif
+endif
+	@rm -rf $(TEST_STAGING) /tmp/cpython_exttest.log /tmp/cpython_ssltest.log
+	@echo "		*** CPython external library tests PASSED ***"
+
 # Clean target
 clean:
 	-make clean 2>/dev/null || true
@@ -520,4 +591,4 @@ verify-package:
 		{ echo "Error: sysroot tarball missing python3.12 binary"; exit 1; }
 	@echo "		*** Package verification PASSED ***"
 
-.PHONY: all configure build clean distclean test install package verify-package
+.PHONY: all configure build clean distclean test test-external-libs install package verify-package
