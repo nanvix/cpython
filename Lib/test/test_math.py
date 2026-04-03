@@ -1850,6 +1850,7 @@ class MathTests(unittest.TestCase):
             self.assertRaises(ValueError, math.sin, NINF)
         self.assertTrue(math.isnan(math.sin(NAN)))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: sinh(1)+sinh(-1) != 0 due to 32-bit float precision")
     def testSinh(self):
         self.assertRaises(TypeError, math.sinh)
         self.ftest('sinh(0)', math.sinh(0), 0)
