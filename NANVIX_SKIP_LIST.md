@@ -16,7 +16,6 @@ Nanvix is an educational operating system with the following relevant constraint
 | No extended attributes | Tests using `os.getxattr()`, `os.setxattr()` |
 | No dynamic linking | Tests using `RTLD_*` constants |
 | No `/dev/null` | Tests relying on `/dev/null` |
-| No dynamic linking | Tests using `RTLD_*` constants |
 | umask is a stub | Tests relying on `os.umask()` mode enforcement |
 | In-memory FS (no write-bit enforcement) | Tests using chmod to restrict directory access |
 | No tty/pipe fstat | Tests using `fstat()` on pipe/tty file descriptors |
