@@ -208,11 +208,36 @@ cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path
 
 ### Test Coverage
 
-The test target verifies:
+The `test` target verifies:
 - Python interpreter starts correctly
 - Basic print functionality works
 - Arithmetic operations work
 - Core module imports work (e.g., `sys`)
+
+In addition, the `test-external-libs` target runs the external-library
+regression suite (tracked in issue [#329](https://github.com/nanvix/cpython/issues/329)):
+
+| Module | Library | Notes |
+|--------|---------|-------|
+| `test_zlib` | zlib 1.3.1 | Compression/decompression |
+| `test_gzip` | zlib 1.3.1 | gzip file format; `TestCommandLine` auto-skipped (no subprocess) |
+| `test_bz2` | bzip2 1.0.8 | bzip2 compression |
+| `test_hashlib` | OpenSSL 3.5.0 | Hash algorithms; `LargeFileTests` auto-skipped (32-bit) |
+| `test_hmac` | OpenSSL 3.5.0 | HMAC authentication codes |
+| `test_sqlite3` | SQLite 3.49.0 | All 10 sub-modules; `MultiprocessTests` auto-skipped (no subprocess) |
+| `test_ssl` | OpenSSL 3.5.0 | Context/cert/BIO/SSLObject tests; socket-based tests skipped (no socket support) |
+
+`test_lzma` is **not** included: liblzma is absent from the Nanvix sysroot.
+
+For a full list of skipped tests and the reasons, see
+[`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md).
+
+To run the external-library tests:
+
+```bash
+# Using Make directly
+make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test-external-libs
+```
 
 ---
 
@@ -268,7 +293,10 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules** | Test suite modules not built |
+| **Test modules disabled in release builds** | Test C extension modules not built when `NANVIX_RELEASE=yes` |
+| **No socket support** | TCP/UDP socket operations unavailable; socket-based tests skipped |
+| **No subprocess/fork** | `subprocess` and `fork()` unavailable; related tests auto-skipped |
+| **No liblzma** | `lzma` module unavailable; `test_lzma` excluded from test suite |
 | **Static linking only** | All executables are statically linked |
 | **Limited I/O** | Some file and network operations may be limited |
 

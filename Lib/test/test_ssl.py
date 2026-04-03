@@ -321,6 +321,7 @@ def testing_context(server_cert=SIGNED_CERTFILE, *, server_chain=True):
     return client_context, server_context, hostname
 
 
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class BasicSocketTests(unittest.TestCase):
 
     def test_constants(self):
@@ -1604,6 +1605,7 @@ class ContextTests(unittest.TestCase):
         self.assertFalse(ctx.check_hostname)
         self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
 
+    @unittest.skipUnless(support.has_socket_support, "requires socket support")
     def test_context_custom_class(self):
         class MySSLSocket(ssl.SSLSocket):
             pass
@@ -1662,6 +1664,7 @@ class SSLErrorTests(unittest.TestCase):
         s = str(cm.exception)
         self.assertTrue("NO_START_LINE" in s, s)
 
+    @unittest.skipUnless(support.has_socket_support, "requires socket support")
     def test_subclass(self):
         # Check that the appropriate SSLError subclass is raised
         # (this only tests one of them)
@@ -1808,6 +1811,7 @@ class SSLObjectTests(unittest.TestCase):
         c_in.write(s_out.read())
         client.unwrap()
 
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class SimpleBackgroundTests(unittest.TestCase):
     """Tests that connect to a simple server running in the background"""
 
@@ -2189,6 +2193,7 @@ class SimpleBackgroundTests(unittest.TestCase):
 
 
 @support.requires_resource('network')
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class NetworkedTests(unittest.TestCase):
 
     def test_timeout_connect_ex(self):
@@ -2766,6 +2771,7 @@ def try_protocol_combo(server_protocol, client_protocol, expect_success,
                                  % (expect_success, stats['version']))
 
 
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class ThreadedTests(unittest.TestCase):
 
     @support.requires_resource('walltime')
@@ -4314,6 +4320,7 @@ class ThreadedTests(unittest.TestCase):
 
 
 @unittest.skipUnless(has_tls_version('TLSv1_3'), "Test needs TLS 1.3")
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class TestPostHandshakeAuth(unittest.TestCase):
     def test_pha_setter(self):
         protocols = [
@@ -4593,6 +4600,7 @@ HAS_KEYLOG = hasattr(ssl.SSLContext, 'keylog_filename')
 requires_keylog = unittest.skipUnless(
     HAS_KEYLOG, 'test requires OpenSSL 1.1.1 with keylog callback')
 
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class TestSSLDebug(unittest.TestCase):
 
     def keylog_lines(self, fname=os_helper.TESTFN):
@@ -4748,6 +4756,7 @@ def set_socket_so_linger_on_with_zero_timeout(sock):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
 
 
+@unittest.skipUnless(support.has_socket_support, "requires socket support")
 class TestPreHandshakeClose(unittest.TestCase):
     """Verify behavior of close sockets with received data before to the handshake.
     """

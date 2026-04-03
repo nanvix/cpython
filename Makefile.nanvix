@@ -45,6 +45,12 @@ NANVIX_RELEASE ?= no
 #             test_io
 NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
 
+# Space-separated list of external-library test modules run via 'test-external-libs'.
+# Covers compression (zlib/gzip/bz2), hashing (hashlib/hmac), and database (sqlite3).
+# test_ssl is invoked separately with -u network in the test-external-libs target.
+# liblzma is not present in the Nanvix sysroot; test_lzma is therefore excluded.
+NANVIX_TEST_LIST_EXTERNAL ?= test_zlib test_gzip test_bz2 test_hashlib test_hmac test_sqlite3
+
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
   NANVIX_TOOLCHAIN ?= /opt/nanvix
@@ -367,6 +373,59 @@ endif
 	@rm -rf $(TEST_STAGING) /tmp/cpython_test.log /tmp/cpython_regrtest.log
 	@echo "		*** CPython tests PASSED ***"
 
+# test-external-libs target: run external-library test modules (compression,
+# hashing, database, SSL) in an independent staging area.
+# SSL tests are run in a separate invocation with -u network so that loopback
+# tests that gate on the 'network' resource can execute.
+# Standalone mode is skipped (ramfs memory limit).
+test-external-libs: build
+	@echo "Running CPython external-library tests on Nanvix..."
+	@rm -rf $(TEST_STAGING)
+	@# Install python and stdlib into a test staging area
+ifdef CONFIG_NANVIX_DOCKER
+	$(DOCKER_RUN) make install DESTDIR="$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging"
+else
+	make install DESTDIR="$(TEST_STAGING)"
+endif
+	@# Copy Nanvix binaries into the staging sysroot
+	@mkdir -p $(TEST_STAGING)/sysroot/bin
+	@cp "$(abspath $(NANVIX_HOME))/bin/nanvixd.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/kernel.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/linuxd.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+	@cp "$(abspath $(NANVIX_HOME))/bin/uservm.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
+ifeq ($(PROCESS_MODE),standalone)
+	@echo "Test: external-libs regrtest skipped for standalone mode (ramfs memory limit)"
+else
+	@echo "Test: external-libs regrtest ($(words $(NANVIX_TEST_LIST_EXTERNAL)) modules + test_ssl)..."
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_extlibs.log; \
+			timeout 600 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
+			  --timeout=120 $(NANVIX_TEST_LIST_EXTERNAL) \
+			  < /dev/null > /tmp/cpython_extlibs.log 2>&1; \
+			extlibs_status=$$?; \
+			if [ $$extlibs_status -ne 0 ]; then \
+				echo "  FAIL: external-libs regrtest exited with status $$extlibs_status"; cat /tmp/cpython_extlibs.log; exit 1; \
+			fi; \
+			echo "  PASS: external-libs regrtest completed"; \
+		}
+	@echo "Test: test_ssl (with -u network)..."
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_ssl.log; \
+			timeout 300 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
+			  --timeout=120 -u network test_ssl \
+			  < /dev/null > /tmp/cpython_ssl.log 2>&1; \
+			ssl_status=$$?; \
+			if [ $$ssl_status -ne 0 ]; then \
+				echo "  FAIL: test_ssl exited with status $$ssl_status"; cat /tmp/cpython_ssl.log; exit 1; \
+			fi; \
+			echo "  PASS: test_ssl completed"; \
+		}
+endif
+	@rm -rf $(TEST_STAGING) /tmp/cpython_extlibs.log /tmp/cpython_ssl.log
+	@echo "		*** CPython external-library tests PASSED ***"
+
 # Clean target
 clean:
 	-make clean 2>/dev/null || true
@@ -520,4 +579,4 @@ verify-package:
 		{ echo "Error: sysroot tarball missing python3.12 binary"; exit 1; }
 	@echo "		*** Package verification PASSED ***"
 
-.PHONY: all configure build clean distclean test install package verify-package
+.PHONY: all configure build clean distclean test test-external-libs install package verify-package
