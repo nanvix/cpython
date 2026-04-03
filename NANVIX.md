@@ -208,11 +208,23 @@ cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path
 
 ### Test Coverage
 
-The test target verifies:
-- Python interpreter starts correctly
-- Basic print functionality works
-- Arithmetic operations work
-- Core module imports work (e.g., `sys`)
+The test target (`make test` / `./z test`) runs the following 31 CPython regression test modules via `regrtest`:
+
+| Category | Modules |
+|----------|---------|
+| **Numeric types** | `test_float`, `test_complex`, `test_bool` |
+| **Binary/struct** | `test_struct` |
+| **Strings** | `test_string`, `test_string_literals`, `test_format`, `test_fstring`, `test_textwrap` |
+| **Unicode** | `test_unicode`, `test_unicodedata`, `test_ucn` |
+| **Codecs** | `test_codecs`, `test_codeccallbacks`, `test_codecencodings_cn`, `test_codecencodings_hk`, `test_codecencodings_iso2022`, `test_codecencodings_jp`, `test_codecencodings_kr`, `test_codecencodings_tw` |
+| **Serialization** | `test_pickle`, `test_pickletools`, `test_marshal`, `test_json`, `test_csv` |
+| **Binary encoding** | `test_base64`, `test_binascii`, `test_quopri`, `test_uu` |
+| **Text/pattern** | `test_difflib`, `test_fnmatch`, `test_glob`, `test_shlex`, `test_re` |
+
+Tests that require subprocess, fork, socket, `_testcapi`, or large memory are
+automatically skipped via pre-existing `unittest.skipIf`/`skipUnless` guards.
+See [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md) for a full list of
+platform-specific skips and the reasons behind them.
 
 ---
 
