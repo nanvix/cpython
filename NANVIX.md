@@ -37,6 +37,7 @@ This document describes the port of [CPython](https://www.python.org/) interpret
 2. [Prerequisites](#prerequisites)
 3. [Building](#building)
 4. [Testing](#testing)
+   - [Test Suite Status](#test-suite-status)
 5. [Changes Summary](#changes-summary)
 6. [Known Limitations](#known-limitations)
 7. [CI/CD](#cicd)
@@ -200,19 +201,60 @@ make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 
 ### Running Individual Tests
 
-To run Python interactively:
+To run Python interactively on Nanvix:
 
 ```bash
-cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path/to/python.elf
+cd .nanvix/_test_staging/sysroot && \
+  echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- ./bin/python3.12
 ```
 
-### Test Coverage
+### Running Individual Modules
 
-The test target verifies:
-- Python interpreter starts correctly
-- Basic print functionality works
-- Arithmetic operations work
-- Core module imports work (e.g., `sys`)
+To run a single test module inside the Nanvix VM:
+
+```bash
+cd .nanvix/_test_staging/sysroot && \
+  ./bin/nanvixd.elf -- ./bin/python3.12 -m test --verbose test_set
+```
+
+### Test Suite Status
+
+The `./z test` target runs **33 CPython stdlib test modules** on Nanvix
+(i686, microvm, multi-process, 128 MB RAM). Tests are split into batches of 4
+modules per VM invocation to stay within the 128 MB memory limit.
+
+| Metric | Value |
+|--------|-------|
+| **Modules enabled** | 33 |
+| **Skip decorators added** | 35 |
+
+#### Enabled Modules
+
+| Group | Modules |
+|-------|---------|
+| Numeric | test_float, test_complex, test_bool, test_struct |
+| Sets | test_set |
+| Mappings | test_collections, test_defaultdict, test_ordered_dict |
+| Sequences | test_deque, test_array, test_weakref, test_weakset |
+| Iterators | test_iter, test_itertools, test_iterlen |
+| Generators & Coroutines | test_generators, test_generator_stop, test_yield_from, test_coroutines |
+| Comprehensions | test_listcomps, test_dictcomps, test_setcomps, test_genexps |
+| Algorithms | test_heapq, test_bisect, test_sort, test_queue |
+| Copy & Serialization | test_copy, test_copyreg |
+| Functional | test_functools, test_funcattrs, test_decorators |
+| Buffer Protocol | test_buffer |
+
+#### Skip Categories
+
+| Category | Count |
+|----------|-------|
+| Pickle corruption (32-bit) | 29 |
+| Missing `_testcapi` | 3 |
+| No asyncio event loop | 1 (class) |
+| `check_pickle` helper no-op | 1 (helper) |
+
+See [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md) for the full per-test skip
+inventory with failure descriptions.
 
 ---
 
@@ -252,6 +294,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
+| `NANVIX_SKIP_LIST.md` | Per-test inventory of `@skipIf(is_nanvix)` decorators |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -268,9 +311,12 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules** | Test suite modules not built |
 | **Static linking only** | All executables are statically linked |
-| **Limited I/O** | Some file and network operations may be limited |
+| **No sockets** | `socketpair()` unavailable; asyncio event loop cannot start |
+| **No subprocess/fork** | `os.fork()`, `subprocess.Popen()` not supported |
+| **Pickle corruption** | `pickle` produces corrupt data on 32-bit Nanvix; likely C accelerator issue |
+| **Missing C test extensions** | `_testcapi` and `_testinternalcapi` not built |
+| **128 MB memory limit** | Tests batched (4 modules/VM); some large modules excluded |
 
 ---
 

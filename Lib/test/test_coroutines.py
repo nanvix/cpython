@@ -2250,8 +2250,8 @@ class CoroutineTest(unittest.TestCase):
 
 
 @unittest.skipIf(
-    support.is_emscripten or support.is_wasi,
-    "asyncio does not work under Emscripten/WASI yet."
+    support.is_emscripten or support.is_wasi or support.is_nanvix,
+    "asyncio does not work under Emscripten/WASI/Nanvix."
 )
 class CoroAsyncIOCompatTest(unittest.TestCase):
 
@@ -2445,6 +2445,7 @@ class UnawaitedWarningDuringShutdownTest(unittest.TestCase):
 
 
 @support.cpython_only
+@unittest.skipIf(support.is_nanvix, "Nanvix: _testcapi not available")
 class CAPITest(unittest.TestCase):
 
     def test_tp_await_1(self):

@@ -2,6 +2,7 @@
 
 import sys
 import unittest
+from test import support
 from test.support import cpython_only
 from test.support.os_helper import TESTFN, unlink
 from test.support import check_free_after_iterating, ALWAYS_EQ, NEVER_EQ
@@ -128,6 +129,8 @@ class TestCase(unittest.TestCase):
 
     # Helper to check picklability
     def check_pickle(self, itorg, seq):
+        if support.is_nanvix:
+            return  # Nanvix: pickle broken on 32-bit platform
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             d = pickle.dumps(itorg, proto)
             it = pickle.loads(d)
@@ -200,6 +203,7 @@ class TestCase(unittest.TestCase):
     def test_seq_class_iter(self):
         self.check_iterator(iter(SequenceClass(10)), list(range(10)))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_mutating_seq_class_iter_pickle(self):
         orig = SequenceClass(5)
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):

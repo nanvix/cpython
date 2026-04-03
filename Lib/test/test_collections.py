@@ -86,6 +86,7 @@ class TestUserObjects(unittest.TestCase):
 
 class TestChainMap(unittest.TestCase):
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_basics(self):
         c = ChainMap()
         c['a'] = 1
@@ -566,6 +567,7 @@ class TestNamedTuple(unittest.TestCase):
         self.assertEqual(b2, tuple(b2_expected))
         self.assertEqual(b._fields, tuple(names))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle(self):
         p = TestNT(x=10, y=20, z=30)
         for module in (pickle,):
@@ -677,6 +679,7 @@ class TestNamedTuple(unittest.TestCase):
         self.assertEqual(a.__dict__, {'w': 5})
 
     @support.cpython_only
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_field_descriptor(self):
         Point = namedtuple('Point', 'x y')
         p = Point(11, 22)
@@ -2204,6 +2207,7 @@ class TestCounter(unittest.TestCase):
         self.assertRaises(TypeError, Counter().update, {}, {})
         self.assertRaises(TypeError, Counter.update)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_copying(self):
         # Check that counters are copyable, deepcopyable, picklable, and
         #have a repr/eval round-trip

@@ -40,10 +40,23 @@ NANVIX_RELEASE ?= no
 # missing platform capabilities (fork/exec, tempdir, asyncio event loop) or
 # memory limits (test_json MemoryError). Those belong to #321 and #322 where
 # each module gets individual skip/xfail annotations before being re-added.
-#   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
-#             test_bytes test_int test_json test_datetime test_os test_pathlib
-#             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+#   Deferred: test_str test_bytes test_json test_datetime test_os test_pathlib
+#             test_io test_builtin test_dict test_list test_int
+NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct \
+    test_set test_collections test_defaultdict test_ordered_dict \
+    test_deque test_array test_weakref test_weakset \
+    test_iter test_itertools test_iterlen \
+    test_generators test_generator_stop test_yield_from test_coroutines \
+    test_listcomps test_dictcomps test_setcomps test_genexps \
+    test_heapq test_bisect test_sort test_queue \
+    test_copy test_copyreg test_functools test_funcattrs test_decorators \
+    test_buffer
+
+# Maximum number of test modules per regrtest VM invocation.
+# The 128MB microvm can run at most ~5 test modules per Python process before
+# exhausting virtual memory.  Tests are split into batches of this size and
+# each batch gets its own nanvixd.elf invocation.
+NANVIX_TEST_BATCH_SIZE ?= 4
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
@@ -344,27 +357,48 @@ else
 		}
 endif
 ifneq ($(NANVIX_RELEASE),yes)
-	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules)..."
+	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, batched)..."
+	@# Clean up any leftover /tmp/test_python_* directories from prior runs
+	@rm -rf /tmp/test_python_* 2>/dev/null || true
 ifeq ($(PROCESS_MODE),standalone)
 	@echo "  SKIP: regrtest skipped for standalone mode (ramfs memory limit)"
 else
-	cd $(TEST_STAGING)/sysroot && \
+	@cd $(TEST_STAGING)/sysroot && \
 		{ \
-			: > /tmp/cpython_regrtest.log; \
-			timeout 600 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
-			  --timeout=120 $(NANVIX_TEST_LIST) \
-			  < /dev/null > /tmp/cpython_regrtest.log 2>&1; \
-			regrtest_status=$$?; \
-			if [ $$regrtest_status -ne 0 ]; then \
-				echo "  FAIL: regrtest exited with status $$regrtest_status"; cat /tmp/cpython_regrtest.log; exit 1; \
-			fi; \
-			echo "  PASS: regrtest completed"; \
+			set -e; \
+			modules="$(NANVIX_TEST_LIST)"; \
+			batch_size=$(NANVIX_TEST_BATCH_SIZE); \
+			batch_num=0; \
+			total_pass=0; \
+			while [ -n "$$modules" ]; do \
+				batch_num=$$((batch_num + 1)); \
+				batch=$$(echo $$modules | tr ' ' '\n' | head -n $$batch_size | tr '\n' ' '); \
+				remaining=$$(echo $$modules | tr ' ' '\n' | tail -n +$$((batch_size + 1)) | tr '\n' ' '); \
+				modules=$$remaining; \
+				batch_count=$$(echo $$batch | wc -w); \
+				echo "  Batch $$batch_num ($$batch_count modules): $$batch"; \
+				: > /tmp/cpython_regrtest_batch.log; \
+				set +e; \
+				timeout 300 ./bin/nanvixd.elf -- ./bin/python3.12 -m test \
+				  $$batch \
+				  < /dev/null > /tmp/cpython_regrtest_batch.log 2>&1; \
+				batch_status=$$?; \
+				set -e; \
+				if [ $$batch_status -ne 0 ]; then \
+					echo "  FAIL: batch $$batch_num exited with status $$batch_status"; \
+					cat /tmp/cpython_regrtest_batch.log; \
+					exit 1; \
+				fi; \
+				grep -E "^(== Tests result:|Total tests:|All [0-9]+ tests OK)" /tmp/cpython_regrtest_batch.log || true; \
+				total_pass=$$((total_pass + batch_count)); \
+			done; \
+			echo "  PASS: all $$total_pass tests passed ($$batch_num batches)"; \
 		}
 endif
 else
 	@echo "Test: regrtest skipped (NANVIX_RELEASE=yes)"
 endif
-	@rm -rf $(TEST_STAGING) /tmp/cpython_test.log /tmp/cpython_regrtest.log
+	@rm -rf $(TEST_STAGING) /tmp/cpython_test.log /tmp/cpython_regrtest.log /tmp/cpython_regrtest_batch.log
 	@echo "		*** CPython tests PASSED ***"
 
 # Clean target
