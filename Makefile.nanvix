@@ -67,7 +67,17 @@ NANVIX_TEST_LIST ?= \
     test_math test_cmath test_decimal test_fractions test_statistics test_random test_numeric_tower \
     test_exception_group test_exceptions test_raise test_traceback \
     test_frame test_contextlib test_contextlib_async test_pprint test_reprlib \
-    test_list test_dict
+    test_list test_dict \
+    test_io test_fileio test_file test_file_eintr test_fileinput test_filecmp test_bufio \
+    test_os test_stat test_posixpath test_pathlib test_genericpath \
+    test_tempfile \
+    test_shutil test_glob test_fnmatch \
+    test_zipfile test_tarfile test_zipimport \
+    test_configparser test_csv \
+    test_mmap \
+    test_shelve test_dbm test_dbm_dumb test_dbm_ndbm test_dbm_gnu \
+    test_linecache test_source_encoding test_largefile \
+    test_import test_importlib test_modulefinder test_pkgutil test_zipapp
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
