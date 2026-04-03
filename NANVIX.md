@@ -37,6 +37,7 @@ This document describes the port of [CPython](https://www.python.org/) interpret
 2. [Prerequisites](#prerequisites)
 3. [Building](#building)
 4. [Testing](#testing)
+   - [Test Suite Status](#test-suite-status)
 5. [Changes Summary](#changes-summary)
 6. [Known Limitations](#known-limitations)
 7. [CI/CD](#cicd)
@@ -198,21 +199,76 @@ After a successful build, you will have:
 make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 ```
 
-### Running Individual Tests
+> **Note:** The `.nanvix/_test_staging/sysroot` directory is ephemeral — it is
+> created by `make test` and removed automatically at the end of a successful
+> run. To use the interactive or individual-module commands below, run
+> `make test` first (or interrupt it after the staging step completes).
 
-To run Python interactively:
+### Running Interactively
+
+To run Python interactively on Nanvix:
 
 ```bash
-cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path/to/python.elf
+cd .nanvix/_test_staging/sysroot && \
+  echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- ./bin/python3.12
 ```
 
-### Test Coverage
+### Running Individual Modules
 
-The test target verifies:
-- Python interpreter starts correctly
-- Basic print functionality works
-- Arithmetic operations work
-- Core module imports work (e.g., `sys`)
+To run a single test module inside the Nanvix VM:
+
+```bash
+cd .nanvix/_test_staging/sysroot && \
+  ./bin/nanvixd.elf -- ./bin/python3.12 -m test --verbose test_int
+```
+
+### Test Suite Status
+
+The `./z test` target runs **73 CPython stdlib test modules** on Nanvix
+(i686, microvm, multi-process, 128 MB RAM). Tests are split into batches of 4
+modules per VM invocation to stay within the 128 MB memory limit.
+
+| Metric | Value |
+|--------|-------|
+| **Modules enabled** | 73 |
+| **Total tests run** | ~4,000+ |
+| **Tests failed** | 0 |
+| **Batches** | 19 |
+
+#### Enabled Modules
+
+| Group | Modules |
+|-------|---------|
+| Built-in Types | test_int, test_range, test_slice, test_memoryview, test_bytes, test_tuple |
+| Operators & Expressions | test_builtin, test_operator, test_binop, test_unary, test_compare, test_richcmp, test_augassign, test_contains |
+| Grammar, Syntax & Compiler | test_grammar, test_syntax, test_compile, test_compiler_assemble, test_compiler_codegen, test_ast, test_symtable, test_opcache, test_peepholer, test_dis, test_code, test_keyword, test_tokenize, test_perf_profiler |
+| Function Calls & Control Flow | test_call, test_extcall, test_positional_only_arg, test_scope, test_global, test_dynamic, test_with |
+| Data Types & Type System | test_types, test_typechecks, test_isinstance, test_hash, test_index, test_super, test_property |
+| Math & Numerics | test_math, test_cmath, test_decimal, test_fractions, test_statistics, test_random, test_numeric_tower |
+| Exceptions & Tracebacks | test_exception_group, test_exceptions, test_raise, test_traceback |
+| Stdlib & Containers | test_frame, test_contextlib, test_contextlib_async, test_pprint, test_reprlib, test_list, test_dict |
+| Threading & Concurrency | test_thread, test_threading, test_threading_local, test_threadedtempfile, test_queue, test_context, test_coroutines, test_asyncgen, test_threadsignals |
+
+#### Excluded Modules
+
+| Module | Reason |
+|--------|--------|
+| test_exception_hierarchy | Crashes at import — `errno.ESHUTDOWN` missing on Nanvix |
+| test_inspect | VM hangs — asyncio event loop setup before skip; module too large for 128 MB |
+
+#### Skip Categories
+
+| Category | Count | % of Skips |
+|----------|-------|------------|
+| Pickle corruption (32-bit) | 33 | 45% |
+| Missing `_testcapi`/`_testinternalcapi` | 18 | 25% |
+| No subprocess/fork | 6 | 8% |
+| VM crash / deep recursion | 4 | 5% |
+| Traceback formatting | 3 | 4% |
+| Other (rounding, float precision, filesystem, 32-bit args) | 9 | 12% |
+
+See [`NANVIX_SKIP_LIST.md`](NANVIX_SKIP_LIST.md) for the full per-test skip
+inventory with failure descriptions.
 
 #### Enabled test modules
 
@@ -273,7 +329,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
-| `NANVIX_SKIP_LIST.md` | Catalogue of skipped tests and rationale |
+| `NANVIX_SKIP_LIST.md` | Per-test inventory of skipped tests and rationale |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -290,11 +346,13 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules in release** | `--disable-test-modules` used for release builds only; test builds include `_testcapi` etc. |
 | **Static linking only** | All executables are statically linked |
-| **Limited I/O** | Some file and network operations may be limited |
-| **No fork/exec** | `os.fork()` and subprocess not available; related tests auto-skip |
-| **No sockets** | Networking disabled; socket-dependent tests auto-skip |
+| **No sockets** | `socketpair()` unavailable; asyncio event loop cannot start |
+| **No subprocess/fork** | `os.fork()`, `subprocess.Popen()` not supported |
+| **Pickle corruption** | `pickle` produces corrupt data on 32-bit Nanvix; likely C accelerator issue |
+| **Missing C test extensions** | `_testcapi` and `_testinternalcapi` not built |
+| **128 MB memory limit** | Tests batched (4 modules/VM); some large modules excluded |
+| **Round-half-up** | C library uses round-half-up instead of IEEE 754 round-half-to-even |
 | **No SIGUSR1/SIGUSR2/SIGALRM to threads** | Signal delivery to non-main threads unreliable; `test_threadsignals` skipped |
 
 ---
