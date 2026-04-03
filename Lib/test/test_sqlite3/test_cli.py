@@ -4,7 +4,7 @@ import unittest
 
 from sqlite3.__main__ import main as cli
 from test.support.os_helper import TESTFN, unlink
-from test.support import captured_stdout, captured_stderr, captured_stdin
+from test.support import captured_stdout, captured_stderr, captured_stdin, is_nanvix
 
 
 class CommandLineInterface(unittest.TestCase):
@@ -53,6 +53,7 @@ class CommandLineInterface(unittest.TestCase):
         stderr = self.expect_failure(":memory:", "sel")
         self.assertIn("OperationalError (SQLITE_ERROR)", stderr)
 
+    @unittest.skipIf(is_nanvix, "Nanvix: SQLITE_IOERR_LOCK on garbled TESTFN")
     def test_cli_on_disk_db(self):
         self.addCleanup(unlink, TESTFN)
         out = self.expect_success(TESTFN, "create table t(t)")
@@ -140,6 +141,7 @@ class InteractiveSession(unittest.TestCase):
         self.assertEqual(out.count(self.PS1), 2)
         self.assertEqual(out.count(self.PS2), 0)
 
+    @unittest.skipIf(is_nanvix, "Nanvix: SQLITE_IOERR_LOCK on garbled TESTFN")
     def test_interact_on_disk_file(self):
         self.addCleanup(unlink, TESTFN)
 

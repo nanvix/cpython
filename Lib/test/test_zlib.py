@@ -242,6 +242,7 @@ class CompressTestCase(BaseCompressTestCase, unittest.TestCase):
 
     # Memory use of the following functions takes into account overallocation
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: MemoryError on 128MB VM")
     @bigmemtest(size=_1G + 1024 * 1024, memuse=3)
     def test_big_compress_buffer(self, size):
         compress = lambda s: zlib.compress(s, 1)
@@ -754,6 +755,7 @@ class CompressObjectTestCase(BaseCompressTestCase, unittest.TestCase):
 
     # Memory use of the following functions takes into account overallocation
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: MemoryError on 128MB VM")
     @bigmemtest(size=_1G + 1024 * 1024, memuse=3)
     def test_big_compress_buffer(self, size):
         c = zlib.compressobj(1)
