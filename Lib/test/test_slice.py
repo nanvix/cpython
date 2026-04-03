@@ -241,6 +241,7 @@ class SliceTest(unittest.TestCase):
         x[1:2] = 42
         self.assertEqual(tmp, [(slice(1, 2), 42)])
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix 32-bit: corrupt pickle data")
     def test_pickle(self):
         import pickle
 
