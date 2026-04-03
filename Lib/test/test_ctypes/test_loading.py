@@ -9,12 +9,6 @@ from test.support import import_helper
 from test.support import os_helper
 from ctypes.util import find_library
 
-# Nanvix uses a fully static build with no dynamic linker; all CDLL/dlopen
-# calls fail at runtime.  Skip this entire module rather than letting each
-# individual test fail.
-if test.support.is_nanvix:
-    raise unittest.SkipTest("loading shared libraries is not supported on Nanvix (static build)")
-
 libc_name = None
 
 def setUpModule():

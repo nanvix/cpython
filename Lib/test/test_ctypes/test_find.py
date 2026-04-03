@@ -7,11 +7,6 @@ from test.support import os_helper
 from ctypes import *
 from ctypes.util import find_library
 
-# Nanvix uses a fully static build with no dynamic linker; find_library() and
-# any subsequent CDLL/dlopen calls fail at runtime.  Skip this entire module.
-if test.support.is_nanvix:
-    raise unittest.SkipTest("loading shared libraries is not supported on Nanvix (static build)")
-
 # On some systems, loading the OpenGL libraries needs the RTLD_GLOBAL mode.
 class Test_OpenGL_libs(unittest.TestCase):
     @classmethod
