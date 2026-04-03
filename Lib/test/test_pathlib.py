@@ -14,7 +14,7 @@ from unittest import mock
 
 from test.support import import_helper
 from test.support import set_recursion_limit
-from test.support import is_emscripten, is_wasi
+from test.support import is_emscripten, is_wasi, is_nanvix
 from test.support import os_helper
 from test.support.os_helper import TESTFN, FakePath
 
@@ -1689,7 +1689,7 @@ class _BasePathTest(object):
         p = P(BASE, session_id=42)
         self.assertEqual(42, p.absolute().session_id)
         self.assertEqual(42, p.resolve().session_id)
-        if not is_wasi:  # WASI has no user accounts.
+        if not is_wasi and not is_nanvix:  # WASI/Nanvix has no user accounts.
             self.assertEqual(42, p.with_segments('~').expanduser().session_id)
         self.assertEqual(42, (p / 'fileA').rename(p / 'fileB').session_id)
         self.assertEqual(42, (p / 'fileB').replace(p / 'fileA').session_id)
@@ -1729,7 +1729,7 @@ class _BasePathTest(object):
         p = self.cls('')
         self.assertEqual(p.stat(), os.stat('.'))
 
-    @unittest.skipIf(is_wasi, "WASI has no user accounts.")
+    @unittest.skipIf(is_wasi or is_nanvix, "WASI/Nanvix has no user accounts.")
     def test_expanduser_common(self):
         P = self.cls
         p = P('~')
@@ -2599,6 +2599,9 @@ class _BasePathTest(object):
     @unittest.skipIf(
         is_wasi, "Cannot create socket on WASI."
     )
+    @unittest.skipIf(
+        is_nanvix, "Cannot create socket on Nanvix."
+    )
     def test_is_socket_true(self):
         P = self.cls(BASE, 'mysock')
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -2983,8 +2986,8 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
             print(path.resolve(strict))
 
     @unittest.skipIf(
-        is_emscripten or is_wasi,
-        "umask is not implemented on Emscripten/WASI."
+        is_emscripten or is_wasi or is_nanvix,
+        "umask is not implemented on Emscripten/WASI/Nanvix."
     )
     def test_open_mode(self):
         old_mask = os.umask(0)
@@ -3010,8 +3013,8 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
             os.chdir(current_directory)
 
     @unittest.skipIf(
-        is_emscripten or is_wasi,
-        "umask is not implemented on Emscripten/WASI."
+        is_emscripten or is_wasi or is_nanvix,
+        "umask is not implemented on Emscripten/WASI/Nanvix."
     )
     def test_touch_mode(self):
         old_mask = os.umask(0)

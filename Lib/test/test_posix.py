@@ -1349,7 +1349,7 @@ class PosixTester(unittest.TestCase):
             # bpo-47205: does not raise OSError on FreeBSD
             self.assertRaises(OSError, posix.sched_setaffinity, -1, mask)
 
-    @unittest.skipIf(support.is_wasi, "No dynamic linking on WASI")
+    @unittest.skipIf(support.is_wasi or support.is_nanvix, "No dynamic linking on WASI/Nanvix")
     @unittest.skipUnless(os.name == 'posix', "POSIX-only test")
     def test_rtld_constants(self):
         # check presence of major RTLD_* constants
@@ -1547,8 +1547,8 @@ class TestPosixDirFd(unittest.TestCase):
                     pass
 
     @unittest.skipIf(
-        support.is_wasi,
-        "WASI: symlink following on path_link is not supported"
+        support.is_wasi or support.is_nanvix,
+        "WASI/Nanvix: symlink following on path_link is not supported"
     )
     @unittest.skipUnless(
         hasattr(os, "link") and os.link in os.supports_dir_fd,

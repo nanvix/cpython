@@ -43,7 +43,17 @@ NANVIX_RELEASE ?= no
 #   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
 #             test_bytes test_int test_json test_datetime test_os test_pathlib
 #             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct \
+  test_io test_fileio test_file test_file_eintr test_fileinput test_filecmp test_bufio \
+  test_pathlib test_genericpath test_posixpath test_ntpath \
+  test_os test_stat test_tempfile \
+  test_zipfile test_zipapp test_zipimport \
+  test_tarfile test_gzip test_posix \
+  test_linecache test_memoryio \
+  test_shutil test_fnmatch test_glob \
+  test_source_encoding \
+  test_dbm_dumb test_shelve \
+  test_import test_pkgutil
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

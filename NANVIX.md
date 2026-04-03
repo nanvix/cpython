@@ -214,6 +214,48 @@ The test target verifies:
 - Arithmetic operations work
 - Core module imports work (e.g., `sys`)
 
+### Test Modules
+
+The following CPython test modules are enabled on Nanvix (see `NANVIX_TEST_LIST` in `Makefile.nanvix`):
+
+#### Core (enabled since initial port)
+`test_float`, `test_complex`, `test_bool`, `test_struct`
+
+#### File I/O (#324)
+`test_io`, `test_fileio`, `test_file`, `test_file_eintr`, `test_fileinput`, `test_filecmp`, `test_bufio`
+
+#### Paths & Directories (#324)
+`test_pathlib`, `test_genericpath`, `test_posixpath`, `test_ntpath`, `test_os`, `test_stat`
+
+#### Temporary Files (#324)
+`test_tempfile`
+
+#### Archives & Compression (#324)
+`test_zipfile`, `test_zipapp`, `test_zipimport`, `test_tarfile`, `test_gzip`
+
+#### POSIX & Low-level (#324)
+`test_posix`
+
+#### Memory I/O (#324)
+`test_memoryio`
+
+#### File Utilities (#324)
+`test_shutil`, `test_fnmatch`, `test_glob`
+
+#### Source & Encoding (#324)
+`test_source_encoding`, `test_linecache`
+
+#### Database & Persistence (#324)
+`test_dbm_dumb`, `test_shelve`
+
+#### Import System (#324)
+`test_import`, `test_pkgutil`
+
+Tests that exercise unsupported platform features (symlinks, sockets, subprocess, umask,
+`/dev/null`, dynamic linking, user accounts) are individually skipped using
+`@unittest.skipIf(support.is_nanvix, ...)`. For a full list of skipped tests and
+reasons, see [NANVIX_SKIP_LIST.md](NANVIX_SKIP_LIST.md).
+
 ---
 
 ## Changes Summary

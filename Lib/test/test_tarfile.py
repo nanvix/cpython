@@ -3393,9 +3393,9 @@ class ArchiveMaker:
 # But in the following tests we use can_symlink to *determine* which
 # behavior is expected.
 # Like other symlink tests, skip these on WASI for now.
-if support.is_wasi:
+if support.is_wasi or support.is_nanvix:
     def symlink_test(f):
-        return unittest.skip("WASI: Skip symlink test for now")(f)
+        return unittest.skip("WASI/Nanvix: Skip symlink test for now")(f)
 else:
     def symlink_test(f):
         return f

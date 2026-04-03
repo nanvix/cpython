@@ -1723,8 +1723,8 @@ class MakedirTests(unittest.TestCase):
         os.makedirs(path)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi,
-        "Emscripten's/WASI's umask is a stub."
+        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_mode(self):
         with os_helper.temp_umask(0o002):
@@ -1739,8 +1739,8 @@ class MakedirTests(unittest.TestCase):
                 self.assertEqual(os.stat(parent).st_mode & 0o777, 0o775)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi,
-        "Emscripten's/WASI's umask is a stub."
+        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_exist_ok_existing_directory(self):
         path = os.path.join(os_helper.TESTFN, 'dir1')
@@ -1757,8 +1757,8 @@ class MakedirTests(unittest.TestCase):
         os.makedirs(os.path.abspath('/'), exist_ok=True)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi,
-        "Emscripten's/WASI's umask is a stub."
+        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_exist_ok_s_isgid_directory(self):
         path = os.path.join(os_helper.TESTFN, 'dir1')
@@ -1910,7 +1910,7 @@ class RemoveDirsTests(unittest.TestCase):
         self.assertTrue(os.path.exists(os_helper.TESTFN))
 
 
-@unittest.skipIf(support.is_wasi, "WASI has no /dev/null")
+@unittest.skipIf(support.is_wasi or support.is_nanvix, "WASI/Nanvix has no /dev/null")
 class DevNullTests(unittest.TestCase):
     def test_devnull(self):
         with open(os.devnull, 'wb', 0) as f:

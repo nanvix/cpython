@@ -7,7 +7,7 @@ import os
 import sys
 import unittest
 import warnings
-from test.support import is_emscripten
+from test.support import is_emscripten, is_nanvix
 from test.support import os_helper
 from test.support import warnings_helper
 from test.support.script_helper import assert_python_ok
@@ -155,7 +155,7 @@ class GenericTest:
             self.assertIs(self.pathmodule.lexists(bfilename + b'\x00'), False)
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
-    @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
+    @unittest.skipIf(is_emscripten or is_nanvix, "Emscripten/Nanvix pipe fds have no stat")
     def test_exists_fd(self):
         r, w = os.pipe()
         try:

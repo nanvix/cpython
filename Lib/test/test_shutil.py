@@ -3169,7 +3169,7 @@ class TestGetTerminalSize(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
-    @unittest.skipIf(support.is_wasi, "WASI has no /dev/null")
+    @unittest.skipIf(support.is_wasi or support.is_nanvix, "WASI/Nanvix has no /dev/null")
     def test_fallback(self):
         with os_helper.EnvironmentVarGuard() as env:
             del env['LINES']
