@@ -208,11 +208,43 @@ cd "$NANVIX_HOME" && echo "print('Hello, Nanvix!')" | ./bin/nanvixd.elf -- /path
 
 ### Test Coverage
 
-The test target verifies:
-- Python interpreter starts correctly
-- Basic print functionality works
-- Arithmetic operations work
-- Core module imports work (e.g., `sys`)
+The test target runs the following modules via `python3 -m test`:
+
+| Module | Status | Notes |
+|--------|--------|-------|
+| `test_float` | ✅ Pass | |
+| `test_complex` | ✅ Pass | |
+| `test_bool` | ✅ Pass | |
+| `test_struct` | ✅ Pass | |
+| `test_capi` | ✅ Pass | Subprocess-dependent tests auto-skipped |
+| `test_clinic` | ⏭ Skip | Whole module skipped – `test_tools` requires subprocess |
+| `test_ctypes` | ✅ Pass* | `test_loading` and `test_find` skipped (no dlopen); see `NANVIX_SKIP_LIST.md` |
+| `test_cppext` | ⏭ Skip | `TestCPPExt` auto-skipped via `@requires_subprocess()` |
+| `test_stable_abi_ctypes` | ✅ Pass | |
+
+\* `test_ctypes` passes with selective skips; see [NANVIX_SKIP_LIST.md](NANVIX_SKIP_LIST.md)
+for the full list of skipped tests and their rationale.
+
+#### C API test modules (#328)
+
+The `test_capi` package exercises the Python C API via the `_testcapi` built-in
+extension module.  Tests that require subprocess (`test_mem`, subprocess-guarded
+methods in `test_misc` and `test_exceptions`) are automatically skipped by the
+existing `@support.requires_subprocess()` decorators.
+
+The `test_ctypes` package tests the `ctypes` / `libffi` integration.  Two
+sub-modules are skipped on Nanvix because the static build has no dynamic
+linker:
+
+- `test_ctypes/test_loading.py` – loads shared libraries via `CDLL`/`dlopen`
+- `test_ctypes/test_find.py`    – calls `find_library()` which spawns subprocesses
+
+All other `test_ctypes` sub-modules pass (structure layout, callbacks, type
+marshalling, etc.).
+
+`test_stable_abi_ctypes` verifies that every Stable ABI symbol is accessible
+through `ctypes.pythonapi`; this works on the static build because
+`ctypes.pythonapi` resolves symbols from the running interpreter process.
 
 ---
 
@@ -252,6 +284,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Standalone Makefile for Nanvix cross-compilation |
 | `NANVIX.md` | This documentation file |
+| `NANVIX_SKIP_LIST.md` | Catalogue of tests skipped on Nanvix with rationale |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
 | `z` | Cross-platform entry point (routes to z.sh or z.ps1) |
@@ -268,7 +301,8 @@ The following changes were made to support Nanvix.
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
-| **No test modules** | Test suite modules not built |
+| **No subprocess / fork** | Tests requiring subprocess are auto-skipped |
+| **No dlopen** | `ctypes` CDLL/find_library tests skipped (see `NANVIX_SKIP_LIST.md`) |
 | **Static linking only** | All executables are statically linked |
 | **Limited I/O** | Some file and network operations may be limited |
 
