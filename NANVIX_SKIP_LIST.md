@@ -122,6 +122,48 @@ Changes to test infrastructure to allow importing on Nanvix:
 | test_super | `TestSuper` (class) | VM crash | Nanvix VM crashes when running multiple tests due to `nonlocal __class__` cell corruption in `tearDown`. |
 | test_types | `UnionTests.test_union_pickle` | Pickle corruption | `pickle.dumps(list[T] \| int)` → corrupt data on 32-bit Nanvix. |
 | test_types | `SimpleNamespaceTests.test_pickle` | Pickle corruption | `pickle.dumps(SimpleNamespace(...))` → corrupt data. |
+| test_configparser | `ExceptionPicklingTestCase` (class) | Pickle corruption | All 11 test methods pickle/unpickle configparser exception objects. Corrupt data on Nanvix. |
+| test_fileio | `OtherFileTests.testBlksize` | No `st_blksize` | WASI/Nanvix does not expose `st_blksize` in stat results. |
+| test_fileio | `OtherFileTests.testAbles` (partial) | No `/dev/tty` | `/dev/tty` does not exist on Nanvix. Guarded by `if` block, not a full skip. |
+| test_genericpath | `AllCommonTest.test_exists_fd` | Pipe fds have no stat | `os.pipe()` fds cannot be `fstat()`'d on Nanvix (same as Emscripten). |
+| test_import | `ImportTests.test_from_import_missing_attr_has_name_and_so_path` | Missing `_testcapi` | Directly imports `_testcapi` which is not built for Nanvix. |
+| test_import | `ImportTests.test_creation_mode` | Stub umask | Nanvix `umask()` is a stub; mode checks fail. Extended existing WASI/Emscripten guard. |
+| test_import | `ImportTests.test_unwritable_directory` | Stub umask | Same root cause — `umask(0o222)` has no effect on Nanvix. |
+| test_io | `CommonBufferedTests.test_optional_abilities` | Pipe fds have no stat | `fstat()` on pipe fd not supported on Nanvix. Extended existing Emscripten guard. |
+| test_io | `CIOTest.test_open_pipe_with_append` | Pipe fds have no stat | Same — `open()` on pipe fd triggers `fstat()`. |
+| test_io | `CIOTest.test_nonblock_pipe_write_bigbuf` | Pipe fds have no stat | Non-blocking pipe write triggers `fstat()`. |
+| test_io | `CIOTest.test_nonblock_pipe_write_smallbuf` | Pipe fds have no stat | Same as above with smaller buffer. |
+| test_os | `StatAttributeTests.test_stat_result_pickle` | Pickle corruption | `pickle.dumps(os.stat_result)` → corrupt data. |
+| test_os | `StatAttributeTests.test_statvfs_result_pickle` | Pickle corruption | `pickle.dumps(os.statvfs_result)` → corrupt data. |
+| test_os | `MakedirTests.test_mode` | Stub umask | `os.umask()` is a stub on Nanvix. Extended existing WASI/Emscripten guard. |
+| test_os | `MakedirTests.test_exist_ok_existing_directory` | Stub umask | Same root cause. |
+| test_os | `MakedirTests.test_exist_ok_s_isgid_directory` | Stub umask | Same root cause. |
+| test_os | `DevNullTests` (class) | No `/dev/null` | Nanvix has no `/dev/null`. Extended existing WASI guard. |
+| test_pathlib | `_BasePurePathTest.test_pickling_common` | Pickle corruption | `pickle.dumps(PurePath)` → corrupt data. |
+| test_pathlib | `_BasePathTest.test_pickling_common` | Pickle corruption | `pickle.dumps(Path)` → corrupt data. |
+| test_pathlib | `PathTest.test_open_mode` | Stub umask | `os.umask()` is a stub. Extended existing WASI/Emscripten guard. |
+| test_pathlib | `PathTest.test_touch_mode` | Stub umask | Same root cause. |
+| test_shutil | `TestGetTerminalSize.test_fallback` | No `/dev/null` | Extended existing WASI guard. |
+| test_stat | `TestFilemodeCStat.test_devices` | No `/dev/null` | `os.devnull` does not exist on Nanvix. |
+| test_tarfile | `GzipWriteTest.test_file_mode` | Stub umask | Extended existing WASI/Emscripten guard. |
+| test_tempfile | `TestBadTempdir.test_read_only_directory` | Cannot remove write bits | Nanvix in-memory FS does not enforce write-bit removal. Extended Emscripten guard. |
+| test_tempfile | `TestSpooledTemporaryFile.test_del_rolled_file` | Cannot fstat renamed files | Nanvix in-memory FS does not support fstat on renamed files. |
+| test_tempfile | `TestSpooledTemporaryFile.test_truncate_with_size_parameter` | Cannot fstat renamed files | Same root cause. |
+| test_zipimport | `UncompressedZipImportTestCase.testFileUnreadable` | Mode 000 not enforced | Nanvix in-memory FS does not enforce mode 000. Extended existing WASI guard. |
+
+## Auto-Skips — Filesystem/IO Modules
+
+These filesystem/IO modules or tests skip automatically via existing guards:
+
+| Module | Mechanism | Notes |
+|--------|-----------|-------|
+| test_file_eintr | Module-level `SkipTest` | `has_subprocess_support` is `False` on Nanvix |
+| test_largefile | `@skip_no_disk_space` / `@requires_resource('cpu')` | 128 MB VM has insufficient disk/memory for 2.5 GB file tests |
+| test_mmap | `import_module('mmap')` | Auto-skips if `mmap` module not available on Nanvix |
+| test_shelve | Module-level `SkipTest` | Shelve requires pickle which produces corrupt data on Nanvix |
+| test_source_encoding | `@requires_subprocess()` | Subprocess-based tests auto-skip |
+| test_dbm_gnu | `import_module("dbm.gnu")` | Auto-skips if `_gdbm` not available |
+| test_dbm_ndbm | `import_module("dbm.ndbm")` | Auto-skips if `_dbm` not available |
 
 ## Excluded Modules
 
@@ -148,3 +190,6 @@ These modules pass with zero skips needed:
 - test_raise, test_frame
 - test_contextlib_async, test_pprint
 - test_traceback
+- test_bufio, test_csv, test_dbm, test_dbm_dumb, test_file, test_filecmp,
+  test_fileinput, test_fnmatch, test_glob, test_linecache, test_modulefinder,
+  test_pkgutil, test_posixpath, test_zipapp, test_zipfile
