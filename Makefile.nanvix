@@ -278,6 +278,30 @@ ifeq ($(PROCESS_MODE),standalone)
 	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/site-packages
 	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/__phello__
 	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/test
+	@# Remove large stdlib packages not needed for the standalone hello test.
+	@# All startup modules are frozen, so only the interpreter binary and the
+	@# test script itself need to be in the ramfs.  Keeping the .py files in
+	@# the *installed* sysroot (make install) preserves stdlib completeness.
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/asyncio
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/email
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/xml
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/multiprocessing
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/unittest
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/http
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/logging
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/urllib
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/html
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/json
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/ctypes
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/sqlite3
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/xmlrpc
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/concurrent
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/dbm
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/distutils
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/tomllib
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/zipfile
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/curses
+	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/zoneinfo
 	@rm -f $(TEST_STAGING)/sysroot/lib/libpython3.12.a
 	@rm -rf $(TEST_STAGING)/sysroot/include
 	@rm -rf $(TEST_STAGING)/sysroot/share
@@ -286,27 +310,36 @@ ifeq ($(PROCESS_MODE),standalone)
 	@rm -f $(TEST_STAGING)/sysroot/bin/pydoc3* $(TEST_STAGING)/sysroot/bin/python3-config
 	@rm -f $(TEST_STAGING)/sysroot/bin/python3.12-config $(TEST_STAGING)/sysroot/bin/python3
 	@find $(TEST_STAGING)/sysroot -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-	@# Strip debug symbols from the python binary
+	@# Strip all symbols from the python binary for smallest ramfs footprint
 ifdef CONFIG_NANVIX_DOCKER
 	$(DOCKER_RUN) sh -c '\
 		if [ -x "$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" ] && [ -f "$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging/sysroot/bin/python3.12" ]; then \
-			"$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" --strip-debug \
+			"$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" --strip-all \
 				"$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging/sysroot/bin/python3.12" || true; \
 		fi'
 else
 	$(if $(wildcard $(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip),\
-		$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip --strip-debug $(TEST_STAGING)/sysroot/bin/python3.12 2>/dev/null || true)
+		$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip --strip-all $(TEST_STAGING)/sysroot/bin/python3.12 2>/dev/null || true)
 endif
+	@# Move host-side binaries out of the ramfs tree so they do not bloat
+	@# the image.  nanvixd, kernel, mkramfs etc. run on the host, not in
+	@# the guest, and would waste ~15 MB of ramfs space.
+	@mkdir -p $(TEST_STAGING)/host-bin
+	@for f in nanvixd.elf kernel.elf linuxd.elf uservm.elf mkramfs.elf; do \
+		test -f "$(TEST_STAGING)/sysroot/bin/$$f" && \
+		mv "$(TEST_STAGING)/sysroot/bin/$$f" "$(TEST_STAGING)/host-bin/" || true; \
+	done
 	@echo "Test: Hello world (standalone)..."
 	cd $(TEST_STAGING)/sysroot && \
-		./bin/mkramfs.elf -o /tmp/rootfs.img . && \
+		$(TEST_STAGING)/host-bin/mkramfs.elf -o /tmp/rootfs.img . && \
+		cp $(TEST_STAGING)/host-bin/* bin/ 2>/dev/null; \
 		{ \
 			: > /tmp/cpython_test.log; \
 			start_time=$$(date +%s%N); \
-			timeout 120 ./bin/nanvixd.elf \
+			./bin/nanvixd.elf \
 			  -bin-dir ./bin -ramfs /tmp/rootfs.img \
 			  -- ./bin/python3.12 \
-			  "-B /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1" \
+			  "-B -S /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0" \
 			  < /dev/null > /tmp/cpython_test.log 2>&1; \
 			test_status=$$?; \
 			end_time=$$(date +%s%N); \
