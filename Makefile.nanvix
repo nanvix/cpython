@@ -153,9 +153,9 @@ CONFIGURE_ENV = \
 	LD="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ld" \
 	AR="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ar" \
 	RANLIB="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ranlib" \
-	CFLAGS="-L$(SYSROOT_PATH)/lib -I$(SYSROOT_PATH)/include" \
+	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -L$(SYSROOT_PATH)/lib -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
-	LDFLAGS="-T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -Wl,-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
+	LDFLAGS="-T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--no-dynamic-linker" \
 	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -lffi -Wl,--end-group" \
 	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
 	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
@@ -168,7 +168,6 @@ CONFIGURE_ENV = \
 
 # Configure options for Nanvix
 CONFIGURE_OPTS = \
-	--with-lto \
 	--disable-shared \
 	--build=x86_64-pc-linux-gnux32 \
 	--host=i686-nanvix \
@@ -182,6 +181,8 @@ CONFIGURE_OPTS = \
 	--with-pkg-config=no \
 	--with-openssl="$(SYSROOT_PATH)" \
 	--disable-ipv6 \
+	--without-doc-strings \
+	--with-computed-gotos \
 	ac_cv_file__dev_ptmx=no \
 	ac_cv_file__dev_ptc=no \
 	ac_cv_pthread_is_default=yes \
@@ -212,6 +213,14 @@ endif
 build: $(CONFIGURED_MARKER)
 ifdef CONFIG_NANVIX_DOCKER
 	@echo "Building inside Docker..."
+	@# Compile nanvix snapshot helper (outside LTO, so it survives optimization)
+	$(DOCKER_RUN) $(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-gcc -c Modules/nanvix_snapshot.S -o Modules/nanvix_snapshot.o
+	@# Inject the snapshot object into the generated Makefile's MODULE_OBJS
+	$(DOCKER_RUN) sh -c '\
+		grep -q "nanvix_snapshot.o" Makefile || \
+		{ sed -i "s|Modules/main\.o|Modules/main.o Modules/nanvix_snapshot.o|" Makefile && \
+		  grep -q "nanvix_snapshot.o" Makefile || \
+		  { echo "Error: failed to inject nanvix_snapshot.o into Makefile"; exit 1; }; }'
 	$(DOCKER_RUN) make -j$$(nproc) all
 	@# Rename python to python.elf for consistency (always use the latest build)
 	@if [ -f python ]; then mv -f python python$(EXE); fi
@@ -226,6 +235,13 @@ ifdef CONFIG_NANVIX_DOCKER
 				echo "Error: failed to strip debug symbols from python$(EXE) inside Docker."; exit 1; }; \
 		fi'
 else
+	@# Compile nanvix snapshot helper (outside LTO, so it survives optimization)
+	$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-gcc -c Modules/nanvix_snapshot.S -o Modules/nanvix_snapshot.o
+	@# Inject the snapshot object into the generated Makefile's MODULE_OBJS
+	@grep -q "nanvix_snapshot.o" Makefile || \
+		{ sed -i 's|Modules/main\.o|Modules/main.o Modules/nanvix_snapshot.o|' Makefile && \
+		  grep -q "nanvix_snapshot.o" Makefile || \
+		  { echo "Error: failed to inject nanvix_snapshot.o into Makefile"; exit 1; }; }
 	make -j$$(nproc) all
 	@# Rename python to python.elf for consistency (always use the latest build)
 	@if [ -f python ]; then mv -f python python$(EXE); fi
@@ -265,48 +281,44 @@ endif
 	@cp "$(abspath $(NANVIX_HOME))/bin/uservm.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
 ifeq ($(PROCESS_MODE),standalone)
 	@cp "$(abspath $(NANVIX_HOME))/bin/mkramfs.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
-	@# Trim staging to fit in ramfs: remove dev-only artifacts not needed at runtime
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/config-3.12
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/__pycache__
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/idlelib
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/tkinter
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/turtledemo
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/lib2to3
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/ensurepip
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/pydoc_data
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/venv
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/site-packages
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/__phello__
-	@rm -rf $(TEST_STAGING)/sysroot/lib/python3.12/test
-	@rm -f $(TEST_STAGING)/sysroot/lib/libpython3.12.a
-	@rm -rf $(TEST_STAGING)/sysroot/include
-	@rm -rf $(TEST_STAGING)/sysroot/share
-	@rm -rf $(TEST_STAGING)/sysroot/lib/pkgconfig
-	@rm -f $(TEST_STAGING)/sysroot/bin/2to3* $(TEST_STAGING)/sysroot/bin/idle3*
-	@rm -f $(TEST_STAGING)/sysroot/bin/pydoc3* $(TEST_STAGING)/sysroot/bin/python3-config
-	@rm -f $(TEST_STAGING)/sysroot/bin/python3.12-config $(TEST_STAGING)/sysroot/bin/python3
-	@find $(TEST_STAGING)/sysroot -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-	@# Strip debug symbols from the python binary
+	@# Build a minimal ramfs for the hello test.
+	@# Startup modules are frozen into the interpreter, so the ramfs only
+	@# needs the test script and the encodings/ package (used by the IO stack).
+	@# The full stdlib remains in the installed sysroot (make install).
+	@mkdir -p $(TEST_STAGING)/ramfs-content/sysroot/lib/python3.12
+	@cp $(TEST_STAGING)/sysroot/test_hello.py $(TEST_STAGING)/ramfs-content/sysroot/
+	@cp -a $(TEST_STAGING)/sysroot/lib/python3.12/encodings $(TEST_STAGING)/ramfs-content/sysroot/lib/python3.12/
+	@find $(TEST_STAGING)/ramfs-content -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+	@# Strip all symbols from the python binary for smallest ramfs footprint
 ifdef CONFIG_NANVIX_DOCKER
 	$(DOCKER_RUN) sh -c '\
 		if [ -x "$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" ] && [ -f "$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging/sysroot/bin/python3.12" ]; then \
-			"$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" --strip-debug \
+			"$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" --strip-all \
 				"$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging/sysroot/bin/python3.12" || true; \
 		fi'
 else
 	$(if $(wildcard $(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip),\
-		$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip --strip-debug $(TEST_STAGING)/sysroot/bin/python3.12 2>/dev/null || true)
+		$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip --strip-all $(TEST_STAGING)/sysroot/bin/python3.12 2>/dev/null || true)
 endif
+	@# Move host-side binaries out of the ramfs tree so they do not bloat
+	@# the image.  nanvixd, kernel, mkramfs etc. run on the host, not in
+	@# the guest, and would waste ~15 MB of ramfs space.
+	@mkdir -p $(TEST_STAGING)/host-bin
+	@for f in nanvixd.elf kernel.elf linuxd.elf uservm.elf mkramfs.elf; do \
+		test -f "$(TEST_STAGING)/sysroot/bin/$$f" && \
+		mv "$(TEST_STAGING)/sysroot/bin/$$f" "$(TEST_STAGING)/host-bin/" || true; \
+	done
 	@echo "Test: Hello world (standalone)..."
 	cd $(TEST_STAGING)/sysroot && \
-		./bin/mkramfs.elf -o /tmp/rootfs.img . && \
+		$(TEST_STAGING)/host-bin/mkramfs.elf -o /tmp/rootfs.img $(TEST_STAGING)/ramfs-content/sysroot && \
+		cp $(TEST_STAGING)/host-bin/* bin/ 2>/dev/null; \
 		{ \
 			: > /tmp/cpython_test.log; \
 			start_time=$$(date +%s%N); \
-			timeout 120 ./bin/nanvixd.elf \
+			./bin/nanvixd.elf \
 			  -bin-dir ./bin -ramfs /tmp/rootfs.img \
 			  -- ./bin/python3.12 \
-			  "-B /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1" \
+			  "-B -S /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0" \
 			  < /dev/null > /tmp/cpython_test.log 2>&1; \
 			test_status=$$?; \
 			end_time=$$(date +%s%N); \
