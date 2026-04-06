@@ -24,7 +24,6 @@ MKRAMFS = $(abspath $(NANVIX_HOME))/bin/mkramfs.elf
 
 # Per-mode test exclusions for standalone (passed to regrtest --ignore).
 #   test_filter_dealloc: creates 1M nested filter objects, OOMs the 32MB heap.
-#   test_random_files: samples 10 test_*.py files but per-batch ramfs has < 10.
 NANVIX_STANDALONE_EXCLUDE = test_filter_dealloc
 
 include .nanvix/mk/ramfs.mk
