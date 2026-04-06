@@ -271,6 +271,7 @@ class BaseTest:
         for protocol in range(3, pickle.HIGHEST_PROTOCOL + 1):
             self.assertIs(a.__reduce_ex__(protocol)[0], array_reconstructor)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle(self):
         for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
             a = array.array(self.typecode, self.example)
@@ -286,6 +287,7 @@ class BaseTest:
             self.assertEqual(a.x, b.x)
             self.assertEqual(type(a), type(b))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle_for_empty_array(self):
         for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
             a = array.array(self.typecode)
@@ -301,6 +303,7 @@ class BaseTest:
             self.assertEqual(a.x, b.x)
             self.assertEqual(type(a), type(b))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_iterator_pickle(self):
         orig = array.array(self.typecode, self.example)
         data = list(orig)
@@ -355,6 +358,7 @@ class BaseTest:
         self.assertEqual(list(a), list(self.example))
         self.assertEqual(list(reversed(a)), list(iter(a))[::-1])
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_reverse_iterator_picking(self):
         orig = array.array(self.typecode, self.example)
         data = list(orig)

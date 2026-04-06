@@ -133,6 +133,7 @@ class ReferencesTestCase(TestBase):
         self.check_basic_callback(create_bound_method)
 
     @support.cpython_only
+    @unittest.skipIf(support.is_nanvix, "Nanvix: _testcapi not available")
     def test_cfunction(self):
         import _testcapi
         create_cfunction = _testcapi.create_cfunction

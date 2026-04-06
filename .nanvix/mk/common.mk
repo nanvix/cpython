@@ -50,7 +50,15 @@ NANVIX_TEST_LIST ?= \
     test_math test_cmath test_decimal test_fractions test_statistics test_random test_numeric_tower \
     test_exception_group test_exceptions test_raise test_traceback \
     test_frame test_contextlib test_contextlib_async test_pprint test_reprlib \
-    test_list test_dict
+    test_list test_dict \
+    test_set test_collections test_defaultdict test_ordered_dict \
+    test_deque test_array test_weakref test_weakset \
+    test_iter test_itertools test_iterlen \
+    test_generators test_generator_stop test_yield_from test_coroutines \
+    test_listcomps test_dictcomps test_setcomps test_genexps \
+    test_heapq test_bisect test_sort test_queue \
+    test_copy test_copyreg test_functools test_funcattrs test_decorators \
+    test_buffer test_numbers
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

@@ -292,6 +292,7 @@ class OrderedDictTests:
         # different length implied inequality
         self.assertNotEqual(od1, OrderedDict(pairs[:-1]))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_copying(self):
         OrderedDict = self.OrderedDict
         # Check that ordered dicts are copyable, deepcopyable, picklable,
@@ -356,6 +357,7 @@ class OrderedDictTests:
         self.assertEqual(od.__dict__['x'], 10)
         self.assertEqual(od.__reduce__()[2], {'x': 10})
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle_recursive(self):
         OrderedDict = self.OrderedDict
         od = OrderedDict()
@@ -821,6 +823,7 @@ class CPythonOrderedDictTests(OrderedDictTests, unittest.TestCase):
                 del od['c']
         self.assertEqual(list(od), list('bdeaf'))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_iterators_pickling(self):
         OrderedDict = self.OrderedDict
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]

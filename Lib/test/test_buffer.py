@@ -4434,6 +4434,7 @@ class TestBufferProtocol(unittest.TestCase):
         self.assertRaises(BufferError, memoryview, x)
 
     @support.cpython_only
+    @unittest.skipIf(_testcapi is None, "Nanvix: _testcapi not available")
     def test_pybuffer_size_from_format(self):
         # basic tests
         for format in ('', 'ii', '3s'):

@@ -24,6 +24,8 @@ def pickle_deprecated(testfunc):
     Third, run with warnings promoted to errors.
     """
     def inner(self):
+        if support.is_nanvix:
+            raise unittest.SkipTest("Nanvix: pickle broken on 32-bit platform")
         with self.assertWarns(DeprecationWarning):
             testfunc(self)
         with warnings.catch_warnings():
@@ -939,6 +941,7 @@ class TestBasicOps(unittest.TestCase):
         keyfunc.skip = 1
         self.assertRaises(ExpectedError, gulp, [None, None], keyfunc)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_filter(self):
         self.assertEqual(list(filter(isEven, range(6))), [0,2,4])
         self.assertEqual(list(filter(None, [0,1,0,2,0])), [1,2])

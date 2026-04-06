@@ -225,6 +225,7 @@ class TestJointOps:
         self.assertFalse(set('a').issubset('cbs'))
         self.assertFalse(set('cbs').issuperset('a'))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickling(self):
         for i in range(pickle.HIGHEST_PROTOCOL + 1):
             if type(self.s) not in (set, frozenset):
@@ -239,6 +240,7 @@ class TestJointOps:
                 self.assertFalse(hasattr(self.s, 'y'))
                 del self.s.x, self.s.z
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_iterator_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             itorg = iter(self.s)
@@ -923,6 +925,7 @@ class TestBasicOps:
         setiter = iter(self.set)
         self.assertEqual(setiter.__length_hint__(), len(self.set))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             p = pickle.dumps(self.set, proto)

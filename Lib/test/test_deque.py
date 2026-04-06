@@ -613,6 +613,7 @@ class TestBasic(unittest.TestCase):
         self.assertNotEqual(id(d), id(e))
         self.assertEqual(list(d), list(e))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle(self):
         for d in deque(range(200)), deque(range(200), 100):
             for i in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -622,6 +623,7 @@ class TestBasic(unittest.TestCase):
                 self.assertEqual(list(e), list(d))
                 self.assertEqual(e.maxlen, d.maxlen)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle_recursive(self):
         for d in deque('abc'), deque('abc', 3):
             d.append(d)
@@ -631,6 +633,7 @@ class TestBasic(unittest.TestCase):
                 self.assertEqual(id(e[-1]), id(e))
                 self.assertEqual(e.maxlen, d.maxlen)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_iterator_pickle(self):
         orig = deque(range(200))
         data = [i*1.01 for i in orig]
