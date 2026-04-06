@@ -83,11 +83,11 @@ endif
 # runner triggers a fatal fatfs panic in nanvixd.  The unittest runner loads
 # test modules via unittest.TextTestRunner directly, which works cleanly.
 #
-# Each batch builds its own ramfs image (~50M) containing the trimmed
-# stdlib + ALL top-level test files (for cross-test imports) +
-# infrastructure subpackages + only that batch's test subpackage
-# directories.  This scales to the full test suite without hitting
-# the 256MB VM memory limit.
+# Each batch builds its own ramfs image (~55M) containing the trimmed
+# stdlib + batch test modules + cross-import whitelist + infra
+# subpackages + data files.  Only the batch's own test_*.py files are
+# included (not all 405), keeping images small enough for the 32MB
+# heap in the 256MB standalone VM.
 # See: https://github.com/nanvix/cpython/issues/369
 test-regrtest-standalone: ramfs-stage
 	@echo "Test: unittest ($(words $(NANVIX_TEST_LIST)) modules, standalone)..."

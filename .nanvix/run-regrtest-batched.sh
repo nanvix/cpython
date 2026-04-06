@@ -27,12 +27,14 @@
 #
 # When RAMFS_TEMPLATE is set, each batch builds its own ramfs image.
 # To handle cross-test imports (e.g. test_int imports from test_grammar),
-# ALL top-level files from test/ are included in every image (~17M),
-# along with infrastructure subpackages (typinganndata, etc., ~5M).
-# Test subpackage directories (test_asyncio/, test_email/, etc.) are only
-# copied when that module is in the batch.  This keeps images at ~50M
-# base + per-batch subpackages, well within the 256MB VM limit even as
-# the full test suite grows.
+# a whitelist of cross-imported .py files is included in every image,
+# along with infrastructure subpackages (typinganndata, etc., ~2M) and
+# non-.py data files (~1.4M).  Only the batch's own test_*.py modules
+# and the whitelist are copied — NOT all 405 test_*.py files (~15M),
+# which would balloon images to ~95M and OOM.  Test subpackage dirs
+# (test_asyncio/, test_email/, etc.) and heavy data dirs
+# (decimaltestdata/) are only copied when that module is in the batch.
+# This keeps images at ~55M, well within the 256MB VM limit.
 #
 # Standalone uses run-standalone-unittest.py instead of regrtest because
 # the regrtest runner triggers a fatfs panic in nanvixd (poll() →
@@ -82,47 +84,88 @@ else
 	ramfs_args=""
 fi
 
+# Cross-import whitelist: test modules imported by OTHER test modules.
+# Derived from static analysis of `from test.X import ...` / `import test.X`
+# across all modules in NANVIX_TEST_LIST.  Update when adding new modules.
+#
+#   test_grammar.py      ← test_float, test_complex, test_int, test_tokenize
+#   string_tests.py      ← test_bytes
+#   list_tests.py        ← test_bytes
+#   seq_tests.py         ← list_tests (transitive)
+#   test_math.py         ← test_cmath
+#   test_contextlib.py   ← test_contextlib_async
+#   test_set.py          ← test_pprint
+#   mapping_tests.py     ← test_dict (via mapping_tests import)
+#   pickletester.py      ← various pickle-related tests
+CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.py test_math.py test_contextlib.py test_set.py mapping_tests.py pickletester.py"
+
 # inject_test_files <mod1> [<mod2> ...]
 # Copy test infrastructure and test modules into the ramfs template.
-# ALL top-level files from test/ are always included: .py files for
-# cross-test imports (~15M) and data files (.txt, .json, etc.) that
-# tests load at runtime (~1.6M).  Infrastructure subpackages
-# (typinganndata, tokenizedata, etc.) are always included too (~5M)
-# since they are imported at module load time by many tests.  Test
-# subpackage directories (test_asyncio/, test_email/, etc.) are only
-# copied when that module is in the current batch.  This keeps each
-# per-batch ramfs image at ~50M, well within the 256MB VM limit.
+#
+# To keep ramfs images small (~55M instead of ~95M), we do NOT copy all
+# 405 test_*.py files.  Instead we copy:
+#   1. Essential package files (__init__.py, __main__.py, regrtest.py)
+#   2. The batch's own test modules
+#   3. Cross-import whitelist (handful of .py files imported across modules)
+#   4. Non-.py data files (.txt, .json, .pck — ~1.4M of test fixtures)
+#   5. Infrastructure subpackages (typinganndata, tokenizedata, etc. — ~2M)
+#   6. test/data/ directory (shared fixtures)
+#   7. Per-batch test subpackage directories (test_asyncio/, etc.)
+# Heavy data directories like decimaltestdata/ (4.5M) are only included
+# when the corresponding test module is in the batch.
 inject_test_files() {
 	mkdir -p "$test_dst/support"
 	cp -a "$test_src/support/." "$test_dst/support/"
-	# Copy ALL top-level files (*.py + data files like .txt, .json, .pck).
-	# The .py files handle cross-test imports (~15M); the data files are
-	# test fixtures loaded by open() at runtime (~1.6M).
-	for f in "$test_src"/*; do
-		[ -f "$f" ] && cp "$f" "$test_dst/"
+	# 1. Essential package files
+	for f in __init__.py __main__.py regrtest.py; do
+		[ -f "$test_src/$f" ] && cp "$test_src/$f" "$test_dst/"
 	done
-	# Copy infrastructure subpackages — always needed (~5M total).
+	# 2. Batch's own test modules
+	for mod in "$@"; do
+		[ -f "$test_src/${mod}.py" ] && cp "$test_src/${mod}.py" "$test_dst/"
+	done
+	# 3. Cross-import whitelist
+	for f in $CROSS_IMPORT_WHITELIST; do
+		[ -f "$test_src/$f" ] && cp "$test_src/$f" "$test_dst/"
+	done
+	# 4. Non-.py data files (test fixtures: .txt, .json, .pck, etc. — ~1.4M)
+	for f in "$test_src"/*; do
+		[ -f "$f" ] || continue
+		case "$f" in *.py) continue ;; esac
+		cp "$f" "$test_dst/"
+	done
+	# 5. Infrastructure subpackages — always needed (~2M without decimaltestdata).
 	# These are non-test_* subdirectories like typinganndata, tokenizedata,
 	# audiodata, etc. that test modules import at load time.
 	for d in "$test_src"/*/; do
 		name=$(basename "$d")
 		case "$name" in
 		__pycache__ | support | data | libregrtest) continue ;;
-		test_*) continue ;; # test subpackages are per-batch
+		test_*) continue ;;          # test subpackages are per-batch
+		decimaltestdata) continue ;; # large (4.5M), per-batch only
 		*) cp -a "$d" "$test_dst/" ;;
 		esac
 	done
-	# test/data/ contains fixtures some tests load at runtime
+	# 6. test/data/ contains fixtures some tests load at runtime
 	if [ -d "$test_src/data" ]; then
 		cp -a "$test_src/data" "$test_dst/"
 	fi
-	# Copy test subpackage directories only for modules in this batch
+	# 7. Per-batch: test subpackage directories and heavy data dirs
 	for mod in "$@"; do
 		if [ -d "$test_src/test_${mod}" ]; then
 			cp -a "$test_src/test_${mod}" "$test_dst/"
 		elif [ -d "$test_src/${mod}" ]; then
 			cp -a "$test_src/${mod}" "$test_dst/"
 		fi
+	done
+	# decimaltestdata/ only when test_decimal is in the batch
+	for mod in "$@"; do
+		case "$mod" in
+		test_decimal)
+			[ -d "$test_src/decimaltestdata" ] && cp -a "$test_src/decimaltestdata" "$test_dst/"
+			break
+			;;
+		esac
 	done
 	# Copy the standalone unittest runner into ramfs root
 	cp "$UNITTEST_RUNNER" "$RAMFS_TEMPLATE/run-standalone-unittest.py"
