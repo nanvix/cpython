@@ -8,11 +8,9 @@
 # passed to nanvixd via -bin-dir.  The ramfs contains only the stdlib and
 # test fixtures.
 #
-# regrtest is NOT used in standalone mode because it triggers a fatfs panic
-# in nanvixd 0.12.x (poll() → OperationNotSupported → byte index out of
-# bounds in dir.rs).  Instead, test modules are loaded and run via
-# unittest.TextTestRunner through run-standalone-unittest.py, which
-# bypasses the problematic regrtest startup code path entirely.
+# regrtest is used for all modes including standalone.  A /tmp directory is
+# created on the ramfs so tempfile.gettempdir() works.  Per-mode test
+# exclusions use regrtest --ignore via EXCLUDE_TESTS.
 
 include .nanvix/mk/test-common.mk
 
@@ -24,8 +22,10 @@ RAMFS_STAGING = $(TEST_RAMFS_CONTENT)
 RAMFS_IMG = /tmp/cpython-rootfs.img
 MKRAMFS = $(abspath $(NANVIX_HOME))/bin/mkramfs.elf
 
-# Standalone unittest runner — injected into per-batch ramfs by run-regrtest-batched.sh
-UNITTEST_RUNNER = $(CURDIR)/.nanvix/run-standalone-unittest.py
+# Per-mode test exclusions for standalone (passed to regrtest --ignore).
+#   test_filter_dealloc: creates 1M nested filter objects, OOMs the 32MB heap.
+#   test_random_files: samples 10 test_*.py files but per-batch ramfs has < 10.
+NANVIX_STANDALONE_EXCLUDE = test_filter_dealloc
 
 include .nanvix/mk/ramfs.mk
 
@@ -77,11 +77,9 @@ endif
 		}
 	$(call validate-hello,/tmp/cpython_test.log)
 
-# test-regrtest-standalone: per-batch ramfs tests via unittest runner.
+# test-regrtest-standalone: per-batch ramfs tests via regrtest.
 #
-# Uses run-standalone-unittest.py instead of regrtest because the regrtest
-# runner triggers a fatal fatfs panic in nanvixd.  The unittest runner loads
-# test modules via unittest.TextTestRunner directly, which works cleanly.
+# Uses regrtest with /tmp on the ramfs so tempfile.gettempdir() works.
 #
 # Each batch builds its own ramfs image (~55M) containing the trimmed
 # stdlib + batch test modules + cross-import whitelist + infra
@@ -90,14 +88,14 @@ endif
 # heap in the 256MB standalone VM.
 # See: https://github.com/nanvix/cpython/issues/369
 test-regrtest-standalone: ramfs-stage
-	@echo "Test: unittest ($(words $(NANVIX_TEST_LIST)) modules, standalone)..."
+	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, standalone)..."
 	cd $(TEST_STAGING)/sysroot && \
 		RAMFS_TEMPLATE="$(TEST_RAMFS_CONTENT)/sysroot" \
 		TEST_SOURCE="$(TEST_STAGING)/sysroot" \
 		MKRAMFS="$(MKRAMFS)" \
 		NANVIXD_RAMFS="$(RAMFS_IMG)" \
 		NANVIXD_BIN_DIR="./bin" \
-		UNITTEST_RUNNER="$(UNITTEST_RUNNER)" \
+		EXCLUDE_TESTS="$(NANVIX_STANDALONE_EXCLUDE)" \
 		BATCH_SIZE=$(NANVIX_TEST_BATCH_SIZE) \
 		NANVIXD_EXTRA_ARGS="$(NANVIXD_EXTRA_ARGS)" \
 		$(CURDIR)/.nanvix/run-regrtest-batched.sh $(NANVIX_TEST_LIST)

@@ -16,16 +16,19 @@
 #   BATCH_SIZE           - modules per VM invocation (default: 4)
 #   NANVIXD_EXTRA_ARGS   - extra flags passed to nanvixd.elf (optional)
 #   BATCH_TIMEOUT        - per-batch timeout in seconds (default: 300)
+#   EXCLUDE_TESTS        - space-separated test patterns to exclude via
+#                          regrtest --ignore (optional)
 #
-# Standalone mode (per-batch ramfs with unittest runner):
+# Standalone mode (per-batch ramfs):
 #   RAMFS_TEMPLATE       - trimmed sysroot directory (no test/)
 #   TEST_SOURCE          - original staging sysroot (has full test/)
 #   MKRAMFS              - path to mkramfs.elf
 #   NANVIXD_RAMFS        - output path for per-batch ramfs image
 #   NANVIXD_BIN_DIR      - binary directory for nanvixd -bin-dir flag
-#   UNITTEST_RUNNER      - path to run-standalone-unittest.py on the HOST
 #
 # When RAMFS_TEMPLATE is set, each batch builds its own ramfs image.
+# A /tmp directory is created on the ramfs so regrtest's
+# tempfile.gettempdir() works without triggering the fatfs panic.
 # To handle cross-test imports (e.g. test_int imports from test_grammar),
 # a whitelist of cross-imported .py files is included in every image,
 # along with infrastructure subpackages (typinganndata, etc., ~2M) and
@@ -36,16 +39,22 @@
 # (decimaltestdata/) are only copied when that module is in the batch.
 # This keeps images at ~55M, well within the 256MB VM limit.
 #
-# Standalone uses run-standalone-unittest.py instead of regrtest because
-# the regrtest runner triggers a fatfs panic in nanvixd (poll() →
-# OperationNotSupported → byte index out of bounds in dir.rs).  The
-# unittest runner loads test modules via unittest.TextTestRunner directly,
-# which avoids the problematic regrtest startup code path.
+# Per-mode test exclusions are supported via EXCLUDE_TESTS, which is
+# converted to regrtest --ignore flags.  This allows excluding specific
+# test methods that fail in a given mode (e.g. OOM on standalone's
+# 32MB heap) without modifying CPython test source files.
 
 set -e
 
 batch_size="${BATCH_SIZE:-4}"
 timeout_sec="${BATCH_TIMEOUT:-300}"
+exclude_tests="${EXCLUDE_TESTS:-}"
+exclude_args=""
+if [ -n "$exclude_tests" ]; then
+	for pat in $exclude_tests; do
+		exclude_args="$exclude_args -i $pat"
+	done
+fi
 logfile="/tmp/cpython_regrtest_batch.log"
 
 # Clean up leftover /tmp/test_python_* directories from prior runs.
@@ -72,10 +81,6 @@ if [ -n "$RAMFS_TEMPLATE" ]; then
 		echo "run-regrtest-batched.sh: mkramfs not found at $MKRAMFS" >&2
 		exit 1
 	fi
-	if [ -z "$UNITTEST_RUNNER" ] || [ ! -f "$UNITTEST_RUNNER" ]; then
-		echo "run-regrtest-batched.sh: standalone mode requires UNITTEST_RUNNER (path to run-standalone-unittest.py)" >&2
-		exit 1
-	fi
 	test_src="$TEST_SOURCE/lib/python3.12/test"
 	test_dst="$RAMFS_TEMPLATE/lib/python3.12/test"
 	ramfs_args="-bin-dir ${NANVIXD_BIN_DIR:-./bin} -ramfs $NANVIXD_RAMFS"
@@ -93,11 +98,14 @@ fi
 #   list_tests.py        ← test_bytes
 #   seq_tests.py         ← list_tests (transitive)
 #   test_math.py         ← test_cmath
+#   test_iter.py         ← test_math (test_math.testSumProd imports BasicIterClass)
 #   test_contextlib.py   ← test_contextlib_async
 #   test_set.py          ← test_pprint
 #   mapping_tests.py     ← test_dict (via mapping_tests import)
 #   pickletester.py      ← various pickle-related tests
-CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.py test_math.py test_contextlib.py test_set.py mapping_tests.py pickletester.py"
+#   test_longexp.py      ← padding (ensures ≥10 test_*.py for test_tokenize.test_random_files)
+#   test_errno.py        ← padding (same reason — random.sample(testfiles, 10) needs ≥10)
+CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.py test_math.py test_iter.py test_contextlib.py test_set.py mapping_tests.py pickletester.py test_longexp.py test_errno.py"
 
 # inject_test_files <mod1> [<mod2> ...]
 # Copy test infrastructure and test modules into the ramfs template.
@@ -115,6 +123,7 @@ CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.
 # when the corresponding test module is in the batch.
 inject_test_files() {
 	mkdir -p "$test_dst/support"
+	mkdir -p "$RAMFS_TEMPLATE/tmp"
 	cp -a "$test_src/support/." "$test_dst/support/"
 	# 1. Essential package files
 	for f in __init__.py __main__.py regrtest.py; do
@@ -140,7 +149,7 @@ inject_test_files() {
 	for d in "$test_src"/*/; do
 		name=$(basename "$d")
 		case "$name" in
-		__pycache__ | support | data | libregrtest) continue ;;
+		__pycache__ | support | data) continue ;;
 		test_*) continue ;;          # test subpackages are per-batch
 		decimaltestdata) continue ;; # large (4.5M), per-batch only
 		*) cp -a "$d" "$test_dst/" ;;
@@ -167,14 +176,11 @@ inject_test_files() {
 			;;
 		esac
 	done
-	# Copy the standalone unittest runner into ramfs root
-	cp "$UNITTEST_RUNNER" "$RAMFS_TEMPLATE/run-standalone-unittest.py"
 }
 
 # clean_test_files - remove injected test files from the ramfs template.
 clean_test_files() {
 	rm -rf "$test_dst"
-	rm -f "$RAMFS_TEMPLATE/run-standalone-unittest.py"
 }
 
 batch_num=0
@@ -199,11 +205,19 @@ while [ -n "$modules" ]; do
 		echo "    ramfs: $img_size"
 	fi
 
+	# Build the nanvixd arg string.  nanvixd splits on spaces to form argv,
+	# and does NOT collapse consecutive spaces — each extra space creates an
+	# empty-string argv entry that regrtest interprets as an unnamed test
+	# module (→ "No module named 'test.'").  Trim batch and exclude_args to
+	# prevent stray spaces.
+	batch_trimmed=$(echo $batch)
+	exclude_trimmed=$(echo $exclude_args)
+
 	set +e
 	if [ "$standalone" = "1" ]; then
 		timeout "$timeout_sec" ./bin/nanvixd.elf $ramfs_args $NANVIXD_EXTRA_ARGS \
 			-- ./bin/python3.12 \
-			"-B /run-standalone-unittest.py $batch;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1" \
+			"-B -m test ${batch_trimmed}${exclude_trimmed:+ $exclude_trimmed};PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1" \
 			</dev/null >"$logfile" 2>&1
 	else
 		timeout "$timeout_sec" ./bin/nanvixd.elf $NANVIXD_EXTRA_ARGS \
@@ -221,11 +235,7 @@ while [ -n "$modules" ]; do
 		exit 1
 	fi
 
-	if [ "$standalone" = "1" ]; then
-		grep -E "^(All [0-9]+ tests OK|FAILED:)" "$logfile" || true
-	else
-		grep -E "^(== Tests result:|Total tests:|All [0-9]+ tests OK)" "$logfile" || true
-	fi
+	grep -E "^(== Tests result:|Total tests:|All [0-9]+ tests OK)" "$logfile" || true
 	total_pass=$((total_pass + batch_count))
 done
 
