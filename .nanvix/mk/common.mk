@@ -24,12 +24,33 @@ NANVIX_RELEASE ?= no
 #
 # Trimmed to validated-green modules only. The remaining modules fail due to
 # missing platform capabilities (fork/exec, tempdir, asyncio event loop) or
-# memory limits (test_json MemoryError). Those belong to #321 and #322 where
-# each module gets individual skip/xfail annotations before being re-added.
+# memory limits. Those belong to #321 and #322 where each module gets
+# individual skip/xfail annotations before being re-added.
 #   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
-#             test_bytes test_int test_json test_datetime test_os test_pathlib
-#             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+#             test_bytes test_int test_datetime test_os test_pathlib test_io
+#
+# Core numeric/struct tests (Issue #320)
+NANVIX_TEST_LIST ?= \
+  test_float test_complex test_bool test_struct \
+  \
+  test_string test_string_literals test_unicode test_unicodedata \
+  test_utf8_mode test_utf8source \
+  \
+  test_codecs test_multibytecodec \
+  test_codecencodings_cn test_codecencodings_hk test_codecencodings_iso2022 \
+  test_codecencodings_jp test_codecencodings_kr test_codecencodings_tw \
+  test_codecmaps_cn test_codecmaps_hk test_codecmaps_jp \
+  test_codecmaps_kr test_codecmaps_tw \
+  \
+  test_pickle test_picklebuffer test_pickletools test_marshal \
+  test_json test_plistlib \
+  \
+  test_base64 test_binascii test_quopri test_uu \
+  \
+  test_re \
+  \
+  test_textwrap test_difflib test_pprint test_reprlib \
+  test_format test_print
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
