@@ -19,6 +19,7 @@ from test.support import os_helper
 from test.support.script_helper import (
     make_pkg, make_script, make_zip_pkg, make_zip_script,
     assert_python_ok, assert_python_failure, spawn_python, kill_python)
+from test.support import requires_subprocess
 
 verbose = support.verbose
 
@@ -89,6 +90,7 @@ def _make_test_zip_pkg(zip_dir, zip_basename, pkg_name, script_basename,
     importlib.invalidate_caches()
     return to_return
 
+@requires_subprocess()
 class CmdLineTest(unittest.TestCase):
     def _check_output(self, script_name, exit_code, data,
                              expected_file, expected_argv0,

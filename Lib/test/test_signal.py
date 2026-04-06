@@ -128,6 +128,7 @@ class PosixTests(unittest.TestCase):
         self.assertIn("Hangup", signal.strsignal(signal.SIGHUP))
 
     # Issue 3864, unknown if this affects earlier versions of freebsd also
+    @support.requires_subprocess()
     def test_interprocess_signal(self):
         dirname = os.path.dirname(__file__)
         script = os.path.join(dirname, 'signalinterproctester.py')
@@ -892,6 +893,7 @@ class PendingSignalsTests(unittest.TestCase):
                          'need signal.pthread_sigmask()')
     @unittest.skipUnless(hasattr(signal, 'sigpending'),
                          'need signal.sigpending()')
+    @support.requires_subprocess()
     def test_sigpending(self):
         code = """if 1:
             import os
@@ -922,6 +924,7 @@ class PendingSignalsTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(signal, 'pthread_kill'),
                          'need signal.pthread_kill()')
     @threading_helper.requires_working_threading()
+    @support.requires_subprocess()
     def test_pthread_kill(self):
         code = """if 1:
             import signal
@@ -947,6 +950,7 @@ class PendingSignalsTests(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(signal, 'pthread_sigmask'),
                          'need signal.pthread_sigmask()')
+    @support.requires_subprocess()
     def wait_helper(self, blocked, test):
         """
         test: body of the "def test(signum):" function.
@@ -1059,6 +1063,7 @@ class PendingSignalsTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(signal, 'pthread_sigmask'),
                          'need signal.pthread_sigmask()')
     @threading_helper.requires_working_threading()
+    @support.requires_subprocess()
     def test_sigwait_thread(self):
         # Check that calling sigwait() from a thread doesn't suspend the whole
         # process. A new interpreter is spawned to avoid problems when mixing
@@ -1115,6 +1120,7 @@ class PendingSignalsTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(signal, 'pthread_sigmask'),
                          'need signal.pthread_sigmask()')
     @threading_helper.requires_working_threading()
+    @support.requires_subprocess()
     def test_pthread_sigmask(self):
         code = """if 1:
         import signal
@@ -1193,6 +1199,7 @@ class PendingSignalsTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(signal, 'pthread_kill'),
                          'need signal.pthread_kill()')
     @threading_helper.requires_working_threading()
+    @support.requires_subprocess()
     def test_pthread_kill_main_thread(self):
         # Test that a signal can be sent to the main thread with pthread_kill()
         # before any other thread has been created (see issue #12392).
@@ -1434,6 +1441,7 @@ class RaiseSignalTest(unittest.TestCase):
         signal.raise_signal(signal.SIGINT)
         self.assertTrue(is_ok)
 
+    @support.requires_subprocess()
     def test__thread_interrupt_main(self):
         # See https://github.com/python/cpython/issues/102397
         code = """if 1:

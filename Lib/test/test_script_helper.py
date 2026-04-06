@@ -10,15 +10,18 @@ from unittest import mock
 
 class TestScriptHelper(unittest.TestCase):
 
+    @requires_subprocess()
     def test_assert_python_ok(self):
         t = script_helper.assert_python_ok('-c', 'import sys; sys.exit(0)')
         self.assertEqual(0, t[0], 'return code was not 0')
 
+    @requires_subprocess()
     def test_assert_python_failure(self):
         # I didn't import the sys module so this child will fail.
         rc, out, err = script_helper.assert_python_failure('-c', 'sys.exit(0)')
         self.assertNotEqual(0, rc, 'return code should not be 0')
 
+    @requires_subprocess()
     def test_assert_python_ok_raises(self):
         # I didn't import the sys module so this child will fail.
         with self.assertRaises(AssertionError) as error_context:
@@ -27,6 +30,7 @@ class TestScriptHelper(unittest.TestCase):
         self.assertIn('command line:', error_msg)
         self.assertIn('sys.exit(0)', error_msg, msg='unexpected command line')
 
+    @requires_subprocess()
     def test_assert_python_failure_raises(self):
         with self.assertRaises(AssertionError) as error_context:
             script_helper.assert_python_failure('-c', 'import sys; sys.exit(0)')

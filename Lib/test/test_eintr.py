@@ -10,6 +10,7 @@ class EINTRTests(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(signal, "setitimer"), "requires setitimer()")
     @support.requires_resource('walltime')
+    @support.requires_subprocess()
     def test_all(self):
         # Run the tester in a sub-process, to make sure there is only one
         # thread (for reliable signal delivery).
