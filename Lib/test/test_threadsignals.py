@@ -11,6 +11,9 @@ import time
 if (sys.platform[:3] == 'win'):
     raise unittest.SkipTest("Can't test signal on %s" % sys.platform)
 
+if sys.platform == 'nanvix':
+    raise unittest.SkipTest("SIGUSR1/SIGUSR2/SIGALRM delivery to threads is unreliable on Nanvix")
+
 process_pid = os.getpid()
 signalled_all=thread.allocate_lock()
 

@@ -18,6 +18,12 @@ MEMORY_SIZE ?= 128mb
 # followed by a full rebuild so the new configure flags are picked up.
 NANVIX_RELEASE ?= no
 
+# Maximum number of test modules per regrtest VM invocation.
+# The 128MB microvm can run at most ~5 test modules per Python process before
+# exhausting virtual memory.  Tests are split into batches of this size and
+# each batch gets its own nanvixd.elf invocation.
+NANVIX_TEST_BATCH_SIZE ?= 4
+
 # Space-separated list of stdlib test modules to run via 'python3 -m test'.
 # Keep this list to pure-Python, non-networking tests known to pass on Nanvix.
 # Expand it as more tests are enabled (see issues linked from #320).
@@ -26,10 +32,34 @@ NANVIX_RELEASE ?= no
 # missing platform capabilities (fork/exec, tempdir, asyncio event loop) or
 # memory limits (test_json MemoryError). Those belong to #321 and #322 where
 # each module gets individual skip/xfail annotations before being re-added.
-#   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
-#             test_bytes test_int test_json test_datetime test_os test_pathlib
-#             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+# Excluded: test_exception_hierarchy (crashes at import time: errno.ESHUTDOWN missing on Nanvix)
+#           test_inspect (VM hangs: IsolatedAsyncioTestCase sets up asyncio loop before skip is evaluated;
+#                         module too large for 128MB VM causing resource exhaustion)
+#
+# Threading tests (#325): pthreads are available (ac_cv_pthread_is_default=yes).
+# Fork/subprocess/socket tests auto-skip via existing support guards.
+# test_threadsignals: SIGUSR1/SIGUSR2/SIGALRM delivery to threads is unreliable
+#   on Nanvix; the module raises unittest.SkipTest on sys.platform == 'nanvix'.
+# test_asyncgen: requires working sockets; auto-skips via requires_working_socket.
+NANVIX_TEST_LIST ?= \
+    test_float test_complex test_bool test_struct \
+    test_int test_range test_slice test_memoryview test_bytes test_tuple \
+    test_builtin test_operator test_binop test_unary \
+    test_compare test_richcmp test_augassign test_contains \
+    test_grammar test_syntax test_compile test_compiler_assemble \
+    test_compiler_codegen test_ast test_symtable test_opcache \
+    test_peepholer test_dis test_code test_keyword test_tokenize \
+    test_perf_profiler \
+    test_call test_extcall test_positional_only_arg \
+    test_scope test_global test_dynamic test_with \
+    test_types test_typechecks test_isinstance test_hash test_index test_super test_property \
+    test_math test_cmath test_decimal test_fractions test_statistics test_random test_numeric_tower \
+    test_exception_group test_exceptions test_raise test_traceback \
+    test_frame test_contextlib test_contextlib_async test_pprint test_reprlib \
+    test_list test_dict \
+    test_thread test_threading test_threading_local \
+    test_threadedtempfile test_queue test_context \
+    test_coroutines test_asyncgen test_threadsignals
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

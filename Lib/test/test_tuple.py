@@ -370,6 +370,11 @@ class TupleTest(seq_tests.CommonTest):
         check(10)       # check our checking code
         check(1000000)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")
+    def test_pickle(self):
+        super().test_pickle()
+
+    @unittest.skipIf(support.is_nanvix, "Nanvix 32-bit: corrupt pickle data")
     def test_iterator_pickle(self):
         # Userlist iterators don't support pickling yet since
         # they are based on generators.
@@ -386,6 +391,7 @@ class TupleTest(seq_tests.CommonTest):
             d = pickle.dumps(it, proto)
             self.assertEqual(self.type2test(it), self.type2test(data)[1:])
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix 32-bit: corrupt pickle data")
     def test_reversed_pickle(self):
         data = self.type2test([4, 5, 6, 7])
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
