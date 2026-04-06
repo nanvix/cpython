@@ -1707,6 +1707,7 @@ class TestBasicOps(unittest.TestCase):
         script_helper.assert_python_ok("-c", script)
 
     # Issue 13454: Crash when deleting backward iterator from tee()
+    @unittest.skipIf(support.is_nanvix, "Nanvix: 20M-element tee OOMs the 128MB VM")
     def test_tee_del_backward(self):
         forward, backward = tee(repeat(None, 20000000))
         try:
