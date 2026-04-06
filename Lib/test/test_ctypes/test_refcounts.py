@@ -7,6 +7,10 @@ MyCallback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int)
 OtherCallback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_ulonglong)
 
 import _ctypes_test
+
+if not getattr(_ctypes_test, '__file__', None):
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+
 dll = ctypes.CDLL(_ctypes_test.__file__)
 
 class RefcountTestCase(unittest.TestCase):

@@ -2,6 +2,10 @@ import unittest
 import pickle
 from ctypes import *
 import _ctypes_test
+
+if not getattr(_ctypes_test, '__file__', None):
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+
 dll = CDLL(_ctypes_test.__file__)
 
 class X(Structure):

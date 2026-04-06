@@ -23,6 +23,10 @@ import unittest
 # In this case, there would have to be an additional reference to the argument...
 
 import _ctypes_test
+
+if not getattr(_ctypes_test, '__file__', None):
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+
 testdll = CDLL(_ctypes_test.__file__)
 
 # Return machine address `a` as a (possibly long) non-negative integer.

@@ -29,7 +29,9 @@ NANVIX_RELEASE ?= no
 #   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
 #             test_bytes test_int test_json test_datetime test_os test_pathlib
 #             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct \
+	test_capi test_ctypes \
+	test_cppext test_stable_abi_ctypes test_clinic
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX

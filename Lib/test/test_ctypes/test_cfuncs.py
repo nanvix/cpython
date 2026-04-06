@@ -7,6 +7,9 @@ from test.test_ctypes import need_symbol
 
 import _ctypes_test
 
+if not getattr(_ctypes_test, '__file__', None):
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+
 class CFunctions(unittest.TestCase):
     _dll = CDLL(_ctypes_test.__file__)
 
