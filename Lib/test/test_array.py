@@ -448,6 +448,7 @@ class BaseTest:
             array.array(self.typecode, self.example + self.example[:1])
         )
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: garbled TESTFN on Nanvix filesystem")
     def test_tofromfile(self):
         a = array.array(self.typecode, 2*self.example)
         self.assertRaises(TypeError, a.tofile)

@@ -819,6 +819,7 @@ class TestSubclass(unittest.TestCase):
         d.clear()
         self.assertEqual(len(d), 0)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_copy_pickle(self):
         for cls in Deque, DequeWithSlots:
             for d in cls('abc'), cls('abcde', maxlen=4):
@@ -843,6 +844,7 @@ class TestSubclass(unittest.TestCase):
                     self.assertEqual(e.z, d.z)
                     self.assertFalse(hasattr(e, 'y'))
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
     def test_pickle_recursive(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             for d in Deque('abc'), Deque('abc', 3):
@@ -912,6 +914,10 @@ class TestSequence(seq_tests.CommonTest):
     def test_getitem(self):
         # For now, bypass tests that require slicing
         pass
+
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    def test_pickle(self):
+        super().test_pickle()
 
     def test_getslice(self):
         # For now, bypass tests that require slicing
