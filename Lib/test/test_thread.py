@@ -227,6 +227,7 @@ class LockTests(lock_tests.LockTests):
     locktype = thread.allocate_lock
 
 
+@unittest.skipUnless(support.has_fork_support, "requires working os.fork()")
 class TestForkInThread(unittest.TestCase):
     def setUp(self):
         self.read_fd, self.write_fd = os.pipe()

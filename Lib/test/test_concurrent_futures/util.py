@@ -79,6 +79,8 @@ class ProcessPoolForkMixin(ExecutorMixin):
     ctx = "fork"
 
     def get_context(self):
+        if support.is_nanvix:
+            self.skipTest("Nanvix: no fork/subprocess support")
         try:
             _check_system_limits()
         except NotImplementedError:
@@ -95,6 +97,8 @@ class ProcessPoolSpawnMixin(ExecutorMixin):
     ctx = "spawn"
 
     def get_context(self):
+        if support.is_nanvix:
+            self.skipTest("Nanvix: no fork/subprocess support")
         try:
             _check_system_limits()
         except NotImplementedError:
@@ -107,6 +111,8 @@ class ProcessPoolForkserverMixin(ExecutorMixin):
     ctx = "forkserver"
 
     def get_context(self):
+        if support.is_nanvix:
+            self.skipTest("Nanvix: no fork/subprocess support")
         try:
             _check_system_limits()
         except NotImplementedError:
