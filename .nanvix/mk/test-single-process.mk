@@ -29,19 +29,10 @@ test-hello-single-process: test-stage
 # test-regrtest-single-process: run stdlib regression tests
 test-regrtest-single-process: test-stage
 ifneq ($(NANVIX_RELEASE),yes)
-	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules)..."
-	cd $(TEST_STAGING)/sysroot && \
-		{ \
-			: > /tmp/cpython_regrtest.log; \
-			timeout 600 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
-			  --timeout=120 $(NANVIX_TEST_LIST) \
-			  < /dev/null > /tmp/cpython_regrtest.log 2>&1; \
-			regrtest_status=$$?; \
-			if [ $$regrtest_status -ne 0 ]; then \
-				echo "  FAIL: regrtest exited with status $$regrtest_status"; cat /tmp/cpython_regrtest.log; exit 1; \
-			fi; \
-			echo "  PASS: regrtest completed"; \
-		}
+	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, batched)..."
+	@cd $(TEST_STAGING)/sysroot && \
+		BATCH_SIZE=$(NANVIX_TEST_BATCH_SIZE) NANVIXD_EXTRA_ARGS="$(NANVIXD_EXTRA_ARGS)" \
+		$(CURDIR)/.nanvix/run-regrtest-batched.sh $(NANVIX_TEST_LIST)
 else
 	@echo "Test: regrtest skipped (NANVIX_RELEASE=yes)"
 endif
