@@ -53,7 +53,10 @@ class GlobTests(unittest.TestCase):
     def tearDown(self):
         if self.dir_fd is not None:
             os.close(self.dir_fd)
-        shutil.rmtree(self.tempdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass  # Nanvix: rmdir returns ENOSYS
 
     def glob(self, *parts, **kwargs):
         if len(parts) == 1:
