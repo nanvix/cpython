@@ -19,8 +19,8 @@ except ImportError:
     resource = None
 
 
-if support.is_emscripten or support.is_wasi:
-    raise unittest.SkipTest("Cannot create socketpair on Emscripten/WASI.")
+if support.is_emscripten or support.is_wasi or support.is_nanvix:
+    raise unittest.SkipTest("Cannot create socketpair on Emscripten/WASI/Nanvix.")
 
 
 if hasattr(socket, 'socketpair'):

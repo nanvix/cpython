@@ -19,6 +19,8 @@ try:
 except ImportError:
     ssl = None
 
+support.requires_working_socket(module=True)
+
 
 certfile = os.path.join(os.path.dirname(__file__), 'certdata', 'keycert3.pem')
 

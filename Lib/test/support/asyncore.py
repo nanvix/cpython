@@ -59,12 +59,16 @@ import warnings
 
 import os
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, EINVAL, \
-     ENOTCONN, ESHUTDOWN, EISCONN, EBADF, ECONNABORTED, EPIPE, EAGAIN, \
+     ENOTCONN, EISCONN, EBADF, ECONNABORTED, EPIPE, EAGAIN, \
      errorcode
+try:
+    from errno import ESHUTDOWN
+except ImportError:
+    ESHUTDOWN = None
 
 
-_DISCONNECTED = frozenset({ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED, EPIPE,
-                           EBADF})
+_DISCONNECTED = frozenset(filter(None, {ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED, EPIPE,
+                                        EBADF}))
 
 try:
     socket_map

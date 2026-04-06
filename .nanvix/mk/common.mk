@@ -29,7 +29,21 @@ NANVIX_RELEASE ?= no
 #   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
 #             test_bytes test_int test_json test_datetime test_os test_pathlib
 #             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct \
+    \
+    test_ipaddress test_urlparse test_http_cookies test_http_cookiejar \
+    \
+    test_urllib test_urllib2 test_urllib_response \
+    \
+    test_socket test_ssl test_timeout \
+    \
+    test_httplib \
+    \
+    test_ftplib test_poplib test_imaplib test_nntplib test_smtplib \
+    \
+    test_xmlrpc \
+    \
+    test_select test_selectors test_poll test_socketserver
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
