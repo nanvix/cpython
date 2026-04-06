@@ -228,6 +228,16 @@ The `./z test` target runs **64 CPython stdlib test modules** on Nanvix
 (i686, microvm, multi-process, 256 MB RAM). Tests are split into batches of 4
 modules per VM invocation to stay within per-process memory limits.
 
+In **multi-process** and **single-process** deployment modes, tests run via
+CPython's regrtest runner (`python -m test`).
+
+In **standalone** mode, regrtest is not used because it triggers a fatal fatfs
+panic in nanvixd (`poll()` → `OperationNotSupported` → byte index out of bounds
+in `dir.rs`). Instead, test modules are loaded and executed directly via
+`unittest.TextTestRunner` through `run-standalone-unittest.py`, which bypasses
+the problematic regrtest startup code path entirely. Individual test modules
+pass cleanly in standalone mode using this approach.
+
 | Metric | Value |
 |--------|-------|
 | **Modules enabled** | 64 |
@@ -311,6 +321,7 @@ The following changes were made to support Nanvix.
 | `Makefile.nanvix` | Top-level Makefile (includes composable `.mk` files) |
 | `.nanvix/mk/*.mk` | Composable Make includes (common, test modes, packaging) |
 | `.nanvix/run-regrtest-batched.sh` | Batched regrtest runner (splits modules across VM invocations) |
+| `.nanvix/run-standalone-unittest.py` | Standalone test runner (bypasses regrtest via `unittest.TextTestRunner`) |
 | `NANVIX.md` | This documentation file |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
@@ -334,6 +345,7 @@ The following changes were made to support Nanvix.
 | **Pickle corruption** | `pickle` produces corrupt data on 32-bit Nanvix; likely C accelerator issue |
 | **Missing C test extensions** | `_testcapi` and `_testinternalcapi` not built |
 | **Round-half-up** | C library uses round-half-up instead of IEEE 754 round-half-to-even |
+| **Standalone regrtest** | regrtest runner triggers fatfs panic in standalone mode; tests use `unittest.TextTestRunner` directly |
 
 ---
 
