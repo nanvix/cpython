@@ -1696,6 +1696,7 @@ class CoverageOneHundredTestCase(unittest.TestCase):
             parser['s2'].getdecimal('two')
 
 
+@unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")
 class ExceptionPicklingTestCase(unittest.TestCase):
     """Tests for issue #13760: ConfigParser exceptions are not picklable."""
 

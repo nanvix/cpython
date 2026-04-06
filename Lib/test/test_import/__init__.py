@@ -27,7 +27,7 @@ import _imp
 from test.support import os_helper
 from test.support import (
     STDLIB_DIR, swap_attr, swap_item, cpython_only, is_emscripten,
-    is_wasi, run_in_subinterp, run_in_subinterp_with_config)
+    is_wasi, is_nanvix, run_in_subinterp, run_in_subinterp_with_config)
 from test.support.import_helper import (
     forget, make_legacy_pyc, unlink, unload, ready_to_import,
     DirsOnSysPath, CleanImport)
@@ -348,6 +348,7 @@ class ImportTests(unittest.TestCase):
         self.assertRegex(str(cm.exception), r"cannot import name 'i_dont_exist' from 'os' \(.*os.py\)")
 
     @cpython_only
+    @unittest.skipIf(is_nanvix, "Nanvix: _testcapi not built")
     def test_from_import_missing_attr_has_name_and_so_path(self):
         import _testcapi
         with self.assertRaises(ImportError) as cm:
@@ -795,8 +796,8 @@ class FilePermissionTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'posix',
                          "test meaningful only on posix systems")
     @unittest.skipIf(
-        is_emscripten or is_wasi,
-        "Emscripten's/WASI's umask is a stub."
+        is_emscripten or is_wasi or is_nanvix,
+        "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_creation_mode(self):
         mask = 0o022
@@ -1146,7 +1147,7 @@ class PycacheTests(unittest.TestCase):
     @skip_if_dont_write_bytecode
     @os_helper.skip_unless_working_chmod
     @os_helper.skip_if_dac_override
-    @unittest.skipIf(is_emscripten, "umask is a stub")
+    @unittest.skipIf(is_emscripten or is_nanvix, "umask is a stub")
     def test_unwritable_directory(self):
         # When the umask causes the new __pycache__ directory to be
         # unwritable, the import still succeeds but no .pyc file is written.

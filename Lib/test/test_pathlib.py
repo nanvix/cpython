@@ -14,7 +14,7 @@ from unittest import mock
 
 from test.support import import_helper
 from test.support import set_recursion_limit
-from test.support import is_emscripten, is_wasi
+from test.support import is_emscripten, is_wasi, is_nanvix
 from test.support import os_helper
 from test.support.os_helper import TESTFN, FakePath
 
@@ -708,6 +708,7 @@ class _BasePurePathTest(object):
         self.assertFalse(p.is_relative_to(''))
         self.assertFalse(p.is_relative_to(P('a')))
 
+    @unittest.skipIf(is_nanvix, "Nanvix: pickle produces corrupt data")
     def test_pickling_common(self):
         P = self.cls
         p = P('/a/b')
@@ -2644,6 +2645,7 @@ class _BasePathTest(object):
         self.assertIs(self.cls(f'{os.devnull}\udfff').is_char_device(), False)
         self.assertIs(self.cls(f'{os.devnull}\x00').is_char_device(), False)
 
+    @unittest.skipIf(is_nanvix, "Nanvix: pickle produces corrupt data")
     def test_pickling_common(self):
         p = self.cls(BASE, 'fileA')
         for proto in range(0, pickle.HIGHEST_PROTOCOL + 1):
@@ -2983,7 +2985,7 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
             print(path.resolve(strict))
 
     @unittest.skipIf(
-        is_emscripten or is_wasi,
+        is_emscripten or is_wasi or is_nanvix,
         "umask is not implemented on Emscripten/WASI."
     )
     def test_open_mode(self):
@@ -3010,7 +3012,7 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
             os.chdir(current_directory)
 
     @unittest.skipIf(
-        is_emscripten or is_wasi,
+        is_emscripten or is_wasi or is_nanvix,
         "umask is not implemented on Emscripten/WASI."
     )
     def test_touch_mode(self):

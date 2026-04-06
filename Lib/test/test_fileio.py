@@ -10,7 +10,7 @@ from weakref import proxy
 from functools import wraps
 
 from test.support import (
-    cpython_only, swap_attr, gc_collect, is_emscripten, is_wasi
+    cpython_only, swap_attr, gc_collect, is_emscripten, is_wasi, is_nanvix
 )
 from test.support.os_helper import (
     TESTFN, TESTFN_ASCII, TESTFN_UNICODE, make_bad_fd,
@@ -69,7 +69,7 @@ class AutoFileTests:
             self.assertRaises((AttributeError, TypeError),
                               setattr, f, attr, 'oops')
 
-    @unittest.skipIf(is_wasi, "WASI does not expose st_blksize.")
+    @unittest.skipIf(is_wasi or is_nanvix, "WASI/Nanvix does not expose st_blksize.")
     def testBlksize(self):
         # test private _blksize attribute
         blksize = io.DEFAULT_BUFFER_SIZE
@@ -378,7 +378,7 @@ class OtherFileTests:
             self.assertEqual(f.isatty(), False)
             f.close()
 
-            if sys.platform != "win32" and not is_emscripten:
+            if sys.platform != "win32" and not is_emscripten and not is_nanvix:
                 try:
                     f = self.FileIO("/dev/tty", "a")
                 except OSError:
