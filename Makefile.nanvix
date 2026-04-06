@@ -56,4 +56,49 @@ include .nanvix/mk/ramfs.mk
 include .nanvix/mk/package-common.mk
 include .nanvix/mk/verify-package.mk
 
-.PHONY: all
+# test-external-libs: run CPython test modules that exercise sysroot-linked C
+# extension modules (zlib, bzip2, OpenSSL, SQLite).  test_ssl is run as a
+# second, separate invocation with '-u network' so that loopback SSL tests are
+# enabled while keeping the main batch hermetic.
+#
+# Skipped in standalone mode (ramfs memory limit) and when NANVIX_RELEASE=yes.
+# Known per-module skips are documented in NANVIX_SKIP_LIST.md (issue #329).
+test-external-libs: test-stage
+ifeq ($(PROCESS_MODE),standalone)
+	@echo "Test: external library tests skipped for standalone mode (ramfs memory limit)"
+else
+ifneq ($(NANVIX_RELEASE),yes)
+	@echo "Test: external library tests ($(words $(NANVIX_TEST_LIST_EXTERNAL)) modules)..."
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_exttest.log; \
+			timeout 900 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
+			  --timeout=120 $(NANVIX_TEST_LIST_EXTERNAL) \
+			  < /dev/null > /tmp/cpython_exttest.log 2>&1; \
+			exttest_status=$$?; \
+			if [ $$exttest_status -ne 0 ]; then \
+				echo "  FAIL: external library tests exited with status $$exttest_status"; cat /tmp/cpython_exttest.log; exit 1; \
+			fi; \
+			echo "  PASS: external library tests completed"; \
+		}
+	@echo "Test: SSL tests (network resources enabled)..."
+	cd $(TEST_STAGING)/sysroot && \
+		{ \
+			: > /tmp/cpython_ssltest.log; \
+			timeout 300 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
+			  -u network --timeout=120 test_ssl \
+			  < /dev/null > /tmp/cpython_ssltest.log 2>&1; \
+			ssltest_status=$$?; \
+			if [ $$ssltest_status -ne 0 ]; then \
+				echo "  FAIL: SSL tests exited with status $$ssltest_status"; cat /tmp/cpython_ssltest.log; exit 1; \
+			fi; \
+			echo "  PASS: SSL tests completed"; \
+		}
+else
+	@echo "Test: external library tests skipped (NANVIX_RELEASE=yes)"
+endif
+endif
+	@rm -rf $(TEST_STAGING) /tmp/cpython_exttest.log /tmp/cpython_ssltest.log
+	@echo "		*** CPython external library tests PASSED ***"
+
+.PHONY: all test-external-libs

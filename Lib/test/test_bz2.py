@@ -29,7 +29,11 @@ has_cmdline_bunzip2 = None
 def ext_decompress(data):
     global has_cmdline_bunzip2
     if has_cmdline_bunzip2 is None:
-        has_cmdline_bunzip2 = bool(shutil.which('bunzip2'))
+        if support.is_nanvix:
+            # Nanvix: no subprocess/exec; fall back to bz2.decompress() directly.
+            has_cmdline_bunzip2 = False
+        else:
+            has_cmdline_bunzip2 = bool(shutil.which('bunzip2'))
     if has_cmdline_bunzip2:
         return subprocess.check_output(['bunzip2'], input=data)
     else:

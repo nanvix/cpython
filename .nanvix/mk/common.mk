@@ -31,6 +31,22 @@ NANVIX_RELEASE ?= no
 #             test_io
 NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
 
+# Space-separated list of test modules that exercise sysroot-linked C extension
+# modules (zlib, bzip2, OpenSSL, SQLite).  Kept separate from NANVIX_TEST_LIST
+# so that the heavier external-library suite can be run independently via the
+# 'test-external-libs' target.  test_ssl is NOT included here — it is invoked
+# separately with '-u network' inside that target.
+#
+# Validated against: zlib 1.3.1, bzip2 1.0.8, OpenSSL 3.5.0, SQLite 3.49.0.
+# Known skips are tracked in NANVIX_SKIP_LIST.md (see issue #329).
+#
+# Excluded external-library modules:
+#   test_gzip — garbled tempfile.mkstemp() paths cause PermissionError in setUp
+#               for nearly all tests (64 errors); regrtest cleanup also crashes
+#   test_ssl  — crashes at import time: errno.ESHUTDOWN missing on Nanvix
+#               (same root cause as test_exception_hierarchy)
+NANVIX_TEST_LIST_EXTERNAL ?= test_zlib test_bz2 test_hashlib test_hmac test_sqlite3
+
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
   NANVIX_TOOLCHAIN ?= /opt/nanvix

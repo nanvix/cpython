@@ -34,7 +34,12 @@ from test.support import (
     is_emscripten, is_wasi
 )
 from test.support import threading_helper
-from _testcapi import INT_MAX, ULLONG_MAX
+try:
+    from _testcapi import INT_MAX, ULLONG_MAX
+except ImportError:
+    # Nanvix: _testcapi is not built; define the constants directly.
+    INT_MAX = 2**31 - 1
+    ULLONG_MAX = 2**64 - 1
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 from test.support.os_helper import TESTFN, TESTFN_UNDECODABLE, unlink, temp_dir, FakePath
 
