@@ -5,11 +5,12 @@ import pickle
 import os
 import sys
 
+from test import support
 from test.support import os_helper
 from collections.abc import MutableMapping
 from test.test_dbm import dbm_iterator
 
-if sys.platform == 'nanvix':
+if support.is_nanvix:
     raise unittest.SkipTest("Nanvix: shelve requires pickle which produces corrupt data")
 
 def L1(s):

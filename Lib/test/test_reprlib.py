@@ -11,6 +11,7 @@ import importlib.util
 import unittest
 import textwrap
 
+from test import support
 from test.support import verbose
 from test.support.os_helper import create_empty_file
 from reprlib import repr as r # Don't shadow builtin repr
@@ -584,7 +585,7 @@ def write_file(path, text):
     with open(path, 'w', encoding='ASCII') as fp:
         fp.write(text)
 
-@unittest.skip("Nanvix: shutil.rmtree unreliable, os.mkdir fails with FileExistsError")
+@unittest.skipIf(support.is_nanvix, "Nanvix: shutil.rmtree unreliable, os.mkdir fails with FileExistsError")
 class LongReprTest(unittest.TestCase):
     longname = 'areallylongpackageandmodulenametotestreprtruncation'
 

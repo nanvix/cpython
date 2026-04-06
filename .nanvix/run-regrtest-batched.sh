@@ -20,7 +20,7 @@
 #                          regrtest --ignore (optional)
 #
 # Standalone mode (per-batch ramfs):
-#   RAMFS_TEMPLATE       - trimmed sysroot directory (no test/)
+#   RAMFS_TEMPLATE       - trimmed sysroot directory (test/ excluded unless RAMFS_KEEP_TESTS=1)
 #   TEST_SOURCE          - original staging sysroot (has full test/)
 #   MKRAMFS              - path to mkramfs.elf
 #   NANVIXD_RAMFS        - output path for per-batch ramfs image
