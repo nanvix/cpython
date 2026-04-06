@@ -224,8 +224,8 @@ cd .nanvix/_test_staging/sysroot && \
 
 ### Test Suite Status
 
-The `./z test` target runs **64 CPython stdlib test modules** on Nanvix
-(i686, microvm, multi-process, 256 MB RAM). Tests are split into batches of 4
+The `./z test` target runs **99 CPython stdlib test modules** on Nanvix
+(i686, microvm, multi-process, 128 MB RAM). Tests are split into batches of 4
 modules per VM invocation to stay within per-process memory limits.
 
 All three deployment modes (**multi-process**, **single-process**, and
@@ -237,13 +237,13 @@ via `--ignore`.
 
 | Metric | Value |
 |--------|-------|
-| **Modules enabled** | 64 |
-| **Total tests run** | ~3,700 |
+| **Modules enabled** | 99 |
+| **Total tests run** | ~7,700 |
 | **Tests passed** | ~90% |
 | **Tests skipped** | ~10% (via `@skipIf(is_nanvix)`) |
 | **Tests failed** | 0 |
-| **Batches** | 16 |
-| **Skip decorators added** | 73 |
+| **Batches** | 25 |
+| **Skip decorators added** | 102 |
 
 #### Enabled Modules
 
@@ -257,6 +257,12 @@ via `--ignore`.
 | Math & Numerics | test_float, test_complex, test_bool, test_struct, test_math, test_cmath, test_decimal, test_fractions, test_statistics, test_random, test_numeric_tower |
 | Exceptions & Tracebacks | test_exception_group, test_exceptions, test_raise, test_traceback |
 | Stdlib & Containers | test_frame, test_contextlib, test_contextlib_async, test_pprint, test_reprlib, test_list, test_dict |
+| File I/O | test_io, test_fileio, test_file, test_file_eintr, test_fileinput, test_filecmp, test_bufio |
+| Paths | test_os, test_stat, test_posixpath, test_pathlib, test_genericpath, test_tempfile |
+| Archives & Compression | test_shutil, test_glob, test_fnmatch, test_zipfile, test_tarfile, test_zipimport |
+| Config & Data | test_configparser, test_csv, test_mmap |
+| Database | test_shelve, test_dbm, test_dbm_dumb, test_dbm_ndbm, test_dbm_gnu |
+| Import System | test_linecache, test_source_encoding, test_largefile, test_import, test_importlib, test_modulefinder, test_pkgutil, test_zipapp |
 
 #### Excluded Modules
 

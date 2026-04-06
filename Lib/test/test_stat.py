@@ -2,6 +2,7 @@ import unittest
 import os
 import socket
 import sys
+from test import support
 from test.support import os_helper
 from test.support import socket_helper
 from test.support.import_helper import import_fresh_module
@@ -197,7 +198,7 @@ class TestFilemode:
         self.assertS_IS("FIFO", st_mode)
 
     @unittest.skipUnless(os.name == 'posix', 'requires Posix')
-    @unittest.skipIf(sys.platform == 'nanvix', "Nanvix: no /dev/null")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: no /dev/null")
     def test_devices(self):
         if os.path.exists(os.devnull):
             st_mode, modestr = self.get_mode(os.devnull, lstat=False)

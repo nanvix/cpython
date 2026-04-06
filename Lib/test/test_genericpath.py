@@ -7,6 +7,7 @@ import os
 import sys
 import unittest
 import warnings
+from test import support
 from test.support import is_emscripten
 from test.support import os_helper
 from test.support import warnings_helper
@@ -156,7 +157,7 @@ class GenericTest:
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
-    @unittest.skipIf(sys.platform == 'nanvix', "Nanvix: pipe fds have no stat")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pipe fds have no stat")
     def test_exists_fd(self):
         r, w = os.pipe()
         try:
