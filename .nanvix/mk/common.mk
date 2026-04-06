@@ -18,6 +18,12 @@ MEMORY_SIZE ?= 128mb
 # followed by a full rebuild so the new configure flags are picked up.
 NANVIX_RELEASE ?= no
 
+# Maximum number of test modules per regrtest VM invocation.
+# The 128MB microvm can run at most ~5 test modules per Python process before
+# exhausting virtual memory.  Tests are split into batches of this size and
+# each batch gets its own nanvixd.elf invocation.
+NANVIX_TEST_BATCH_SIZE ?= 4
+
 # Space-separated list of stdlib test modules to run via 'python3 -m test'.
 # Keep this list to pure-Python, non-networking tests known to pass on Nanvix.
 # Expand it as more tests are enabled (see issues linked from #320).
@@ -26,10 +32,33 @@ NANVIX_RELEASE ?= no
 # missing platform capabilities (fork/exec, tempdir, asyncio event loop) or
 # memory limits (test_json MemoryError). Those belong to #321 and #322 where
 # each module gets individual skip/xfail annotations before being re-added.
-#   Deferred: test_builtin test_dict test_list test_str test_tuple test_set
-#             test_bytes test_int test_json test_datetime test_os test_pathlib
-#             test_io
-NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
+# Excluded: test_exception_hierarchy (crashes at import time: errno.ESHUTDOWN missing on Nanvix)
+#           test_inspect (VM hangs: IsolatedAsyncioTestCase sets up asyncio loop before skip is evaluated;
+#                         module too large for 128MB VM causing resource exhaustion)
+#
+# C API / ctypes tests (#328):
+#   test_clinic   — auto-skips (test_tools requires subprocess)
+#   test_cppext   — auto-skips (requires_subprocess decorator)
+#   Excluded: test_capi (crashes: _testcapi C extension not built for Nanvix)
+#             test_ctypes (crashes: 17 sub-modules import _ctypes_test at top level)
+#             test_stable_abi_ctypes (crashes: imports _testcapi.get_feature_macros)
+NANVIX_TEST_LIST ?= \
+    test_float test_complex test_bool test_struct \
+    test_int test_range test_slice test_memoryview test_bytes test_tuple \
+    test_builtin test_operator test_binop test_unary \
+    test_compare test_richcmp test_augassign test_contains \
+    test_grammar test_syntax test_compile test_compiler_assemble \
+    test_compiler_codegen test_ast test_symtable test_opcache \
+    test_peepholer test_dis test_code test_keyword test_tokenize \
+    test_perf_profiler \
+    test_call test_extcall test_positional_only_arg \
+    test_scope test_global test_dynamic test_with \
+    test_types test_typechecks test_isinstance test_hash test_index test_super test_property \
+    test_math test_cmath test_decimal test_fractions test_statistics test_random test_numeric_tower \
+    test_exception_group test_exceptions test_raise test_traceback \
+    test_frame test_contextlib test_contextlib_async test_pprint test_reprlib \
+    test_list test_dict \
+    test_clinic test_cppext
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
