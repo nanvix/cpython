@@ -34,8 +34,7 @@ NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
 # Space-separated list of test modules that exercise sysroot-linked C extension
 # modules (zlib, bzip2, OpenSSL, SQLite).  Kept separate from NANVIX_TEST_LIST
 # so that the heavier external-library suite can be run independently via the
-# 'test-external-libs' target.  test_ssl is NOT included here — it is invoked
-# separately with '-u network' inside that target.
+# 'test-external-libs' target.
 #
 # Validated against: zlib 1.3.1, bzip2 1.0.8, OpenSSL 3.5.0, SQLite 3.49.0.
 # Known skips are tracked in NANVIX_SKIP_LIST.md (see issue #329).
