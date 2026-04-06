@@ -228,15 +228,12 @@ The `./z test` target runs **64 CPython stdlib test modules** on Nanvix
 (i686, microvm, multi-process, 256 MB RAM). Tests are split into batches of 4
 modules per VM invocation to stay within per-process memory limits.
 
-In **multi-process** and **single-process** deployment modes, tests run via
-CPython's regrtest runner (`python -m test`).
-
-In **standalone** mode, regrtest is not used because it triggers a fatal fatfs
-panic in nanvixd (`poll()` → `OperationNotSupported` → byte index out of bounds
-in `dir.rs`). Instead, test modules are loaded and executed directly via
-`unittest.TextTestRunner` through `run-standalone-unittest.py`, which bypasses
-the problematic regrtest startup code path entirely. Individual test modules
-pass cleanly in standalone mode using this approach.
+All three deployment modes (**multi-process**, **single-process**, and
+**standalone**) run tests via CPython's regrtest runner (`python -m test`).
+A `/tmp` directory is created on the standalone ramfs so
+`tempfile.gettempdir()` works.  Per-mode exclusions (e.g.
+`test_filter_dealloc` on standalone to avoid OOM) are passed to regrtest
+via `--ignore`.
 
 | Metric | Value |
 |--------|-------|
@@ -320,8 +317,7 @@ The following changes were made to support Nanvix.
 |------|---------|
 | `Makefile.nanvix` | Top-level Makefile (includes composable `.mk` files) |
 | `.nanvix/mk/*.mk` | Composable Make includes (common, test modes, packaging) |
-| `.nanvix/run-regrtest-batched.sh` | Batched regrtest runner (splits modules across VM invocations) |
-| `.nanvix/run-standalone-unittest.py` | Standalone test runner (bypasses regrtest via `unittest.TextTestRunner`) |
+| `.nanvix/run-regrtest-batched.sh` | Batched regrtest runner (splits modules across VM invocations, all modes) |
 | `NANVIX.md` | This documentation file |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
