@@ -52,6 +52,12 @@ NANVIX_TEST_LIST ?= \
   test_textwrap test_difflib test_pprint test_reprlib \
   test_format test_print
 
+# Maximum number of test modules per regrtest invocation.
+# The Nanvix microVM limits command-line length to ~512 bytes; running all
+# modules in a single invocation exceeds this.  Batching splits the list
+# into multiple nanvixd invocations of at most this many modules each.
+NANVIX_TEST_BATCH_SIZE ?= 10
+
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
   NANVIX_TOOLCHAIN ?= /opt/nanvix

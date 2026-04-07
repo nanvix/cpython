@@ -26,22 +26,33 @@ test-hello-multi-process: test-stage
 		}
 	$(call validate-hello,/tmp/cpython_test.log)
 
-# test-regrtest-multi-process: run stdlib regression tests
+# test-regrtest-multi-process: run stdlib regression tests in batches
+# The microVM limits command-line length, so we split the module list into
+# batches of NANVIX_TEST_BATCH_SIZE modules per invocation.
 test-regrtest-multi-process: test-stage
 ifneq ($(NANVIX_RELEASE),yes)
-	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules)..."
-	cd $(TEST_STAGING)/sysroot && \
-		{ \
-			: > /tmp/cpython_regrtest.log; \
-			timeout 600 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
-			  --timeout=120 $(NANVIX_TEST_LIST) \
-			  < /dev/null > /tmp/cpython_regrtest.log 2>&1; \
-			regrtest_status=$$?; \
-			if [ $$regrtest_status -ne 0 ]; then \
-				echo "  FAIL: regrtest exited with status $$regrtest_status"; cat /tmp/cpython_regrtest.log; exit 1; \
-			fi; \
-			echo "  PASS: regrtest completed"; \
-		}
+	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, batch size $(NANVIX_TEST_BATCH_SIZE))..."
+	@: > /tmp/cpython_regrtest.log
+	@batch_num=0; \
+	set -- $(NANVIX_TEST_LIST); \
+	while [ $$# -gt 0 ]; do \
+		batch_num=$$((batch_num + 1)); \
+		batch=""; count=0; \
+		while [ $$# -gt 0 ] && [ $$count -lt $(NANVIX_TEST_BATCH_SIZE) ]; do \
+			batch="$$batch $$1"; shift; count=$$((count + 1)); \
+		done; \
+		echo "  Batch $$batch_num ($$count modules):$$batch"; \
+		cd $(TEST_STAGING)/sysroot && \
+		timeout 600 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
+		  --timeout=120 $$batch \
+		  < /dev/null >> /tmp/cpython_regrtest.log 2>&1; \
+		regrtest_status=$$?; \
+		if [ $$regrtest_status -ne 0 ]; then \
+			echo "  FAIL: regrtest batch $$batch_num exited with status $$regrtest_status"; \
+			cat /tmp/cpython_regrtest.log; exit 1; \
+		fi; \
+	done
+	@echo "  PASS: all regrtest batches completed"
 else
 	@echo "Test: regrtest skipped (NANVIX_RELEASE=yes)"
 endif
