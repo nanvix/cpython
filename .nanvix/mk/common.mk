@@ -37,7 +37,7 @@ NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct
 # 'test-external-libs' target.
 #
 # Validated against: zlib 1.3.1, bzip2 1.0.8, OpenSSL 3.5.0, SQLite 3.49.0.
-# Known skips are tracked in NANVIX_SKIP_LIST.md (see issue #329).
+# Known skips are tracked in NANVIX_SKIP_LIST.md (see issues #329, #371).
 #
 # Excluded external-library modules:
 #   test_gzip — garbled tempfile.mkstemp() paths cause PermissionError in setUp

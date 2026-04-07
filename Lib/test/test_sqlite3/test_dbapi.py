@@ -37,7 +37,7 @@ from test.support import threading_helper
 try:
     from _testcapi import INT_MAX, ULLONG_MAX
 except ImportError:
-    # Nanvix: _testcapi is not built; define the constants directly.
+    # Nanvix: _testcapi is not built; define the constants directly.  gh-371
     INT_MAX = 2**31 - 1
     ULLONG_MAX = 2**64 - 1
 from os import SEEK_SET, SEEK_CUR, SEEK_END

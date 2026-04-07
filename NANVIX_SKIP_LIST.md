@@ -2,7 +2,7 @@
 
 This file tracks test cases that are intentionally skipped or known to fail
 when running the CPython test suite on Nanvix.  It is updated whenever a new
-test module is enabled (see issue #329 and related issues).
+test module is enabled (see issue #329 and the tracking issue #371).
 
 Tests are skipped in one of two ways:
 
@@ -135,7 +135,7 @@ When a test fails during a CI run:
 
 ---
 
-## External Library Tests (#329)
+## External Library Tests (#329, #371)
 
 Tests for CPython C extension modules linked against sysroot libraries
 (zlib 1.3.1, bzip2 1.0.8, OpenSSL 3.5.0, SQLite 3.49.0).

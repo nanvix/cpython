@@ -60,7 +60,7 @@ include .nanvix/mk/verify-package.mk
 # extension modules (zlib, bzip2, OpenSSL, SQLite).
 #
 # Skipped in standalone mode (ramfs memory limit) and when NANVIX_RELEASE=yes.
-# Known per-module skips are documented in NANVIX_SKIP_LIST.md (issue #329).
+# Known per-module skips are documented in NANVIX_SKIP_LIST.md (issues #329, #371).
 #
 # Excluded modules: test_gzip (garbled TESTFN), test_ssl (crashes at import:
 # errno.ESHUTDOWN missing on Nanvix).

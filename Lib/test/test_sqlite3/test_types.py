@@ -517,7 +517,7 @@ class DateTimeTests(unittest.TestCase):
         self.assertEqual(ts, ts2)
 
     @unittest.skipIf(support.is_nanvix,
-                     "Nanvix: system clock returns epoch (1969)")
+                     "Nanvix: system clock returns epoch (1969) (gh-371)")
     def test_sql_timestamp(self):
         now = datetime.datetime.now(tz=datetime.UTC)
         self.cur.execute("insert into test(ts) values (current_timestamp)")
