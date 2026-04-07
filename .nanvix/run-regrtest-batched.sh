@@ -103,9 +103,10 @@ fi
 #   test_set.py          ← test_pprint
 #   mapping_tests.py     ← test_dict (via mapping_tests import)
 #   pickletester.py      ← various pickle-related tests
+#   lock_tests.py        ← test_thread (from test import lock_tests)
 #   test_longexp.py      ← padding (ensures ≥10 test_*.py for test_tokenize.test_random_files)
 #   test_errno.py        ← padding (same reason — random.sample(testfiles, 10) needs ≥10)
-CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.py test_math.py test_iter.py test_contextlib.py test_set.py mapping_tests.py pickletester.py test_longexp.py test_errno.py"
+CROSS_IMPORT_WHITELIST="test_grammar.py string_tests.py list_tests.py seq_tests.py test_math.py test_iter.py test_contextlib.py test_set.py mapping_tests.py pickletester.py lock_tests.py test_longexp.py test_errno.py"
 
 # inject_test_files <mod1> [<mod2> ...]
 # Copy test infrastructure and test modules into the ramfs template.

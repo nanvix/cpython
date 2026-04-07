@@ -36,6 +36,8 @@ NANVIX_TEST_BATCH_SIZE ?= 4
 #           test_inspect (VM hangs: IsolatedAsyncioTestCase sets up asyncio loop before skip is evaluated;
 #                         module too large for 128MB VM causing resource exhaustion)
 #           test_asyncio (no asyncio event loop: socketpair() unavailable on Nanvix)
+#           test_threading (MemoryError crash in all modes — module too large for 256MB VM;
+#                           see https://github.com/nanvix/cpython/issues/371)
 NANVIX_TEST_LIST ?= \
     test_float test_complex test_bool test_struct \
     test_int test_range test_slice test_memoryview test_bytes test_tuple \
@@ -52,7 +54,7 @@ NANVIX_TEST_LIST ?= \
     test_exception_group test_exceptions test_raise test_traceback \
     test_frame test_contextlib test_contextlib_async test_pprint test_reprlib \
     test_list test_dict \
-    test_thread test_threading test_threading_local test_threadsignals test_threadedtempfile \
+    test_thread test_threading_local test_threadsignals test_threadedtempfile \
     test_queue test_sched test_context \
     test_concurrent_futures \
     test_fork1 test_wait3 test_wait4

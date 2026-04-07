@@ -24,7 +24,13 @@ MKRAMFS = $(abspath $(NANVIX_HOME))/bin/mkramfs.elf
 
 # Per-mode test exclusions for standalone (passed to regrtest --ignore).
 #   test_filter_dealloc: creates 1M nested filter objects, OOMs the 32MB heap.
-NANVIX_STANDALONE_EXCLUDE = test_filter_dealloc
+#   Threading modules: the 32MB standalone heap cannot allocate thread stacks
+#     (each 512KB).  These pass in single-process / multi-process modes.
+#     See: https://github.com/nanvix/cpython/issues/371
+NANVIX_STANDALONE_EXCLUDE = test_filter_dealloc \
+    test_thread test_threading_local test_threadsignals test_threadedtempfile \
+    test_queue test_sched test_context \
+    test_concurrent_futures
 
 include .nanvix/mk/ramfs.mk
 
