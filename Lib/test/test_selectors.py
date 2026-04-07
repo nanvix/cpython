@@ -20,7 +20,8 @@ except ImportError:
 
 
 if support.is_emscripten or support.is_wasi or support.is_nanvix:
-    raise unittest.SkipTest("Cannot create socketpair on Emscripten/WASI/Nanvix.")
+    raise unittest.SkipTest("Cannot create socketpair on Emscripten/WASI/Nanvix."
+                            " https://github.com/nanvix/cpython/issues/371")
 
 
 if hasattr(socket, 'socketpair'):

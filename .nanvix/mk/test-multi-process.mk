@@ -26,22 +26,32 @@ test-hello-multi-process: test-stage
 		}
 	$(call validate-hello,/tmp/cpython_test.log)
 
-# test-regrtest-multi-process: run stdlib regression tests
+# test-regrtest-multi-process: run stdlib regression tests in batches
 test-regrtest-multi-process: test-stage
 ifneq ($(NANVIX_RELEASE),yes)
-	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules)..."
-	cd $(TEST_STAGING)/sysroot && \
-		{ \
+	@echo "Test: regrtest ($(words $(NANVIX_TEST_LIST)) modules, batch size $(NANVIX_TEST_BATCH_SIZE))..."
+	@cd $(TEST_STAGING)/sysroot && \
+		set -- $(NANVIX_TEST_LIST); \
+		batch_num=0; total=$$#; \
+		total_batches=$$(( (total + $(NANVIX_TEST_BATCH_SIZE) - 1) / $(NANVIX_TEST_BATCH_SIZE) )); \
+		while [ $$# -gt 0 ]; do \
+			batch_num=$$((batch_num + 1)); \
+			batch=""; i=0; \
+			while [ $$# -gt 0 ] && [ $$i -lt $(NANVIX_TEST_BATCH_SIZE) ]; do \
+				batch="$$batch $$1"; shift; i=$$((i + 1)); \
+			done; \
+			echo "  Batch $$batch_num/$$total_batches:$$batch"; \
 			: > /tmp/cpython_regrtest.log; \
 			timeout 600 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 -m test \
-			  --timeout=120 $(NANVIX_TEST_LIST) \
+			  --timeout=120 $$batch \
 			  < /dev/null > /tmp/cpython_regrtest.log 2>&1; \
 			regrtest_status=$$?; \
 			if [ $$regrtest_status -ne 0 ]; then \
-				echo "  FAIL: regrtest exited with status $$regrtest_status"; cat /tmp/cpython_regrtest.log; exit 1; \
+				echo "  FAIL: regrtest batch $$batch_num exited with status $$regrtest_status"; cat /tmp/cpython_regrtest.log; exit 1; \
 			fi; \
-			echo "  PASS: regrtest completed"; \
-		}
+			echo "  PASS: batch $$batch_num completed"; \
+		done; \
+		echo "  PASS: all $$total_batches batches completed"
 else
 	@echo "Test: regrtest skipped (NANVIX_RELEASE=yes)"
 endif

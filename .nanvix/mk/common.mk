@@ -45,6 +45,12 @@ NANVIX_TEST_LIST ?= test_float test_complex test_bool test_struct \
     \
     test_select test_selectors test_poll test_socketserver
 
+# Maximum number of test modules per regrtest invocation.  Nanvix has a
+# relatively short guest command-line limit; running too many modules in
+# one invocation can exceed it and crash the VM.  Batching also keeps
+# peak memory usage lower on the 256 MB microvm.
+NANVIX_TEST_BATCH_SIZE ?= 4
+
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
   NANVIX_TOOLCHAIN ?= /opt/nanvix

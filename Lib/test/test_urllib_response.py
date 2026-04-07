@@ -7,7 +7,8 @@ import unittest
 from test import support
 
 if support.is_wasi or support.is_nanvix:
-    raise unittest.SkipTest("Cannot create socket on WASI/Nanvix")
+    raise unittest.SkipTest("Cannot create socket on WASI/Nanvix."
+                            " https://github.com/nanvix/cpython/issues/371")
 
 
 class TestResponse(unittest.TestCase):
