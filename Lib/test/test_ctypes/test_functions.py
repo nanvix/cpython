@@ -15,10 +15,13 @@ except NameError:
     # fake to enable this test on Linux
     WINFUNCTYPE = CFUNCTYPE
 
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 if not getattr(_ctypes_test, '__file__', None):
-    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")  # gh-371
 
 dll = CDLL(_ctypes_test.__file__)
 if sys.platform == "win32":

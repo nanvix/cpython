@@ -22,10 +22,13 @@ import unittest
 #
 # In this case, there would have to be an additional reference to the argument...
 
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 if not getattr(_ctypes_test, '__file__', None):
-    raise unittest.SkipTest("_ctypes_test is not available as a shared library")
+    raise unittest.SkipTest("_ctypes_test is not available as a shared library")  # gh-371
 
 testdll = CDLL(_ctypes_test.__file__)
 

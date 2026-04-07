@@ -4,7 +4,10 @@ from ctypes import *
 import unittest, sys
 from test import support
 
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 @unittest.skipUnless(sys.platform == "win32", 'Windows-specific test')
 class FunctionCallTestCase(unittest.TestCase):

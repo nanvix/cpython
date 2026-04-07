@@ -11,7 +11,10 @@ from ctypes import (CDLL, Array, Structure, Union, POINTER, sizeof, byref, align
                     c_long, c_ulong, c_longlong, c_ulonglong, c_float, c_double)
 from ctypes.util import find_library
 from struct import calcsize
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 from collections import namedtuple
 from test import support
 

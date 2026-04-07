@@ -1,7 +1,10 @@
 import unittest, sys
 
 from ctypes import *
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 ctype_types = [c_byte, c_ubyte, c_short, c_ushort, c_int, c_uint,
                  c_long, c_ulong, c_longlong, c_ulonglong, c_double, c_float]

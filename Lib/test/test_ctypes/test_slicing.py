@@ -2,7 +2,10 @@ import unittest
 from ctypes import *
 from test.test_ctypes import need_symbol
 
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 class SlicesTestCase(unittest.TestCase):
     def test_getslice_cint(self):

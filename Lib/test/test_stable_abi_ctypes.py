@@ -10,7 +10,7 @@ try:
     from _testcapi import get_feature_macros
     feature_macros = get_feature_macros()
 except ImportError:
-    raise unittest.SkipTest("requires _testcapi")
+    raise unittest.SkipTest("requires _testcapi")  # gh-371
 ctypes_test = import_module('ctypes')
 
 class TestStableABIAvailability(unittest.TestCase):

@@ -5,7 +5,10 @@ from test import support
 from ctypes import *
 from test.test_ctypes import need_symbol
 from _ctypes import CTYPES_MAX_ARGCOUNT
-import _ctypes_test
+try:
+    import _ctypes_test
+except ImportError:
+    raise unittest.SkipTest("_ctypes_test is not available")  # gh-371
 
 class Callbacks(unittest.TestCase):
     functype = CFUNCTYPE

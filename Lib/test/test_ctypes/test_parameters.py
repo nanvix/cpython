@@ -159,7 +159,12 @@ class SimpleTypesTestCase(unittest.TestCase):
         self.assertRaises(TypeError, LPINT.from_param, c_uint*3)
 
     def test_noctypes_argtype(self):
-        import _ctypes_test
+        try:
+            import _ctypes_test
+        except ImportError:
+            self.skipTest("_ctypes_test is not available")  # gh-371
+        if not getattr(_ctypes_test, '__file__', None):
+            self.skipTest("_ctypes_test is not available as a shared library")  # gh-371
         from ctypes import CDLL, c_void_p, ArgumentError
 
         func = CDLL(_ctypes_test.__file__)._testfunc_p_p
@@ -269,7 +274,12 @@ class SimpleTypesTestCase(unittest.TestCase):
     @test.support.cpython_only
     def test_from_param_result_refcount(self):
         # Issue #99952
-        import _ctypes_test
+        try:
+            import _ctypes_test
+        except ImportError:
+            self.skipTest("_ctypes_test is not available")  # gh-371
+        if not getattr(_ctypes_test, '__file__', None):
+            self.skipTest("_ctypes_test is not available as a shared library")  # gh-371
         from ctypes import PyDLL, c_int, c_void_p, py_object, Structure
 
         class X(Structure):
