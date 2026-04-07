@@ -24,6 +24,8 @@ except ImportError:
 
 class GenericTests(unittest.TestCase):
 
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix: signal.Sigmasks not available (gh-371)")
     def test_enums(self):
         for name in dir(signal):
             sig = getattr(signal, name)
