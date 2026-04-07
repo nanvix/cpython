@@ -6,6 +6,7 @@ import threading
 import time
 import unittest
 import weakref
+from test import support
 from test.support import gc_collect
 from test.support import import_helper
 from test.support import threading_helper
@@ -619,6 +620,7 @@ class CSimpleQueueTest(BaseSimpleQueueTest, unittest.TestCase):
         self.assertIs(self.type2test, self.queue.SimpleQueue)
         self.assertIs(self.type2test, self.queue.SimpleQueue)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix: GC reentrancy loop OOMs the 128MB VM")
     def test_reentrancy(self):
         # bpo-14976: put() may be called reentrantly in an asynchronous
         # callback.
