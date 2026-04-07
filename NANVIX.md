@@ -275,12 +275,12 @@ via `--ignore`.
 
 | Category | Count | % of Skips |
 |----------|-------|------------|
-| Pickle corruption (32-bit) | 33 | 45% |
-| Missing `_testcapi`/`_testinternalcapi` | 18 | 25% |
-| No subprocess/fork | 6 | 8% |
-| VM crash / deep recursion | 4 | 5% |
-| Traceback formatting | 3 | 4% |
-| Other (rounding, float precision, filesystem, 32-bit args) | 9 | 12% |
+| Pickle corruption (32-bit) | 33 | ~45% |
+| Missing `_testcapi`/`_testinternalcapi` | 18 | ~25% |
+| No subprocess/fork | 6 | ~8% |
+| VM crash / deep recursion | 4 | ~5% |
+| Traceback formatting | 3 | ~4% |
+| Other (rounding, float precision, filesystem, 32-bit args) | 9 | ~13% |
 
 Each skip is annotated with a reason in the `@skipIf(is_nanvix, "...")` decorator
 directly in the test source file.
