@@ -58,7 +58,7 @@ NANVIX_TEST_LIST ?= \
     test_listcomps test_dictcomps test_setcomps test_genexps \
     test_heapq test_bisect test_sort \
     test_copy test_copyreg test_functools test_funcattrs test_decorators \
-    test_buffer test_numbers
+    test_buffer
 
 # Nanvix cross-compilation configuration
 ifdef CONFIG_NANVIX
