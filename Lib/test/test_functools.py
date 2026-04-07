@@ -1642,6 +1642,8 @@ class TestLRU:
         for attr in self.module.WRAPPER_ASSIGNMENTS:
             self.assertEqual(getattr(g, attr), getattr(f, attr))
 
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix: threading Barrier/Event deadlocks on Nanvix VM (gh-322)")
     @threading_helper.requires_working_threading()
     def test_lru_cache_threaded(self):
         n, m = 5, 11
@@ -1691,6 +1693,8 @@ class TestLRU:
         finally:
             sys.setswitchinterval(orig_si)
 
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix: threading Barrier/Event deadlocks on Nanvix VM (gh-322)")
     @threading_helper.requires_working_threading()
     def test_lru_cache_threaded2(self):
         # Simultaneous call with the same arguments
@@ -1719,6 +1723,8 @@ class TestLRU:
                 pause.reset()
                 self.assertEqual(f.cache_info(), (0, (i+1)*n, m*n, i+1))
 
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix: threading Barrier/Event deadlocks on Nanvix VM (gh-322)")
     @threading_helper.requires_working_threading()
     def test_lru_cache_threaded3(self):
         @self.module.lru_cache(maxsize=2)
