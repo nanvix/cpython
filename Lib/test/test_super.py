@@ -47,7 +47,7 @@ class G(A):
     pass
 
 
-@unittest.skipIf(support.is_nanvix, "Nanvix: VM crash when running multiple tests due to nonlocal __class__ cell corruption")
+@unittest.skipIf(support.is_nanvix, "Nanvix: VM crash when running multiple tests due to nonlocal __class__ cell corruption")  # gh-371
 class TestSuper(unittest.TestCase):
 
     def tearDown(self):

@@ -69,7 +69,7 @@ class AutoFileTests:
             self.assertRaises((AttributeError, TypeError),
                               setattr, f, attr, 'oops')
 
-    @unittest.skipIf(is_wasi or is_nanvix, "WASI/Nanvix does not expose st_blksize.")
+    @unittest.skipIf(is_wasi or is_nanvix, "WASI/Nanvix does not expose st_blksize.")  # gh-371
     def testBlksize(self):
         # test private _blksize attribute
         blksize = io.DEFAULT_BUFFER_SIZE
@@ -378,7 +378,7 @@ class OtherFileTests:
             self.assertEqual(f.isatty(), False)
             f.close()
 
-            if sys.platform != "win32" and not is_emscripten and not is_nanvix:
+            if sys.platform != "win32" and not is_emscripten and not is_nanvix:  # gh-371
                 try:
                     f = self.FileIO("/dev/tty", "a")
                 except OSError:

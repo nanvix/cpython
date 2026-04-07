@@ -363,7 +363,7 @@ class RangeTest(unittest.TestCase):
         self.assertEqual(repr(range(1, 2)), 'range(1, 2)')
         self.assertEqual(repr(range(1, 2, 3)), 'range(1, 2, 3)')
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range value fails pickle")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range value fails pickle")  # gh-371
     def test_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1),
                      (13, 21, 3), (-2, 2, 2), (2**65, 2**65+2)]
@@ -374,7 +374,7 @@ class RangeTest(unittest.TestCase):
                     self.assertEqual(list(pickle.loads(pickle.dumps(r, proto))),
                                      list(r))
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**63 range OOM/overflow")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**63 range OOM/overflow")  # gh-371
     def test_iterator_pickling(self):
         testcases = [(13,), (0, 11), (-22, 10), (20, 3, -1), (13, 21, 3),
                      (-2, 2, 2)]
@@ -405,7 +405,7 @@ class RangeTest(unittest.TestCase):
                     it = pickle.loads(d)
                     self.assertEqual(list(it), data[1:])
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**32 overflows iterator index")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**32 overflows iterator index")  # gh-371
     def test_iterator_pickling_overflowing_index(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             with self.subTest(proto=proto):
@@ -415,7 +415,7 @@ class RangeTest(unittest.TestCase):
                 it = pickle.loads(d)
                 self.assertEqual(next(it), 2**32 + 1)
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range value fails pickle")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range value fails pickle")  # gh-371
     def test_exhausted_iterator_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             r = range(2**65, 2**65+2)
@@ -429,7 +429,7 @@ class RangeTest(unittest.TestCase):
             self.assertEqual(list(i), [])
             self.assertEqual(list(i2), [])
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: pickle corrupt data")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: pickle corrupt data")  # gh-371
     def test_large_exhausted_iterator_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             r = range(20)
@@ -443,7 +443,7 @@ class RangeTest(unittest.TestCase):
             self.assertEqual(list(i), [])
             self.assertEqual(list(i2), [])
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 64-bit encoded pickle bytes fail")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 64-bit encoded pickle bytes fail")  # gh-371
     def test_iterator_unpickle_compat(self):
         testcases = [
             b'c__builtin__\niter\n(c__builtin__\nxrange\n(I10\nI20\nI2\ntRtRI2\nb.',
@@ -462,7 +462,7 @@ class RangeTest(unittest.TestCase):
             it = pickle.loads(t)
             self.assertEqual(list(it), [14, 16, 18])
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range values fail")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**65 range values fail")  # gh-371
     def test_iterator_setstate(self):
         it = iter(range(10, 20, 2))
         it.__setstate__(2)
@@ -538,7 +538,7 @@ class RangeTest(unittest.TestCase):
         self.assertNotIn(-1, r)
         self.assertNotIn(1, r)
 
-    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**32/2**64 OOM/overflow")
+    @unittest.skipIf(is_nanvix, "Nanvix 32-bit: 2**32/2**64 OOM/overflow")  # gh-371
     def test_range_iterators(self):
         # exercise 'fast' iterators, that use a rangeiterobject internally.
         # see issue 7298

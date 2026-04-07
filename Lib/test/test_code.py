@@ -172,7 +172,7 @@ def external_getitem(self, i):
 class CodeTest(unittest.TestCase):
 
     @cpython_only
-    @unittest.skipIf(is_nanvix, "Nanvix: _testcapi not available")
+    @unittest.skipIf(is_nanvix, "Nanvix: _testcapi not available")  # gh-371
     def test_newempty(self):
         import _testcapi
         co = _testcapi.code_newempty("filename", "funcname", 15)

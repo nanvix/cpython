@@ -585,7 +585,7 @@ def write_file(path, text):
     with open(path, 'w', encoding='ASCII') as fp:
         fp.write(text)
 
-@unittest.skipIf(support.is_nanvix, "Nanvix: shutil.rmtree unreliable, os.mkdir fails with FileExistsError")
+@unittest.skipIf(support.is_nanvix, "Nanvix: shutil.rmtree unreliable, os.mkdir fails with FileExistsError")  # gh-371
 class LongReprTest(unittest.TestCase):
     longname = 'areallylongpackageandmodulenametotestreprtruncation'
 

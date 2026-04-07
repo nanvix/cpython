@@ -335,7 +335,7 @@ def _mock_candidate_names(*names):
 class TestBadTempdir:
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot remove write bits."
+        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot remove write bits."  # gh-371
     )
     def test_read_only_directory(self):
         with _inside_empty_temp_dir():
@@ -1219,7 +1219,7 @@ class TestSpooledTemporaryFile(BaseTestCase):
             f.__del__()
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot fstat renamed files."
+        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot fstat renamed files."  # gh-371
     )
     def test_del_rolled_file(self):
         # The rolled file should be deleted when the SpooledTemporaryFile
@@ -1447,7 +1447,7 @@ class TestSpooledTemporaryFile(BaseTestCase):
         self.assertRaises(ValueError, use_closed)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot fstat renamed files."
+        support.is_emscripten or support.is_nanvix, "Emscripten/Nanvix cannot fstat renamed files."  # gh-371
     )
     def test_truncate_with_size_parameter(self):
         # A SpooledTemporaryFile can be truncated to zero size

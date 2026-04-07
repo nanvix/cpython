@@ -834,7 +834,7 @@ class FractionTest(unittest.TestCase):
             s += num / fact * sign
         self.assertAlmostEqual(math.cos(1), s)
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")  # gh-371
     def test_copy_deepcopy_pickle(self):
         r = F(13, 7)
         dr = DummyFraction(13, 7)

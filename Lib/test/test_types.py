@@ -882,7 +882,7 @@ class UnionTests(unittest.TestCase):
         eq(x[NT], int | NT | bytes)
         eq(x[S], int | S | bytes)
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")  # gh-371
     def test_union_pickle(self):
         orig = list[T] | int
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -1911,7 +1911,7 @@ class SimpleNamespaceTests(unittest.TestCase):
         self.assertIs(type(spam), Spam)
         self.assertEqual(vars(spam), {'ham': 8, 'eggs': 9})
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")  # gh-371
     def test_pickle(self):
         ns = types.SimpleNamespace(breakfast="spam", lunch="spam")
 

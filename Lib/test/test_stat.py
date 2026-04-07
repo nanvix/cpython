@@ -198,7 +198,7 @@ class TestFilemode:
         self.assertS_IS("FIFO", st_mode)
 
     @unittest.skipUnless(os.name == 'posix', 'requires Posix')
-    @unittest.skipIf(support.is_nanvix, "Nanvix: no /dev/null")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: no /dev/null")  # gh-371
     def test_devices(self):
         if os.path.exists(os.devnull):
             st_mode, modestr = self.get_mode(os.devnull, lstat=False)

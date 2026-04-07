@@ -3022,7 +3022,7 @@ class TestNormalDist:
         nd2 = copy.deepcopy(nd)
         self.assertEqual(nd, nd2)
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")  # gh-371
     def test_pickle(self):
         nd = self.module.NormalDist(37.5, 5.625)
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):

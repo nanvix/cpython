@@ -381,7 +381,7 @@ class TestBasicOps:
         self.assertRaises(ValueError, self.gen.getrandbits, -1)
         self.assertRaises(TypeError, self.gen.getrandbits, 10.1)
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle broken on 32-bit platform")  # gh-371
     def test_pickling(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             state = pickle.dumps(self.gen, proto)

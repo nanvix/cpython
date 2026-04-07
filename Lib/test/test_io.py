@@ -452,7 +452,7 @@ class IOTest(unittest.TestCase):
             self.assertRaises(exc, fp.seek, -1, self.SEEK_END)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"
+        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"  # gh-371
     )
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     def test_optional_abilities(self):
@@ -4247,7 +4247,7 @@ class MiscIOTest(unittest.TestCase):
             self.assertIn('invalid mode', str(cm.exception))
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"
+        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"  # gh-371
     )
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     def test_open_pipe_with_append(self):
@@ -4418,13 +4418,13 @@ class MiscIOTest(unittest.TestCase):
                             pickle.dumps(f, protocol)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"
+        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"  # gh-371
     )
     def test_nonblock_pipe_write_bigbuf(self):
         self._test_nonblock_pipe_write(16*1024)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"
+        support.is_emscripten or support.is_nanvix, "fstat() of a pipe fd is not supported"  # gh-371
     )
     def test_nonblock_pipe_write_smallbuf(self):
         self._test_nonblock_pipe_write(1024)

@@ -792,7 +792,7 @@ class BadFileZipImportTestCase(unittest.TestCase):
         os_helper.create_empty_file(TESTMOD)
         self.assertZipFailure(TESTMOD)
 
-    @unittest.skipIf(support.is_wasi or support.is_nanvix,
+    @unittest.skipIf(support.is_wasi or support.is_nanvix,  # gh-371
                      "mode 000 not supported.")
     def testFileUnreadable(self):
         os_helper.unlink(TESTMOD)

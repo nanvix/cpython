@@ -1589,7 +1589,7 @@ class StreamWriteTest(WriteTestBase, unittest.TestCase):
     @unittest.skipUnless(sys.platform != "win32" and hasattr(os, "umask"),
                          "Missing umask implementation")
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        support.is_emscripten or support.is_wasi or support.is_nanvix,  # gh-371
         "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_file_mode(self):

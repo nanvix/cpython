@@ -613,7 +613,7 @@ class StatAttributeTests(unittest.TestCase):
             self.skipTest("cannot encode %a for the filesystem" % self.fname)
         self.check_stat_attributes(fname)
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")  # gh-371
     def test_stat_result_pickle(self):
         result = os.stat(self.fname)
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -671,7 +671,7 @@ class StatAttributeTests(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, 'statvfs'),
                          "need os.statvfs()")
-    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: pickle produces corrupt data")  # gh-371
     def test_statvfs_result_pickle(self):
         result = os.statvfs(self.fname)
 
@@ -1725,7 +1725,7 @@ class MakedirTests(unittest.TestCase):
         os.makedirs(path)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        support.is_emscripten or support.is_wasi or support.is_nanvix,  # gh-371
         "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_mode(self):
@@ -1741,7 +1741,7 @@ class MakedirTests(unittest.TestCase):
                 self.assertEqual(os.stat(parent).st_mode & 0o777, 0o775)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        support.is_emscripten or support.is_wasi or support.is_nanvix,  # gh-371
         "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_exist_ok_existing_directory(self):
@@ -1759,7 +1759,7 @@ class MakedirTests(unittest.TestCase):
         os.makedirs(os.path.abspath('/'), exist_ok=True)
 
     @unittest.skipIf(
-        support.is_emscripten or support.is_wasi or support.is_nanvix,
+        support.is_emscripten or support.is_wasi or support.is_nanvix,  # gh-371
         "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_exist_ok_s_isgid_directory(self):
@@ -1912,7 +1912,7 @@ class RemoveDirsTests(unittest.TestCase):
         self.assertTrue(os.path.exists(os_helper.TESTFN))
 
 
-@unittest.skipIf(support.is_wasi or support.is_nanvix,
+@unittest.skipIf(support.is_wasi or support.is_nanvix,  # gh-371
                  "WASI/Nanvix has no /dev/null")
 class DevNullTests(unittest.TestCase):
     def test_devnull(self):

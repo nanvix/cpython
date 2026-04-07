@@ -30,7 +30,7 @@ class BadConstructorArgs(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, MSG):
             ExceptionGroup('eg', [ValueError('too')], [TypeError('many')])
 
-    @unittest.skipIf(support.is_nanvix, "Nanvix: 32-bit arg numbering produces garbled TypeError message")
+    @unittest.skipIf(support.is_nanvix, "Nanvix: 32-bit arg numbering produces garbled TypeError message")  # gh-371
     def test_bad_EG_construction__bad_message(self):
         MSG = 'argument 1 must be str, not '
         with self.assertRaisesRegex(TypeError, MSG):

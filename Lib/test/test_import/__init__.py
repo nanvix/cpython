@@ -348,7 +348,7 @@ class ImportTests(unittest.TestCase):
         self.assertRegex(str(cm.exception), r"cannot import name 'i_dont_exist' from 'os' \(.*os.py\)")
 
     @cpython_only
-    @unittest.skipIf(is_nanvix, "Nanvix: _testcapi not built")
+    @unittest.skipIf(is_nanvix, "Nanvix: _testcapi not built")  # gh-371
     def test_from_import_missing_attr_has_name_and_so_path(self):
         import _testcapi
         with self.assertRaises(ImportError) as cm:
@@ -796,7 +796,7 @@ class FilePermissionTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'posix',
                          "test meaningful only on posix systems")
     @unittest.skipIf(
-        is_emscripten or is_wasi or is_nanvix,
+        is_emscripten or is_wasi or is_nanvix,  # gh-371
         "Emscripten's/WASI's/Nanvix's umask is a stub."
     )
     def test_creation_mode(self):
@@ -1147,7 +1147,7 @@ class PycacheTests(unittest.TestCase):
     @skip_if_dont_write_bytecode
     @os_helper.skip_unless_working_chmod
     @os_helper.skip_if_dac_override
-    @unittest.skipIf(is_emscripten or is_nanvix, "umask is a stub")
+    @unittest.skipIf(is_emscripten or is_nanvix, "umask is a stub")  # gh-371
     def test_unwritable_directory(self):
         # When the umask causes the new __pycache__ directory to be
         # unwritable, the import still succeeds but no .pyc file is written.

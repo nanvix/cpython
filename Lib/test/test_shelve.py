@@ -10,7 +10,7 @@ from test.support import os_helper
 from collections.abc import MutableMapping
 from test.test_dbm import dbm_iterator
 
-if support.is_nanvix:
+if support.is_nanvix:  # gh-371
     raise unittest.SkipTest("Nanvix: shelve requires pickle which produces corrupt data")
 
 def L1(s):
