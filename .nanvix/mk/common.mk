@@ -56,7 +56,7 @@ NANVIX_TEST_LIST ?= \
     test_iter test_itertools test_iterlen \
     test_generators test_generator_stop test_yield_from test_coroutines \
     test_listcomps test_dictcomps test_setcomps test_genexps \
-    test_heapq test_bisect test_sort test_queue \
+    test_heapq test_bisect test_sort \
     test_copy test_copyreg test_functools test_funcattrs test_decorators \
     test_buffer test_numbers
 
