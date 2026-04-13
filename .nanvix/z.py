@@ -4,11 +4,12 @@
 """Nanvix build script for CPython.
 
 Usage:
-    ./z setup     # Download Nanvix sysroot and dependencies
-    ./z build     # Cross-compile python.elf and libpython3.12.a
-    ./z test      # Run test suite (hello-world on nanvixd.elf)
-    ./z release   # Package release tarballs (sysroot + buildroot)
-    ./z clean     # Remove build artifacts
+    ./z setup                               # Download Nanvix sysroot and dependencies
+    ./z setup --with-nanvix /path/to/nanvix # Use a local Nanvix build (deps still downloaded)
+    ./z build                               # Cross-compile python.elf and libpython3.12.a
+    ./z test                                # Run test suite (hello-world on nanvixd.elf)
+    ./z release                             # Package release tarballs (sysroot + buildroot)
+    ./z clean                               # Remove build artifacts
 """
 
 import json
@@ -60,6 +61,21 @@ _DEP_EXPECTED_LIBS: dict[str, list[str]] = {
 
 class CPythonBuild(ZScript):
     """Build script for nanvix/cpython."""
+
+    # Class-level storage for --with-nanvix, set by main() before dispatch.
+    _with_nanvix: str | None = None
+
+    @classmethod
+    def main(cls, *, repo_root: Path | None = None) -> None:
+        """Extract ``--with-nanvix`` from argv, then delegate to base."""
+        cls._with_nanvix = None
+        argv = sys.argv[1:]
+        for i, arg in enumerate(argv):
+            if arg == "--with-nanvix" and i + 1 < len(argv):
+                cls._with_nanvix = argv[i + 1]
+                sys.argv = [sys.argv[0]] + argv[:i] + argv[i + 2:]
+                break
+        super().main(repo_root=repo_root)
 
     # ---- Make invocation -------------------------------------------------
 
@@ -142,7 +158,20 @@ class CPythonBuild(ZScript):
 
         The base class is not called for dependency installation because
         its retry loop wastes ~30 seconds on expected 404s before raising.
+
+        **Local mode**: pass ``--with-nanvix`` to skip the GitHub
+        download and use binaries from a local Nanvix build::
+
+            ./z setup --with-nanvix /path/to/nanvix
+
+        The path may point to the ``bin/`` directory or the Nanvix
+        project root (containing ``bin/``, ``lib/``, and ``build/``).
+        Third-party dependencies are still downloaded from GitHub.
         """
+        if self._with_nanvix:
+            self._setup_local(Path(self._with_nanvix))
+            return
+
         # ---- Step 1: download and verify the sysroot (from base class) ----
         from nanvix_zutil import Sysroot, CFG_GH_TOKEN
 
@@ -162,6 +191,94 @@ class CPythonBuild(ZScript):
         self._install_missing_deps()
         self.config.save()
 
+        self._merge_buildroot_into_sysroot()
+
+    # ---- Local-sysroot setup ---------------------------------------------
+
+    def _setup_local(self, local_path: Path) -> None:
+        """Build a sysroot from a local Nanvix build directory.
+
+        Accepts either the Nanvix project root or its ``bin/`` sub-directory.
+        Copies binaries, libraries, and the linker script into
+        ``.nanvix/sysroot/``, then downloads third-party dependencies
+        (zlib, OpenSSL, …) and merges them in.
+        """
+        local_path = local_path.resolve()
+        if not local_path.is_dir():
+            log.fatal(
+                f"Directory not found: {local_path}",
+                hint="Provide the path to a local Nanvix build directory.",
+            )
+
+        # Accept both nanvix/ and nanvix/bin/ as input.
+        if local_path.name == "bin" and (local_path.parent / "lib").is_dir():
+            nanvix_root = local_path.parent
+        else:
+            nanvix_root = local_path
+
+        bin_src = nanvix_root / "bin" if (nanvix_root / "bin").is_dir() else nanvix_root
+        lib_src = nanvix_root / "lib"
+
+        sysroot = self.nanvix_dir / "sysroot"
+
+        # ---- Copy binaries ------------------------------------------------
+        bin_dst = sysroot / "bin"
+        bin_dst.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for item in bin_src.iterdir():
+            if item.is_file():
+                shutil.copy2(item, bin_dst / item.name)
+                copied += 1
+        log.info(f"Copied {copied} files from {bin_src} → sysroot/bin/")
+
+        # ---- Copy libraries -----------------------------------------------
+        lib_dst = sysroot / "lib"
+        lib_dst.mkdir(parents=True, exist_ok=True)
+        if lib_src.is_dir():
+            for item in lib_src.iterdir():
+                if item.is_file() and item.suffix == ".a":
+                    shutil.copy2(item, lib_dst / item.name)
+                    log.info(f"Copied {item.name} → sysroot/lib/")
+
+        # ---- Copy linker script -------------------------------------------
+        # Search common locations for user.ld.
+        ld_candidates = [
+            nanvix_root / "build" / "user" / "linker" / "x86" / "user.ld",
+            nanvix_root / "build" / "user" / "linker" / "x86_64" / "user.ld",
+            lib_src / "user.ld",
+        ]
+        for ld_path in ld_candidates:
+            if ld_path.is_file():
+                shutil.copy2(ld_path, lib_dst / "user.ld")
+                log.info(f"Copied {ld_path} → sysroot/lib/user.ld")
+                break
+        else:
+            log.warning(
+                "user.ld not found in local Nanvix build. "
+                "Linking may fail without the linker script."
+            )
+
+        # ---- Copy include headers -----------------------------------------
+        inc_src = nanvix_root / "include"
+        if inc_src.is_dir():
+            inc_dst = sysroot / "include"
+            inc_dst.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(inc_src, inc_dst, dirs_exist_ok=True)
+            log.info("Copied include/ → sysroot/include/")
+
+        self.config.set(CFG_SYSROOT, str(sysroot))
+        log.info(f"Sysroot configured at {sysroot} (local)")
+
+        # ---- Download third-party dependencies ----------------------------
+        self._install_missing_deps()
+        self.config.save()
+
+        self._merge_buildroot_into_sysroot()
+
+    # ---- Merge buildroot into sysroot ------------------------------------
+
+    def _merge_buildroot_into_sysroot(self) -> None:
+        """Copy dependency libs and headers from buildroot into the sysroot."""
         buildroot = self.nanvix_dir / "buildroot"
         sysroot = self.config.get(CFG_SYSROOT, "")
         if not sysroot or not buildroot.is_dir():
