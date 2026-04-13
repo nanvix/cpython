@@ -22,9 +22,11 @@ _DHM_SYS_MOUNT  := /mnt/sysroot
 # Named Docker volume that persists the build tree across container runs,
 # so that Make's timestamp-based dependency tracking can skip up-to-date
 # targets on subsequent builds instead of rebuilding from scratch.
-# The volume name includes a hash of the workspace path to avoid
-# cross-contamination between different clones/branches on the same host.
-_DHM_WORKSPACE_ID := $(shell printf '%s' '$(abspath $(CURDIR))' | cksum | awk '{print $$1}')
+# The volume name is derived from the workspace path, sanitised for Docker
+# volume naming rules (letters, digits, hyphens, underscores only).
+# On Windows the standard Unix tools (printf, cksum, awk) are unavailable,
+# so we use pure Make text functions instead of $(shell ...).
+_DHM_WORKSPACE_ID := $(subst /,-,$(subst \,-,$(subst :,,$(abspath $(CURDIR)))))
 _DHM_BUILD_VOLUME ?= cpython-nanvix-build-$(_DHM_WORKSPACE_ID)
 
 # Files that need CRLF -> LF normalization for autotools
