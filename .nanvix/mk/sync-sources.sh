@@ -51,5 +51,7 @@ done < "$_sync_list"
 cd "$BUILD_DIR"
 find . -type f > "$_build_list"
 while IFS= read -r _f; do
-    [ ! -f "$_stg/$_f" ] && rm -f "$BUILD_DIR/$_f" || true
+    if [ ! -f "$_stg/$_f" ]; then
+        rm -f "$BUILD_DIR/$_f"
+    fi
 done < "$_build_list"

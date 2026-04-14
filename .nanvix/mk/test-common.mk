@@ -19,29 +19,35 @@ TEST_STAGING ?= $(CURDIR)/.nanvix/_test_staging
 # Stage the CPython install and test fixtures into TEST_STAGING.
 # After this target, $(TEST_STAGING)/sysroot/ contains the full install tree
 # plus the hello test script and Nanvix runtime binaries.
-test-stage: build
-	@echo "Running CPython tests on Nanvix..."
-	@rm -rf $(TEST_STAGING)
-	@# Install python and stdlib into a test staging area
-ifdef CONFIG_NANVIX_DOCKER
-	$(DOCKER_RUN) make install DESTDIR="$(DOCKER_WORKSPACE_PATH)/.nanvix/_test_staging"
-else
-	make install DESTDIR="$(TEST_STAGING)"
-endif
-	@# Copy test script into the staging sysroot
-	@echo "import sys; print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])" > $(TEST_STAGING)/sysroot/test_hello.py
-	@# Copy Nanvix runtime binaries into the staging sysroot
-	@mkdir -p $(TEST_STAGING)/sysroot/bin
-	@cp "$(abspath $(NANVIX_HOME))/bin/nanvixd.elf" $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
-	@cp "$(abspath $(NANVIX_HOME))/bin/kernel.elf"  $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
-	@cp "$(abspath $(NANVIX_HOME))/bin/linuxd.elf"  $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
-	@cp "$(abspath $(NANVIX_HOME))/bin/uservm.elf"  $(TEST_STAGING)/sysroot/bin/ 2>/dev/null || true
-	@# Replace unstripped python binary in staging with the stripped python.elf to save VM memory
-	@if [ -f "$(CURDIR)/python.elf" ]; then \
-		cp "$(CURDIR)/python.elf" "$(TEST_STAGING)/sysroot/bin/python3.12"; \
-		echo "  Installed stripped python.elf into staging ($$(du -sh $(TEST_STAGING)/sysroot/bin/python3.12 | cut -f1))"; \
+#
+# If the staging directory already contains the python binary from a
+# previous run, rebuild and re-staging are skipped entirely.
+test-stage:
+	@if [ -f "$(TEST_STAGING)/sysroot/bin/python3.12" ]; then \
+		echo "Staging already populated — skipping build"; \
+	else \
+		$(MAKE) -f Makefile.nanvix build \
+			CONFIG_NANVIX=$(CONFIG_NANVIX) \
+			NANVIX_HOME=$(NANVIX_HOME) \
+			NANVIX_TOOLCHAIN=$(NANVIX_TOOLCHAIN) \
+			PLATFORM=$(PLATFORM) \
+			PROCESS_MODE=$(PROCESS_MODE) \
+			MEMORY_SIZE=$(MEMORY_SIZE) \
+			INSTALL_PREFIX=$(INSTALL_PREFIX) \
+			NANVIX_RELEASE=$(NANVIX_RELEASE) && \
+		echo "Running CPython tests on Nanvix..." && \
+		rm -rf $(TEST_STAGING) && \
+		$(MAKE) install DESTDIR="$(TEST_STAGING)" && \
+		echo "import sys; print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])" > $(TEST_STAGING)/sysroot/test_hello.py && \
+		cp $(CURDIR)/.nanvix/run-regrtest.py $(TEST_STAGING)/sysroot/run-regrtest.py && \
+		mkdir -p $(TEST_STAGING)/sysroot/bin && \
+		for bin in nanvixd kernel linuxd uservm; do \
+			for ext in .elf .exe; do \
+				src="$(abspath $(NANVIX_HOME))/bin/$${bin}$${ext}"; \
+				if [ -f "$$src" ]; then cp "$$src" $(TEST_STAGING)/sysroot/bin/; break; fi; \
+			done; \
+		done; \
 	fi
-	@cp $(CURDIR)/.nanvix/run-regrtest.py $(TEST_STAGING)/sysroot/run-regrtest.py
 
 # Validate hello-world test output in a log file.
 # Usage: $(call validate-hello,/path/to/logfile)

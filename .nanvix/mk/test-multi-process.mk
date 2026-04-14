@@ -19,7 +19,9 @@ test-hello-multi-process-run:
 		{ \
 			: > /tmp/cpython_test.log; \
 			start_time=$$(date +%s%N); \
-			timeout 120 ./bin/nanvixd.elf $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 ./test_hello.py < /dev/null > /tmp/cpython_test.log 2>&1; \
+			NANVIXD=""; for ext in .elf .exe; do [ -x "./bin/nanvixd$$ext" ] && NANVIXD="./bin/nanvixd$$ext" && break; done; \
+			if [ -z "$$NANVIXD" ]; then echo "Error: nanvixd not found in ./bin/"; exit 1; fi; \
+			timeout 120 $$NANVIXD $(NANVIXD_EXTRA_ARGS) -- ./bin/python3.12 ./test_hello.py < /dev/null > /tmp/cpython_test.log 2>&1; \
 			test_status=$$?; \
 			end_time=$$(date +%s%N); \
 			elapsed=$$(( (end_time - start_time) / 1000000 )); \

@@ -7,7 +7,7 @@
 # Usage: test-run-host.py <staging-dir> <process-mode> [test-list...]
 #
 # Unified test runner for both Windows and Linux hosts.
-# On Windows, nanvixd.elf is invoked via WSL with paths translated by wslpath.
+# On Windows, nanvixd.exe is invoked natively.
 # On Linux, staging is copied to /tmp for writable access and run directly.
 
 import argparse
@@ -22,6 +22,18 @@ import time
 
 IS_WINDOWS = platform.system() == "Windows"
 
+# Host tool extensions to try, in order of preference.
+_HOST_BIN_EXTS = (".elf", ".exe")
+
+
+def find_host_bin(base_path):
+    """Find a host binary, trying .elf then .exe extension."""
+    for ext in _HOST_BIN_EXTS:
+        p = base_path + ext
+        if os.path.exists(p):
+            return p
+    return base_path + _HOST_BIN_EXTS[0]  # fallback for error messages
+
 
 def die(msg):
     print(f"Error: {msg}", file=sys.stderr)
@@ -33,16 +45,6 @@ def validate_test_names(test_list):
     for t in test_list:
         if not re.fullmatch(r"[A-Za-z0-9_]+", t):
             die(f"Invalid test module name: '{t}'")
-
-
-def to_wsl_path(win_path):
-    """Convert a Windows path to a WSL /mnt/ path via wslpath."""
-    unix = win_path.replace("\\", "/")
-    result = subprocess.run(
-        ["wsl", "wslpath", "-a", unix],
-        capture_output=True, text=True, check=True,
-    )
-    return result.stdout.strip()
 
 
 def run_command(cmd, timeout, log_path):
@@ -83,55 +85,28 @@ def prepare_workdir_linux(staging):
 
 def build_hello_cmd(mode, staging_dir):
     """Build the command list for the hello-world test."""
-    if IS_WINDOWS:
-        wsl_staging = to_wsl_path(os.path.abspath(staging_dir))
-        nanvixd = f"{wsl_staging}/sysroot/bin/nanvixd.elf"
-        python_bin = f"{wsl_staging}/sysroot/bin/python3.12"
-        if mode == "standalone":
-            ramfs = f"{wsl_staging}/cpython-rootfs.img"
-            bin_dir = f"{wsl_staging}/sysroot/bin"
-            return [
-                "wsl", "--", nanvixd,
-                "-bin-dir", bin_dir, "-ramfs", ramfs,
-                "--", python_bin,
-                "-B /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1",
-            ]
-        else:
-            inner = f"cd '{wsl_staging}/sysroot' && '{nanvixd}' -- '{python_bin}' ./test_hello.py 2>&1"
-            return ["wsl", "--", "bash", "-c", inner]
+    sysroot = os.path.join(os.path.abspath(staging_dir), "sysroot")
+    nanvixd = find_host_bin(os.path.join(sysroot, "bin", "nanvixd"))
+    python_bin = os.path.join(sysroot, "bin", "python3.12")
+    if mode == "standalone":
+        ramfs = os.path.join(os.path.abspath(staging_dir), "cpython-rootfs.img")
+        return [
+            nanvixd,
+            "-bin-dir", os.path.join(sysroot, "bin"),
+            "-ramfs", ramfs,
+            "--", python_bin,
+            "-B /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1",
+        ]
     else:
-        # Linux: use the /tmp workdir
-        sysroot = os.path.join(staging_dir, "sysroot")
-        nanvixd = "./bin/nanvixd.elf"
-        python_bin = "./bin/python3.12"
-        if mode == "standalone":
-            ramfs = os.path.join(staging_dir, "cpython-rootfs.img")
-            return [
-                nanvixd,
-                "-bin-dir", "./bin", "-ramfs", ramfs,
-                "--", python_bin,
-                "-B /test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1",
-            ]
-        else:
-            return [nanvixd, "--", python_bin, "./test_hello.py"]
+        return [nanvixd, "--", python_bin, "./test_hello.py"]
 
 
 def build_regrtest_cmd(staging_dir, test_list):
     """Build the command list for regrtest."""
-    if IS_WINDOWS:
-        wsl_staging = to_wsl_path(os.path.abspath(staging_dir))
-        nanvixd = f"{wsl_staging}/sysroot/bin/nanvixd.elf"
-        python_bin = f"{wsl_staging}/sysroot/bin/python3.12"
-        test_args = " ".join(test_list)
-        inner = (
-            f"cd '{wsl_staging}/sysroot' && "
-            f"'{nanvixd}' -- '{python_bin}' -m test --timeout=120 {test_args} 2>&1"
-        )
-        return ["wsl", "--", "bash", "-c", inner]
-    else:
-        nanvixd = "./bin/nanvixd.elf"
-        python_bin = "./bin/python3.12"
-        return [nanvixd, "--", python_bin, "-m", "test", "--timeout=120"] + test_list
+    sysroot = os.path.join(os.path.abspath(staging_dir), "sysroot")
+    nanvixd = find_host_bin(os.path.join(sysroot, "bin", "nanvixd"))
+    python_bin = os.path.join(sysroot, "bin", "python3.12")
+    return [nanvixd, "--", python_bin, "-m", "test", "--timeout=120"] + test_list
 
 
 def run_hello_test(mode, staging_dir, log_dir):
@@ -140,10 +115,8 @@ def run_hello_test(mode, staging_dir, log_dir):
     log_path = os.path.join(log_dir, "cpython_test.log")
     cmd = build_hello_cmd(mode, staging_dir)
 
-    # On Linux, cd into sysroot before running
-    cwd = None
-    if not IS_WINDOWS:
-        cwd = os.path.join(staging_dir, "sysroot")
+    # Set cwd to sysroot for commands that use relative paths.
+    cwd = os.path.join(staging_dir, "sysroot")
 
     start = time.monotonic()
     try:
@@ -187,9 +160,7 @@ def run_regrtest(staging_dir, test_list, log_dir):
     log_path = os.path.join(log_dir, "cpython_regrtest.log")
     cmd = build_regrtest_cmd(staging_dir, test_list)
 
-    cwd = None
-    if not IS_WINDOWS:
-        cwd = os.path.join(staging_dir, "sysroot")
+    cwd = os.path.join(staging_dir, "sysroot")
 
     start = time.monotonic()
     try:
@@ -242,19 +213,13 @@ def main():
     # Validate test names
     validate_test_names(test_list)
 
-    # Verify WSL on Windows
-    if IS_WINDOWS and shutil.which("wsl") is None:
-        die("WSL is required but was not found. "
-            "Install WSL: https://learn.microsoft.com/windows/wsl/install")
-
     # Verify staging directory
-    if IS_WINDOWS:
-        nanvixd_path = os.path.join(staging_dir, "sysroot", "bin", "nanvixd.elf")
-    else:
-        nanvixd_path = os.path.join(staging_dir, "sysroot", "bin", "nanvixd.elf")
+    nanvixd_path = find_host_bin(
+        os.path.join(staging_dir, "sysroot", "bin", "nanvixd")
+    )
 
     if not os.path.exists(nanvixd_path):
-        die(f"nanvixd.elf not found in staging: {nanvixd_path}")
+        die(f"nanvixd not found in staging: {nanvixd_path}")
 
     # On Linux, copy staging to a writable /tmp location
     if not IS_WINDOWS:

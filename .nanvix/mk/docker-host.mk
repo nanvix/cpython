@@ -23,10 +23,18 @@ _DHM_SYS_MOUNT  := /mnt/sysroot
 # so that Make's timestamp-based dependency tracking can skip up-to-date
 # targets on subsequent builds instead of rebuilding from scratch.
 # The volume name is derived from the workspace path, sanitised for Docker
-# volume naming rules (letters, digits, hyphens, underscores only).
-# On Windows the standard Unix tools (printf, cksum, awk) are unavailable,
-# so we use pure Make text functions instead of $(shell ...).
-_DHM_WORKSPACE_ID := $(subst /,-,$(subst \,-,$(subst :,,$(abspath $(CURDIR)))))
+# volume naming rules. On Windows the path may contain spaces and other
+# punctuation that Docker volume names do not accept, so normalise common
+# problematic characters to hyphens using only Make text functions.
+_DHM_EMPTY :=
+_DHM_SPACE := $(_DHM_EMPTY) $(_DHM_EMPTY)
+_DHM_BAD_CHARS := : \ / ( ) [ ] { } , ; = + & ' " * ? ! # % ^ ~ ` @
+
+# $(call _dhm_sanitise,string,char-list) — replace each char in the list with a hyphen.
+_dhm_sanitise = $(if $2,$(call _dhm_sanitise,$(subst $(firstword $2),-,$1),$(wordlist 2,$(words $2),$2)),$1)
+
+_DHM_WORKSPACE_PATH := $(abspath $(CURDIR))
+_DHM_WORKSPACE_ID   := $(call _dhm_sanitise,$(subst $(_DHM_SPACE),-,$(_DHM_WORKSPACE_PATH)),$(_DHM_BAD_CHARS))
 _DHM_BUILD_VOLUME ?= cpython-nanvix-build-$(_DHM_WORKSPACE_ID)
 
 # Files that need CRLF -> LF normalization for autotools
@@ -127,11 +135,11 @@ endef
 # Test staging directory on the host (populated by docker-host-test-prepare)
 _DHM_TEST_STAGING := $(CURDIR)/.nanvix/_test_staging
 
-# Determine the prepare target name and test script content based on
-# deployment mode.  The test script runs via WSL on the host.
+# Determine the Docker-side prepare target.
+# For standalone: use the install-only target (no ramfs) — ramfs is built
+# natively on the host.  For other modes: use the standard prepare target.
 ifeq ($(PROCESS_MODE),standalone)
-  _DHM_TEST_PREPARE := test-hello-standalone-prepare test-regrtest-standalone
-  _DHM_RAMFS_IMG := $(_DHM_TEST_STAGING)/cpython-rootfs.img
+  _DHM_TEST_PREPARE := test-hello-standalone-install test-regrtest-standalone
 else ifeq ($(PROCESS_MODE),single-process)
   _DHM_TEST_PREPARE := test-hello-single-process-prepare test-regrtest-single-process-prepare
 else
@@ -159,18 +167,45 @@ all: build
 build:
 	$(call docker-host-run,build)
 
-# Test: cross-compile and stage inside Docker, then run nanvixd on the host.
-# Phase 1 (Docker): build, install, ramfs, strip — everything needing the
-#   cross-toolchain or Linux tools.
-# Phase 2 (host): execute nanvixd.elf natively on Windows.
-#   nanvixd.elf is a Linux ELF binary that runs via Windows WSL interop.
-#   The Python test runner invokes it directly (no explicit WSL call).
-test:
-	@echo "=== Phase 1: Preparing test artifacts inside Docker ==="
+# Test: cross-compile artifacts in Docker, then run nanvixd natively.
+#
+# Phase 1 (Docker): install + strip — only if staging is not already
+#   populated from a previous run.  No rebuild is triggered.
+# Phase 1b (native, standalone only): build ramfs with mkramfs.exe.
+# Phase 2 (native): execute nanvixd.exe on the host.
+
+# Sentinel file that indicates the staging directory is fully populated.
+_DHM_STAGING_READY := $(subst /,\,$(_DHM_TEST_STAGING)\sysroot\bin\python3.12)
+
+# Ramfs image path on the host (standalone mode only).
+_DHM_RAMFS_IMG := $(subst /,\,$(_DHM_TEST_STAGING)\cpython-rootfs.img)
+
+# Conditionally run Docker install+strip, then build ramfs natively.
+test-prepare:
+	@python -c "import sys,os; sys.exit(0 if os.path.isfile(r'$(_DHM_STAGING_READY)') else 1)" || $(MAKE) -f Makefile.nanvix test-prepare-docker CONFIG_NANVIX=$(CONFIG_NANVIX) DOCKER_HOST_MODE=$(DOCKER_HOST_MODE) NANVIX_HOME=$(NANVIX_HOME) NANVIX_TOOLCHAIN=$(NANVIX_TOOLCHAIN) PLATFORM=$(PLATFORM) PROCESS_MODE=$(PROCESS_MODE) MEMORY_SIZE=$(MEMORY_SIZE) INSTALL_PREFIX=$(INSTALL_PREFIX) NANVIX_RELEASE=$(NANVIX_RELEASE)
+ifeq ($(PROCESS_MODE),standalone)
+	@python -c "import sys,os; sys.exit(0 if os.path.isfile(r'$(_DHM_RAMFS_IMG)') else 1)" || $(MAKE) -f Makefile.nanvix test-prepare-ramfs CONFIG_NANVIX=$(CONFIG_NANVIX) DOCKER_HOST_MODE=$(DOCKER_HOST_MODE) NANVIX_HOME=$(NANVIX_HOME) NANVIX_TOOLCHAIN=$(NANVIX_TOOLCHAIN) PLATFORM=$(PLATFORM) PROCESS_MODE=$(PROCESS_MODE) MEMORY_SIZE=$(MEMORY_SIZE) INSTALL_PREFIX=$(INSTALL_PREFIX) NANVIX_RELEASE=$(NANVIX_RELEASE)
+endif
+
+# Docker phase: install + strip (no rebuild, no ramfs).
+test-prepare-docker:
+	@echo === Phase 1: Installing test artifacts via Docker ===
 	$(call docker-host-test-prepare,$(_DHM_TEST_PREPARE))
+
+# Native ramfs build (standalone mode only).
+# Runs mkramfs.exe directly on the Windows host.
+test-prepare-ramfs:
+	@echo === Phase 1b: Building ramfs natively with mkramfs.exe ===
+	@python -c "open(r'$(subst /,\,$(_DHM_TEST_STAGING)\sysroot\test_hello.py)','w').write(\"import sys; print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n\")"
+	@python -c "import shutil,os; src=r'$(subst /,\,$(_DHM_TEST_STAGING)\sysroot\lib)'; dst=r'$(subst /,\,$(_DHM_TEST_STAGING)\ramfs-content\sysroot\lib)'; os.makedirs(os.path.dirname(dst),exist_ok=True); shutil.copytree(src,dst,dirs_exist_ok=True)"
+	@python -c "import shutil; shutil.copy2(r'$(subst /,\,$(_DHM_TEST_STAGING)\sysroot\test_hello.py)',r'$(subst /,\,$(_DHM_TEST_STAGING)\ramfs-content\sysroot\test_hello.py)')"
+	python $(dir $(lastword $(MAKEFILE_LIST)))ramfs-trim-host.py $(subst /,\,$(_DHM_TEST_STAGING)\ramfs-content\sysroot)
+	$(subst /,\,$(abspath $(NANVIX_HOME))\bin\mkramfs.exe) -o $(_DHM_RAMFS_IMG) $(subst /,\,$(_DHM_TEST_STAGING)\ramfs-content\sysroot)
+	@echo Built ramfs image: $(_DHM_RAMFS_IMG)
+
+test: test-prepare
 	@echo "=== Phase 2: Running tests on host ==="
 	python $(_DHM_TEST_RUNNER) $(subst /,\,$(_DHM_TEST_STAGING)) $(PROCESS_MODE) $(_DHM_REGRTEST_ARGS)
-	-rmdir /s /q $(subst /,\,$(_DHM_TEST_STAGING)) 2>nul
 	@echo "		*** CPython tests PASSED ***"
 
 install:

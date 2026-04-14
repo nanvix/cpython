@@ -4,7 +4,7 @@
 # Licensed under the MIT License.
 #
 # In standalone mode the runtime filesystem is a ramfs image.  Binaries
-# (nanvixd.elf, python3.12, etc.) are NOT included in the ramfs — they are
+# (nanvixd, python3.12, etc.) are NOT included in the ramfs — they are
 # passed to nanvixd via -bin-dir.  The ramfs contains only the stdlib and
 # test fixtures.
 #
@@ -68,7 +68,9 @@ test-hello-standalone: ramfs-stage
 		{ \
 			: > /tmp/cpython_test.log; \
 			start_time=$$(date +%s%N); \
-			timeout 120 ./bin/nanvixd.elf \
+			NANVIXD=""; for ext in .elf .exe; do [ -x "./bin/nanvixd$$ext" ] && NANVIXD="./bin/nanvixd$$ext" && break; done; \
+			if [ -z "$$NANVIXD" ]; then echo "Error: nanvixd not found in ./bin/"; exit 1; fi; \
+			timeout 120 $$NANVIXD \
 			  -bin-dir ./bin -ramfs $(RAMFS_IMG) $(NANVIXD_EXTRA_ARGS) \
 			  -- ./bin/python3.12 \
 			  "-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1" \

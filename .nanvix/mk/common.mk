@@ -43,6 +43,10 @@ ifdef CONFIG_NANVIX
 
   EXE=.elf
 
+  # Resolve a host-tool binary, trying .elf then .exe extension.
+  # Usage: $(call _find_host_bin,/path/to/basename_without_ext)
+  _find_host_bin = $(firstword $(wildcard $(1).elf $(1).exe))
+
   ifdef CONFIG_NANVIX_DOCKER
     # Docker-based cross-compilation
     # All paths inside Docker

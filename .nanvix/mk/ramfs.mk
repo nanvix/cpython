@@ -51,20 +51,25 @@ endif
 	@rm -f  $(RAMFS_STAGING)/sysroot/bin/pydoc3* $(RAMFS_STAGING)/sysroot/bin/python3-config
 	@rm -f  $(RAMFS_STAGING)/sysroot/bin/python3.12-config $(RAMFS_STAGING)/sysroot/bin/python3
 	@# Remove all ELF binaries — binaries are not included in ramfs
-	@find $(RAMFS_STAGING)/sysroot/bin -name '*.elf' -delete 2>/dev/null || true
+	@find $(RAMFS_STAGING)/sysroot/bin \( -name '*.elf' -o -name '*.exe' \) -delete 2>/dev/null || true
 	@# Remove remaining non-python binaries if bin/ is now empty
 	@rmdir $(RAMFS_STAGING)/sysroot/bin 2>/dev/null || true
 	@find $(RAMFS_STAGING)/sysroot -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Build a ramfs image from the trimmed sysroot.
 # Output: $(RAMFS_IMG)
-# Requires: mkramfs.elf in $(NANVIX_HOME)/bin/
+# Requires: mkramfs (.elf or .exe) in $(NANVIX_HOME)/bin/
 RAMFS_IMG ?= /tmp/cpython-rootfs.img
 
 ramfs-build: ramfs-trim
-	@MKRAMFS="$(abspath $(NANVIX_HOME))/bin/mkramfs.elf"; \
-	if [ ! -x "$$MKRAMFS" ]; then \
-		echo "Error: mkramfs.elf not found at $$MKRAMFS"; exit 1; \
+	@MKRAMFS=""; \
+	for ext in .elf .exe; do \
+		if [ -x "$(abspath $(NANVIX_HOME))/bin/mkramfs$$ext" ]; then \
+			MKRAMFS="$(abspath $(NANVIX_HOME))/bin/mkramfs$$ext"; break; \
+		fi; \
+	done; \
+	if [ -z "$$MKRAMFS" ]; then \
+		echo "Error: mkramfs not found at $(abspath $(NANVIX_HOME))/bin/ (.elf or .exe)"; exit 1; \
 	fi; \
 	"$$MKRAMFS" -o "$(RAMFS_IMG)" "$(RAMFS_STAGING)/sysroot"; \
 	echo "Built ramfs image: $(RAMFS_IMG) ($$(du -h "$(RAMFS_IMG)" | cut -f1))"

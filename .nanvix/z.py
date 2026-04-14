@@ -71,7 +71,12 @@ class CPythonBuild(ZScript):
         cls._with_nanvix = None
         argv = sys.argv[1:]
         for i, arg in enumerate(argv):
-            if arg == "--with-nanvix" and i + 1 < len(argv):
+            if arg == "--with-nanvix":
+                if i + 1 >= len(argv):
+                    log.fatal(
+                        "missing path for --with-nanvix",
+                        hint="Usage: --with-nanvix <path>",
+                    )
                 cls._with_nanvix = argv[i + 1]
                 sys.argv = [sys.argv[0]] + argv[:i] + argv[i + 2:]
                 break
