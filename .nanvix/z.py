@@ -14,6 +14,7 @@ Usage:
 import json
 import os
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -210,12 +211,10 @@ class CPythonBuild(ZScript):
             for name in ("_test_staging", "staging"):
                 p = self.repo_root / name
                 if p.is_dir():
-                    shutil.rmtree(p)
-                    log.info(f"Removed {name}/")
+                    self._rmtree_robust(p, name)
             test_staging = self.repo_root / ".nanvix" / "_test_staging"
             if test_staging.is_dir():
-                shutil.rmtree(test_staging)
-                log.info("Removed .nanvix/_test_staging/")
+                self._rmtree_robust(test_staging, ".nanvix/_test_staging")
         else:
             self.run(
                 "make",
@@ -224,6 +223,50 @@ class CPythonBuild(ZScript):
                 "clean",
                 cwd=self.repo_root,
             )
+
+    @staticmethod
+    def _rmtree_robust(path: Path, label: str) -> None:
+        """Remove a directory tree, retrying on permission errors.
+
+        On Windows, files copied from Docker volumes may have read-only
+        attributes that cause ``shutil.rmtree`` to fail.  The onerror
+        handler clears the write attribute and retries.  On other
+        platforms the original error is re-raised so failures are not
+        silently swallowed.
+        """
+        def _on_error(func, fpath, exc_info):
+            if os.name == "nt":
+                try:
+                    os.chmod(fpath, stat.S_IWRITE)
+                    func(fpath)
+                except OSError as retry_exc:
+                    log.warning(
+                        f"Failed to remove {fpath} after retry: {retry_exc} "
+                        f"(original error: {exc_info[1]})"
+                    )
+            else:
+                raise exc_info[1]
+
+        try:
+            shutil.rmtree(path, onerror=_on_error)
+            if path.exists():
+                log.warning(f"Could not fully remove {label}/ — some files may be locked")
+            else:
+                log.info(f"Removed {label}/")
+        except OSError as e:
+            log.warning(f"Could not remove {label}/: {e}")
+
+    def distclean(self) -> None:
+        """Remove all transient artifacts including test staging.
+
+        Extends the base distclean to also remove CPython-specific artifacts
+        (test staging, build outputs) that the base class does not know about.
+        """
+        try:
+            self.clean()
+        except Exception as e:
+            log.warning(f"clean() failed during distclean: {e}")
+        super().distclean()
 
     # ---- Fallback dependency download ------------------------------------
 
