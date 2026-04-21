@@ -11,19 +11,11 @@ invocation for configure/build/install only.
 from __future__ import annotations
 
 import hashlib
-import io
 import os
-import shutil
 import subprocess
-import tarfile
-import tempfile
 from pathlib import Path
 
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _loader import load_sibling
-
-config = load_sibling("config", __file__)
+import config
 
 
 def _workspace_id(workspace: Path) -> str:
@@ -47,13 +39,21 @@ def _docker_run_base(
     uid = os.getuid() if hasattr(os, "getuid") else 1000
     gid = os.getgid() if hasattr(os, "getgid") else 1000
     return [
-        "docker", "run", "--rm",
-        "--user", f"{uid}:{gid}",
-        "-v", f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
-        "-v", f"{workspace}:/mnt/host-workspace",
-        "-v", f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
-        "-w", config.DOCKER_WORKSPACE_PATH,
-        "-e", "HOME=/tmp",
+        "docker",
+        "run",
+        "--rm",
+        "--user",
+        f"{uid}:{gid}",
+        "-v",
+        f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
+        "-v",
+        f"{workspace}:/mnt/host-workspace",
+        "-v",
+        f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
+        "-w",
+        config.DOCKER_WORKSPACE_PATH,
+        "-e",
+        "HOME=/tmp",
         image,
     ]
 
@@ -79,17 +79,13 @@ def sync_sources(
     )
 
     rsync_excludes = " ".join(f"--exclude={e}" for e in config.DOCKER_TAR_EXCLUDES)
-    rsync_cmd = (
-        f"rsync -a --delete {rsync_excludes} "
-        f"/mnt/host-workspace/ {build_dir}/"
-    )
+    rsync_cmd = f"rsync -a --delete {rsync_excludes} /mnt/host-workspace/ {build_dir}/"
     tar_cmd = (
-        f"cd /mnt/host-workspace && "
-        f"tar -cf - {excludes} . | tar -xf - -C {build_dir}"
+        f"cd /mnt/host-workspace && tar -cf - {excludes} . | tar -xf - -C {build_dir}"
     )
 
     return (
-        f'if command -v rsync >/dev/null 2>&1; then {rsync_cmd}; '
+        f"if command -v rsync >/dev/null 2>&1; then {rsync_cmd}; "
         f"else {tar_cmd}; fi && "
         f"{crlf_cmds}"
     )
@@ -133,7 +129,7 @@ def docker_build(
     strip_bin = f"{config.DOCKER_TOOLCHAIN_PATH}/bin/{config.TOOLCHAIN_TRIPLET}-strip"
     strip_build = (
         f'if [ -x "{strip_bin}" ]; then '
-        f'for f in python python{config.EXE}; do '
+        f"for f in python python{config.EXE}; do "
         f'[ -f "{config.DOCKER_WORKSPACE_PATH}/$f" ] && '
         f'"{strip_bin}" --strip-all "{config.DOCKER_WORKSPACE_PATH}/$f" && '
         f'echo "Stripped $f"; done; fi'
@@ -149,16 +145,16 @@ def docker_build(
     # Fix: fingerprint key sysroot files and force `make clean` when the
     # fingerprint changes.
     sysroot_check = (
-        f'_sr_hash=$(cat '
-        f'{config.DOCKER_SYSROOT_PATH}/lib/libposix.a '
-        f'{config.DOCKER_SYSROOT_PATH}/lib/user.ld '
+        f"_sr_hash=$(cat "
+        f"{config.DOCKER_SYSROOT_PATH}/lib/libposix.a "
+        f"{config.DOCKER_SYSROOT_PATH}/lib/user.ld "
         f'2>/dev/null | md5sum | cut -d" " -f1); '
-        f'_stored=$(cat {config.DOCKER_WORKSPACE_PATH}/.sysroot-hash 2>/dev/null || true); '
+        f"_stored=$(cat {config.DOCKER_WORKSPACE_PATH}/.sysroot-hash 2>/dev/null || true); "
         f'if [ "$_sr_hash" != "$_stored" ]; then '
         f'echo "Sysroot changed -- forcing clean rebuild"; '
-        f'make -f Makefile.nanvix clean 2>/dev/null || true; '
-        f'rm -f {config.DOCKER_WORKSPACE_PATH}/.nanvix-configured; '
-        f'fi; '
+        f"make -f Makefile.nanvix clean 2>/dev/null || true; "
+        f"rm -f {config.DOCKER_WORKSPACE_PATH}/.nanvix-configured; "
+        f"fi; "
         f'echo "$_sr_hash" > {config.DOCKER_WORKSPACE_PATH}/.sysroot-hash'
     )
 
@@ -305,7 +301,7 @@ def _copy_outputs_cmd(workspace: Path) -> str:
     copies = []
     for f in config.DOCKER_OUTPUT_FILES:
         copies.append(
-            f'[ -f {config.DOCKER_WORKSPACE_PATH}/{f} ] && '
-            f'cp -f {config.DOCKER_WORKSPACE_PATH}/{f} /mnt/host-workspace/{f}'
+            f"[ -f {config.DOCKER_WORKSPACE_PATH}/{f} ] && "
+            f"cp -f {config.DOCKER_WORKSPACE_PATH}/{f} /mnt/host-workspace/{f}"
         )
     return " ; ".join(copies)

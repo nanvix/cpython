@@ -9,20 +9,16 @@ tarball creation, ramfs image inclusion, and tarball verification.
 
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
-import sys
+import sys as _sys
 import tarfile
 from pathlib import Path
 
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _loader import load_sibling
+import build as build_mod
+import config
+import ramfs as ramfs_mod
 
-config = load_sibling("config", __file__)
-build_mod = load_sibling("build", __file__)
-ramfs_mod = load_sibling("ramfs", __file__)
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _artifact_base(
@@ -65,7 +61,9 @@ def package(
 
     # Build.
     build_mod.build(
-        sysroot, toolchain, repo_root,
+        sysroot,
+        toolchain,
+        repo_root,
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -76,7 +74,10 @@ def package(
 
     # Install into staging.
     build_mod.install(
-        sysroot, toolchain, repo_root, release_staging,
+        sysroot,
+        toolchain,
+        repo_root,
+        release_staging,
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -112,15 +113,26 @@ def package(
         # Copy config-3.12.
         config_dir = lib_src / config.PYTHON_LIB_DIR / f"config-{config.PYTHON_VERSION}"
         if config_dir.is_dir():
-            dest = buildroot_pkg / "lib" / config.PYTHON_LIB_DIR / f"config-{config.PYTHON_VERSION}"
+            dest = (
+                buildroot_pkg
+                / "lib"
+                / config.PYTHON_LIB_DIR
+                / f"config-{config.PYTHON_VERSION}"
+            )
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(config_dir, dest)
 
     # Copy dev binaries.
-    for f in ["python3-config", f"python{config.PYTHON_VERSION}-config",
-              "2to3", f"2to3-{config.PYTHON_VERSION}",
-              "idle3", f"idle{config.PYTHON_VERSION}",
-              "pydoc3", f"pydoc{config.PYTHON_VERSION}"]:
+    for f in [
+        "python3-config",
+        f"python{config.PYTHON_VERSION}-config",
+        "2to3",
+        f"2to3-{config.PYTHON_VERSION}",
+        "idle3",
+        f"idle{config.PYTHON_VERSION}",
+        "pydoc3",
+        f"pydoc{config.PYTHON_VERSION}",
+    ]:
         src = sysroot_installed / "bin" / f
         if src.is_file():
             shutil.copy2(src, buildroot_pkg / "bin" / f)

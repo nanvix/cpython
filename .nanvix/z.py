@@ -1,5 +1,6 @@
 # Copyright(c) The Maintainers of Nanvix.
 # Licensed under the MIT License.
+# ruff: noqa: E402
 
 """Nanvix build script for CPython.
 
@@ -27,8 +28,16 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
-import zipfile
 from pathlib import Path
+from typing import override
+
+# Ensure sibling modules (build, config, docker, package, ramfs, test) are
+# importable when this file is loaded via importlib (e.g. by the nanvix-zutil
+# CLI), which does not prepend the script's directory to sys.path the way
+# `python z.py` does.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 
 from nanvix_zutil import (
     CFG_SYSROOT,
@@ -39,19 +48,10 @@ from nanvix_zutil import (
     suffix_dep,
 )
 
-# ---------------------------------------------------------------------------
-# Local modules (loaded via importlib since .nanvix/ is not a valid package name)
-# ---------------------------------------------------------------------------
-
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _loader import load_sibling
-
-build_mod = load_sibling("build", __file__)
-config = load_sibling("config", __file__)
-docker_mod = load_sibling("docker", __file__)
-package_mod = load_sibling("package", __file__)
-test_mod = load_sibling("test", __file__)
+import build as build_mod
+import config
+import package as package_mod
+import test as test_mod
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -113,6 +113,7 @@ class CPythonBuild(ZScript):
     # ---- CLI entry point -------------------------------------------------
 
     @classmethod
+    @override
     def main(cls, *, repo_root: Path | None = None) -> None:
         """Pre-parse ``--with-nanvix`` and delegate to ZScript.main()."""
         if _EARLY_LOCAL_NANVIX is not None:
@@ -136,17 +137,13 @@ class CPythonBuild(ZScript):
         Works on both Linux (ELF binaries) and Windows (.exe binaries).
         """
         # CLI flag takes precedence; fall back to persisted config.
-        nanvix_path = self._local_nanvix_path or self.config.get(
-            _CFG_LOCAL_NANVIX, ""
-        )
+        nanvix_path = self._local_nanvix_path or self.config.get(_CFG_LOCAL_NANVIX, "")
         if not nanvix_path:
             return
 
         nanvix_path = os.path.abspath(os.path.expanduser(nanvix_path))
         if not os.path.isdir(nanvix_path):
-            log.warning(
-                f"--with-nanvix path no longer exists: {nanvix_path}"
-            )
+            log.warning(f"--with-nanvix path no longer exists: {nanvix_path}")
             return
 
         # Persist so subsequent commands reuse the same path.
@@ -172,8 +169,11 @@ class CPythonBuild(ZScript):
             binaries = ["nanvixd.exe", "mkramfs.exe", "kernel.elf"]
         else:
             binaries = [
-                "nanvixd.elf", "kernel.elf", "mkramfs.elf",
-                "linuxd.elf", "uservm.elf",
+                "nanvixd.elf",
+                "kernel.elf",
+                "mkramfs.elf",
+                "linuxd.elf",
+                "uservm.elf",
             ]
 
         for name in binaries:
@@ -252,7 +252,9 @@ class CPythonBuild(ZScript):
         release = os.environ.get(_MAKE_VAR_RELEASE, "no")
 
         return build_mod.make_args(
-            sysroot, toolchain, *targets,
+            sysroot,
+            toolchain,
+            *targets,
             platform=self.config.machine,
             process_mode=self.config.deployment_mode,
             memory_size=self.config.memory_size,
@@ -260,13 +262,14 @@ class CPythonBuild(ZScript):
             release=(release == "yes"),
         )
 
-    def setup(self) -> None:
+    @override
+    def setup(self) -> bool:
         """Download the Nanvix sysroot and dependencies.
-
         Delegates sysroot download, Windows binary augmentation, and
         verification to the base class. The local-nanvix override is
         handled before calling super().
         """
+
         local_nanvix = self._local_nanvix_path
         if local_nanvix:
             local_nanvix = os.path.abspath(os.path.expanduser(local_nanvix))
@@ -285,7 +288,7 @@ class CPythonBuild(ZScript):
         buildroot = self.nanvix_dir / "buildroot"
         sysroot = self.config.get(CFG_SYSROOT, "")
         if not sysroot or not buildroot.is_dir():
-            return
+            return False
 
         sysroot_path = Path(sysroot)
         for subdir in ("lib", "include"):
@@ -306,17 +309,21 @@ class CPythonBuild(ZScript):
         # Overlay local Nanvix binaries last so they take precedence.
         self._overlay_local_nanvix()
 
+    @override
     def build(self) -> None:
         """Cross-compile python.elf and libpython.a for Nanvix."""
         self._overlay_local_nanvix()
         sysroot, toolchain = self._get_paths()
         release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
         build_mod.build(
-            sysroot, toolchain, self.repo_root,
+            sysroot,
+            toolchain,
+            self.repo_root,
             **self._build_kwargs(release=release),
             run_fn=lambda *args, **kw: self.run(*args, **kw),
         )
 
+    @override
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
         self._overlay_local_nanvix()
@@ -324,11 +331,14 @@ class CPythonBuild(ZScript):
         kwargs = self._build_kwargs()
 
         test_mod.run_all(
-            sysroot, toolchain, self.repo_root,
+            sysroot,
+            toolchain,
+            self.repo_root,
             **kwargs,
             run_fn=lambda *args, **kw: self.run(*args, **kw),
         )
 
+    @override
     def release(self) -> None:
         """Package the CPython release tarballs and verify them."""
         self._overlay_local_nanvix()
@@ -336,7 +346,9 @@ class CPythonBuild(ZScript):
         kwargs = self._build_kwargs(release=True)
 
         package_mod.package(
-            sysroot, toolchain, self.repo_root,
+            sysroot,
+            toolchain,
+            self.repo_root,
             **kwargs,
             run_fn=lambda *args, **kw: self.run(*args, **kw),
         )
@@ -347,10 +359,12 @@ class CPythonBuild(ZScript):
             memory_size=kwargs["memory_size"],
         )
 
+    @override
     def clean(self) -> None:
         """Remove build artifacts."""
         build_mod.clean(self.repo_root)
 
+    @override
     def distclean(self) -> None:
         """Deep clean: remove all build artifacts, caches, and untracked files."""
         build_mod.distclean(self.repo_root)
@@ -374,8 +388,11 @@ class CPythonBuild(ZScript):
             binaries = ["nanvixd.exe", "mkramfs.exe", "kernel.elf"]
         else:
             binaries = [
-                "nanvixd.elf", "kernel.elf", "mkramfs.elf",
-                "linuxd.elf", "uservm.elf",
+                "nanvixd.elf",
+                "kernel.elf",
+                "mkramfs.elf",
+                "linuxd.elf",
+                "uservm.elf",
             ]
         for name in binaries:
             src = local / "bin" / name

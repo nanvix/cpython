@@ -11,3 +11,4 @@ cpython-rootfs.img
 cpython_*.log
 __pycache__/
 release/
+uv.lock

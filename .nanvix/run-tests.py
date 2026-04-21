@@ -75,9 +75,7 @@ def run_batch(
             # for environment variables.
             modules_str = " ".join(batch)
             exclude_str = " ".join(exclude_args)
-            regrtest_args = (
-                f"-B -m test --timeout={REGRTEST_TIMEOUT} {modules_str}"
-            )
+            regrtest_args = f"-B -m test --timeout={REGRTEST_TIMEOUT} {modules_str}"
             if exclude_str:
                 regrtest_args += f" {exclude_str}"
             python_arg = (
@@ -108,9 +106,7 @@ def run_batch(
             ]
 
         try:
-            rc = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, timeout=600
-            ).returncode
+            rc = subprocess.run(cmd, stdin=subprocess.DEVNULL, timeout=600).returncode
         except subprocess.TimeoutExpired:
             print(f"  TIMEOUT: batch {batch_num} exceeded 600s")
             rc = 124  # match GNU timeout exit code
@@ -157,7 +153,9 @@ def main() -> int:
 
     total = len(modules)
     if failed:
-        print(f"  FAILED: {failed_batches} batch(es) ({len(failed)}/{total} modules affected):")
+        print(
+            f"  FAILED: {failed_batches} batch(es) ({len(failed)}/{total} modules affected):"
+        )
         print(f"    {' '.join(failed)}")
         return 1
 

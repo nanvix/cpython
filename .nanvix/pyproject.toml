@@ -1,0 +1,14 @@
+[project]
+name = "zutils-dev"
+version = "0"
+requires-python = ">=3.12"
+dependencies = ["nanvix-zutil"]
+
+[tool.uv.sources]
+nanvix-zutil = { git = "https://github.com/nanvix/zutils" }
+
+[dependency-groups]
+dev = [
+    "basedpyright",
+    "ruff",
+]

@@ -23,14 +23,9 @@ import time
 import urllib.request
 from pathlib import Path
 
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _loader import load_sibling
-
-config = load_sibling("config", __file__)
-build_mod = load_sibling("build", __file__)
-ramfs_mod = load_sibling("ramfs", __file__)
-
+import build as build_mod
+import config
+import ramfs as ramfs_mod
 
 # ---------------------------------------------------------------------------
 # Windows: download release artifacts as install cache
@@ -153,6 +148,7 @@ def _download_release_as_cache(
 # Staging
 # ---------------------------------------------------------------------------
 
+
 def stage(
     sysroot: str | Path,
     toolchain: str | Path,
@@ -195,7 +191,9 @@ def stage(
     else:
         # Linux: build and install directly.
         build_mod.build(
-            sysroot, toolchain, repo_root,
+            sysroot,
+            toolchain,
+            repo_root,
             platform=platform,
             process_mode=process_mode,
             memory_size=memory_size,
@@ -205,7 +203,10 @@ def stage(
         )
 
         build_mod.install(
-            sysroot, toolchain, repo_root, staging,
+            sysroot,
+            toolchain,
+            repo_root,
+            staging,
             platform=platform,
             process_mode=process_mode,
             memory_size=memory_size,
@@ -236,7 +237,9 @@ def stage(
         else:
             print(f"  WARNING: pybuilddir.txt not found; cannot locate {scdata_name}")
     else:
-        print(f"  Verified: {scdata_name} installed ({scdata_dst.stat().st_size} bytes)")
+        print(
+            f"  Verified: {scdata_name} installed ({scdata_dst.stat().st_size} bytes)"
+        )
 
     # Copy test script — a simple smoke test that validates the interpreter.
     hello_script = sysroot_dir / "test_hello.py"
@@ -250,8 +253,14 @@ def stage(
     bin_dir = sysroot_dir / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     nanvix_home = Path(sysroot)
-    for binary in ["nanvixd.elf", "kernel.elf", "linuxd.elf", "uservm.elf",
-                    "nanvixd.exe", "kernel.exe"]:
+    for binary in [
+        "nanvixd.elf",
+        "kernel.elf",
+        "linuxd.elf",
+        "uservm.elf",
+        "nanvixd.exe",
+        "kernel.exe",
+    ]:
         src = nanvix_home / "bin" / binary
         if src.is_file():
             shutil.copy2(src, bin_dir / binary)
@@ -283,6 +292,7 @@ def stage(
 # ---------------------------------------------------------------------------
 # Ramfs staging (standalone mode)
 # ---------------------------------------------------------------------------
+
 
 def stage_ramfs(
     staging: Path,
@@ -320,7 +330,9 @@ def stage_ramfs(
 
     # Trim and build ramfs image (keep tests for test pipeline).
     ramfs_mod.trim_and_build(
-        ramfs_cache, nanvix_home, ramfs_img,
+        ramfs_cache,
+        nanvix_home,
+        ramfs_img,
         keep_tests=True,
     )
 
@@ -330,6 +342,7 @@ def stage_ramfs(
 # ---------------------------------------------------------------------------
 # Hello-world test
 # ---------------------------------------------------------------------------
+
 
 def run_hello(
     staging: Path,
@@ -371,9 +384,13 @@ def run_hello(
         # Standalone: semicolon-delimited env vars + ramfs.
         cmd = [
             nanvixd,
-            "-bin-dir", "./bin", "-ramfs", str(ramfs_img),
+            "-bin-dir",
+            "./bin",
+            "-ramfs",
+            str(ramfs_img),
             *nanvixd_extra,
-            "--", python_bin,
+            "--",
+            python_bin,
             f"-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
             f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}",
         ]
@@ -382,7 +399,8 @@ def run_hello(
         cmd = [
             nanvixd,
             *nanvixd_extra,
-            "--", python_bin,
+            "--",
+            python_bin,
             "./test_hello.py",
         ]
 
@@ -406,9 +424,7 @@ def run_hello(
     if result.returncode != 0:
         print(f"  FAIL: Hello test exited with status {result.returncode}")
         print(output)
-        raise RuntimeError(
-            f"Hello test exited with status {result.returncode}"
-        )
+        raise RuntimeError(f"Hello test exited with status {result.returncode}")
 
     # Validate output.
     found_hello = False
@@ -430,6 +446,7 @@ def run_hello(
 # ---------------------------------------------------------------------------
 # Regression tests
 # ---------------------------------------------------------------------------
+
 
 def run_regrtest(
     staging: Path,
@@ -485,21 +502,24 @@ def run_regrtest(
 
     result = subprocess.run(cmd, cwd=sysroot, env=env)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"regrtest failed with exit code {result.returncode}"
-        )
+        raise RuntimeError(f"regrtest failed with exit code {result.returncode}")
 
 
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
 
+
 def cleanup(repo_root: Path) -> None:
     """Clean up test artifacts."""
     staging = repo_root / ".nanvix" / "_test_staging"
     if staging.is_dir():
         shutil.rmtree(staging)
-    for name in ["cpython_test.log", "cpython_regrtest.log", "cpython_regrtest_batch.log"]:
+    for name in [
+        "cpython_test.log",
+        "cpython_regrtest.log",
+        "cpython_regrtest_batch.log",
+    ]:
         p = repo_root / ".nanvix" / name
         if p.is_file():
             p.unlink()
@@ -519,6 +539,7 @@ def deep_cleanup(repo_root: Path) -> None:
 # ---------------------------------------------------------------------------
 # Aggregate test runner
 # ---------------------------------------------------------------------------
+
 
 def run_all(
     sysroot: str | Path,
@@ -540,7 +561,9 @@ def run_all(
 
     # Stage.
     staging = stage(
-        sysroot, toolchain, repo_root,
+        sysroot,
+        toolchain,
+        repo_root,
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -566,7 +589,8 @@ def run_all(
 
     # Regression tests.
     run_regrtest(
-        staging, repo_root,
+        staging,
+        repo_root,
         process_mode=process_mode,
         platform=platform,
         test_list=test_list,

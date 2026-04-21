@@ -9,8 +9,6 @@ across defaults.mk, common.mk, and the various test-*.mk files.
 
 from __future__ import annotations
 
-import os
-import platform
 import sys
 from pathlib import Path
 
@@ -128,28 +126,32 @@ def configure_opts(
     ]
     if release:
         opts.append("--disable-test-modules")
-    opts.extend([
-        f"--with-libc={libc}",
-        f"--with-libm={libm}",
-        f"--prefix={install_prefix}",
-        f"--exec-prefix={install_prefix}",
-        "--with-ensurepip=no",
-        "--with-pkg-config=no",
-        f"--with-openssl={sysroot}",
-        "--disable-ipv6",
-    ])
+    opts.extend(
+        [
+            f"--with-libc={libc}",
+            f"--with-libm={libm}",
+            f"--prefix={install_prefix}",
+            f"--exec-prefix={install_prefix}",
+            "--with-ensurepip=no",
+            "--with-pkg-config=no",
+            f"--with-openssl={sysroot}",
+            "--disable-ipv6",
+        ]
+    )
     if release:
         opts.append("--without-doc-strings")
-    opts.extend([
-        "--with-computed-gotos",
-        "ac_cv_file__dev_ptmx=no",
-        "ac_cv_file__dev_ptc=no",
-        "ac_cv_pthread_is_default=yes",
-        "ac_cv_pthread=yes",
-        "ac_cv_kthread=no",
-        "ac_cv_func_dlopen=yes",
-        "ac_cv_header_dlfcn_h=yes",
-    ])
+    opts.extend(
+        [
+            "--with-computed-gotos",
+            "ac_cv_file__dev_ptmx=no",
+            "ac_cv_file__dev_ptc=no",
+            "ac_cv_pthread_is_default=yes",
+            "ac_cv_pthread=yes",
+            "ac_cv_kthread=no",
+            "ac_cv_func_dlopen=yes",
+            "ac_cv_header_dlfcn_h=yes",
+        ]
+    )
     return opts
 
 
@@ -159,24 +161,70 @@ def configure_opts(
 
 # Canonical list of stdlib test modules known to pass on Nanvix.
 NANVIX_TEST_LIST: list[str] = [
-    "test_float", "test_complex", "test_bool", "test_struct",
-    "test_int", "test_range", "test_slice", "test_memoryview", "test_bytes", "test_tuple",
-    "test_builtin", "test_operator", "test_binop", "test_unary",
-    "test_compare", "test_richcmp", "test_augassign", "test_contains",
-    "test_grammar", "test_syntax", "test_compile", "test_compiler_assemble",
-    "test_compiler_codegen", "test_ast", "test_symtable", "test_opcache",
-    "test_peepholer", "test_dis", "test_code", "test_keyword", "test_tokenize",
+    "test_float",
+    "test_complex",
+    "test_bool",
+    "test_struct",
+    "test_int",
+    "test_range",
+    "test_slice",
+    "test_memoryview",
+    "test_bytes",
+    "test_tuple",
+    "test_builtin",
+    "test_operator",
+    "test_binop",
+    "test_unary",
+    "test_compare",
+    "test_richcmp",
+    "test_augassign",
+    "test_contains",
+    "test_grammar",
+    "test_syntax",
+    "test_compile",
+    "test_compiler_assemble",
+    "test_compiler_codegen",
+    "test_ast",
+    "test_symtable",
+    "test_opcache",
+    "test_peepholer",
+    "test_dis",
+    "test_code",
+    "test_keyword",
+    "test_tokenize",
     "test_perf_profiler",
-    "test_call", "test_extcall", "test_positional_only_arg",
-    "test_scope", "test_global", "test_dynamic", "test_with",
-    "test_types", "test_typechecks", "test_isinstance", "test_hash",
-    "test_index", "test_super", "test_property",
-    "test_math", "test_cmath", "test_decimal", "test_fractions",
-    "test_statistics", "test_random", "test_numeric_tower",
-    "test_exception_group", "test_exceptions", "test_raise", "test_traceback",
-    "test_frame", "test_contextlib", "test_contextlib_async",
-    "test_pprint", "test_reprlib",
-    "test_list", "test_dict",
+    "test_call",
+    "test_extcall",
+    "test_positional_only_arg",
+    "test_scope",
+    "test_global",
+    "test_dynamic",
+    "test_with",
+    "test_types",
+    "test_typechecks",
+    "test_isinstance",
+    "test_hash",
+    "test_index",
+    "test_super",
+    "test_property",
+    "test_math",
+    "test_cmath",
+    "test_decimal",
+    "test_fractions",
+    "test_statistics",
+    "test_random",
+    "test_numeric_tower",
+    "test_exception_group",
+    "test_exceptions",
+    "test_raise",
+    "test_traceback",
+    "test_frame",
+    "test_contextlib",
+    "test_contextlib_async",
+    "test_pprint",
+    "test_reprlib",
+    "test_list",
+    "test_dict",
 ]
 
 # Default batch size for regrtest VM invocations.
@@ -214,8 +262,12 @@ SYSROOT_TRIM_DIRS: list[str] = [
 
 # Files removed from sysroot bin/ during ramfs trimming.
 SYSROOT_TRIM_BIN_PATTERNS: list[str] = [
-    "2to3*", "idle3*", "pydoc3*",
-    "python3-config", f"python{PYTHON_VERSION}-config", "python3",
+    "2to3*",
+    "idle3*",
+    "pydoc3*",
+    "python3-config",
+    f"python{PYTHON_VERSION}-config",
+    "python3",
 ]
 
 # ---------------------------------------------------------------------------
@@ -223,25 +275,49 @@ SYSROOT_TRIM_BIN_PATTERNS: list[str] = [
 # ---------------------------------------------------------------------------
 
 DOCKER_TAR_EXCLUDES: list[str] = [
-    ".git", ".nanvix/venv", ".nanvix/cache", ".nanvix/sysroot",
-    ".nanvix/buildroot", "Doc", "Lib/idlelib", "Lib/tkinter",
-    "Lib/turtledemo", "Lib/ensurepip", "PC", "PCbuild",
+    ".git",
+    ".nanvix/venv",
+    ".nanvix/cache",
+    ".nanvix/sysroot",
+    ".nanvix/buildroot",
+    "Doc",
+    "Lib/idlelib",
+    "Lib/tkinter",
+    "Lib/turtledemo",
+    "Lib/ensurepip",
+    "PC",
+    "PCbuild",
 ]
 
 # Files needing CRLF → LF normalization for autotools.
 DOCKER_CRLF_FILES: list[str] = [
-    "configure", "config.guess", "config.sub", "install-sh",
-    "Modules/makesetup", "Modules/Setup",
-    "Modules/Setup.bootstrap.in", "Modules/Setup.stdlib.in",
-    "Modules/config.c.in", "Modules/ld_so_aix.in",
-    "Makefile.pre.in", "pyconfig.h.in", "aclocal.m4", "configure.ac",
-    "Misc/python.pc.in", "Misc/python-embed.pc.in",
-    "Misc/python-config.sh.in", "Misc/python-config.in",
+    "configure",
+    "config.guess",
+    "config.sub",
+    "install-sh",
+    "Modules/makesetup",
+    "Modules/Setup",
+    "Modules/Setup.bootstrap.in",
+    "Modules/Setup.stdlib.in",
+    "Modules/config.c.in",
+    "Modules/ld_so_aix.in",
+    "Makefile.pre.in",
+    "pyconfig.h.in",
+    "aclocal.m4",
+    "configure.ac",
+    "Misc/python.pc.in",
+    "Misc/python-embed.pc.in",
+    "Misc/python-config.sh.in",
+    "Misc/python-config.in",
 ]
 
 # Docker output files to copy back to host workspace.
 DOCKER_OUTPUT_FILES: list[str] = [
-    "python", "python.exe", "python.elf", "python.wasm", f"libpython{PYTHON_VERSION}.a",
+    "python",
+    "python.exe",
+    "python.elf",
+    "python.wasm",
+    f"libpython{PYTHON_VERSION}.a",
     "pybuilddir.txt",
 ]
 

@@ -10,18 +10,12 @@ build/install/clean targets from common.mk. Constructs and executes
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _loader import load_sibling
-
-config = load_sibling("config", __file__)
-docker_mod = load_sibling("docker", __file__)
+import config
+import docker as docker_mod
 
 
 def make_args(
@@ -48,8 +42,9 @@ def make_args(
 
     args = [
         "make",
-        "-f", "Makefile.nanvix",
-        f"CONFIG_NANVIX=y",
+        "-f",
+        "Makefile.nanvix",
+        "CONFIG_NANVIX=y",
         f"NANVIX_HOME={sysroot_p}",
         f"NANVIX_TOOLCHAIN={toolchain_p}",
         f"PLATFORM={platform}",
@@ -102,7 +97,8 @@ def build(
         # is cached for later use by ``./z test`` (no Docker during tests).
         install_cache = repo_root / ".nanvix" / "_install_cache"
         docker_mod.docker_build(
-            repo_root, Path(sysroot),
+            repo_root,
+            Path(sysroot),
             platform=platform,
             process_mode=process_mode,
             memory_size=memory_size,
@@ -112,7 +108,9 @@ def build(
         )
         return
     args = make_args(
-        sysroot, toolchain, "build",
+        sysroot,
+        toolchain,
+        "build",
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -138,7 +136,9 @@ def install(
     """Install CPython into a staging directory."""
     if config.IS_WINDOWS:
         docker_mod.docker_install(
-            repo_root, Path(sysroot), destdir,
+            repo_root,
+            Path(sysroot),
+            destdir,
             platform=platform,
             process_mode=process_mode,
             memory_size=memory_size,
@@ -147,7 +147,10 @@ def install(
         )
         return
     args = make_args(
-        sysroot, toolchain, "install", f"DESTDIR={destdir}",
+        sysroot,
+        toolchain,
+        "install",
+        f"DESTDIR={destdir}",
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -180,12 +183,24 @@ def clean(repo_root: Path) -> None:
 
 # Git-clean exclusion list — files preserved during distclean.
 _DISTCLEAN_EXCLUDES: list[str] = [
-    "Makefile.nanvix", "NANVIX.md", ".github",
-    ".nanvix/z.py", ".nanvix/_loader.py", ".nanvix/nanvix.toml", ".nanvix/.gitignore",
-    ".nanvix/config.py", ".nanvix/build.py", ".nanvix/docker.py",
-    ".nanvix/ramfs.py", ".nanvix/test.py", ".nanvix/package.py",
-    ".nanvix/run-regrtest.py", ".nanvix/run-tests.py",
-    "z", "z.sh", "z.ps1",
+    "Makefile.nanvix",
+    "NANVIX.md",
+    ".github",
+    ".nanvix/z.py",
+    ".nanvix/_loader.py",
+    ".nanvix/nanvix.toml",
+    ".nanvix/.gitignore",
+    ".nanvix/config.py",
+    ".nanvix/build.py",
+    ".nanvix/docker.py",
+    ".nanvix/ramfs.py",
+    ".nanvix/test.py",
+    ".nanvix/package.py",
+    ".nanvix/run-regrtest.py",
+    ".nanvix/run-tests.py",
+    "z",
+    "z.sh",
+    "z.ps1",
 ]
 
 
