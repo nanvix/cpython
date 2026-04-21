@@ -22,14 +22,32 @@ import tarfile
 import time
 import urllib.request
 from pathlib import Path
+from typing import TypedDict, cast
 
 import build as build_mod
 import config
 import ramfs as ramfs_mod
 
+
+# XXX: duplicated with z.py — consider extracting to a shared helper module
+# (e.g. .nanvix/_gh.py) once the GitHub-API fetch logic stabilises.
+class _GhAsset(TypedDict):
+    """Subset of the GitHub release-asset JSON schema."""
+
+    name: str
+    browser_download_url: str
+
+
+class _GhRelease(TypedDict):
+    """Subset of the GitHub release JSON schema."""
+
+    tag_name: str
+    assets: list[_GhAsset]
+
 # ---------------------------------------------------------------------------
 # Windows: download release artifacts as install cache
 # ---------------------------------------------------------------------------
+
 
 def _download_release_as_cache(
     repo_root: Path,
@@ -56,29 +74,34 @@ def _download_release_as_cache(
     if gh_token:
         req.add_header("Authorization", f"Bearer {gh_token}")
 
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        release = json.loads(resp.read())
+    with urllib.request.urlopen(req, timeout=30) as resp:  # pyright: ignore[reportAny]
+        release: _GhRelease = cast(
+            _GhRelease,
+            json.loads(resp.read()),  # pyright: ignore[reportAny]
+        )
 
     tag = release["tag_name"]
     print(f"  Resolved cpython release: {tag}")
 
     # Find a standalone tarball asset.
     asset_prefix = f"cpython-{platform}-{process_mode}-{memory_size}"
-    asset_url = None
-    asset_name = None
+    asset_url: str | None = None
+    asset_name: str | None = None
     for a in release.get("assets", []):
         name = a.get("name", "")
-        if (name.startswith(asset_prefix)
-                and name.endswith(".tar.bz2")
-                and "buildroot" not in name):
+        if (
+            name.startswith(asset_prefix)
+            and name.endswith(".tar.bz2")
+            and "buildroot" not in name
+        ):
             asset_url = a["browser_download_url"]
             asset_name = name
             break
 
-    if not asset_url:
+    if asset_url is None or asset_name is None:
         raise FileNotFoundError(
             f"No cpython release asset matching '{asset_prefix}*.tar.bz2' "
-            f"in release {tag}. Available assets: "
+            + f"in release {tag}. Available assets: "
             + ", ".join(a["name"] for a in release.get("assets", []))
         )
 
@@ -88,7 +111,7 @@ def _download_release_as_cache(
     tarball = dl_dir / asset_name
     if not tarball.is_file():
         print(f"  Downloading {asset_name}...")
-        urllib.request.urlretrieve(asset_url, str(tarball))
+        _ = urllib.request.urlretrieve(asset_url, str(tarball))
 
     # Extract into _install_cache with path-traversal protection.
     print(f"  Extracting to {cache_dir}...")
@@ -96,9 +119,7 @@ def _download_release_as_cache(
         base = cache_dir.resolve()
         for member in tf.getmembers():
             if member.issym() or member.islnk():
-                raise tarfile.TarError(
-                    f"refusing to extract link entry: {member.name}"
-                )
+                raise tarfile.TarError(f"refusing to extract link entry: {member.name}")
             resolved = (base / member.name).resolve()
             if os.path.commonpath([str(base), str(resolved)]) != str(base):
                 raise tarfile.TarError(
@@ -118,7 +139,7 @@ def _download_release_as_cache(
             if parent != cache_dir:
                 sysroot.mkdir(exist_ok=True)
                 for item in parent.iterdir():
-                    shutil.move(str(item), str(sysroot / item.name))
+                    _ = shutil.move(str(item), str(sysroot / item.name))
                 break
 
     # Copy the stripped python binary into sysroot/bin/ if present.
@@ -126,7 +147,7 @@ def _download_release_as_cache(
     bin_dir.mkdir(exist_ok=True)
     python_elf = cache_dir / "bin" / "python.elf"
     if python_elf.is_file():
-        shutil.copy2(python_elf, bin_dir / config.python_binary())
+        _ = shutil.copy2(python_elf, bin_dir / config.python_binary())
         print(f"  Installed python binary ({python_elf.stat().st_size // 1024}K)")
 
     # Copy the test suite from the source tree into the sysroot.
@@ -136,7 +157,7 @@ def _download_release_as_cache(
     test_dst = pylib_dir / "test"
     test_src = repo_root / "Lib" / "test"
     if test_src.is_dir() and not test_dst.is_dir():
-        shutil.copytree(test_src, test_dst)
+        _ = shutil.copytree(test_src, test_dst)
         test_count = sum(1 for _ in test_dst.rglob("*.py"))
         print(f"  Copied test suite from source tree ({test_count} files)")
 
@@ -159,7 +180,7 @@ def stage(
     memory_size: str = config.DEFAULT_MEMORY_SIZE,
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
     release: bool = False,
-    run_fn=None,
+    run_fn: build_mod.RunFn | None = None,
 ) -> Path:
     """Build, install, and stage CPython for testing.
 
@@ -176,7 +197,7 @@ def stage(
         # so that no Docker invocation is needed during testing.
         install_cache = repo_root / ".nanvix" / "_install_cache"
         if install_cache.is_dir():
-            shutil.copytree(install_cache, staging)
+            _ = shutil.copytree(install_cache, staging)
             print("  Using cached install from ./z build")
         else:
             # Fallback: download the release tarball and use it as the
@@ -184,10 +205,14 @@ def stage(
             # without a prior ``./z build`` (which requires Docker).
             print("  Install cache not found — downloading release artifacts...")
             install_cache = _download_release_as_cache(
-                repo_root, platform, process_mode, memory_size,
+                repo_root,
+                platform,
+                process_mode,
+                memory_size,
             )
-            shutil.copytree(install_cache, staging)
+            _ = shutil.copytree(install_cache, staging)
             print("  Using downloaded release as install cache")
+
     else:
         # Linux: build and install directly.
         build_mod.build(
@@ -230,7 +255,7 @@ def stage(
             bdir = repo_root / pybuilddir.read_text().strip()
             scdata_src = bdir / scdata_name
             if scdata_src.is_file():
-                shutil.copy2(scdata_src, scdata_dst)
+                _ = shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
             else:
                 print(f"  WARNING: {scdata_name} not found in build dir {bdir}")
@@ -243,10 +268,10 @@ def stage(
 
     # Copy test script — a simple smoke test that validates the interpreter.
     hello_script = sysroot_dir / "test_hello.py"
-    hello_script.write_text(
+    _ = hello_script.write_text(
         "import sys\n"
-        "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
-        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
+        + "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
+        + "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
     )
 
     # Copy Nanvix runtime binaries.
@@ -263,20 +288,20 @@ def stage(
     ]:
         src = nanvix_home / "bin" / binary
         if src.is_file():
-            shutil.copy2(src, bin_dir / binary)
+            _ = shutil.copy2(src, bin_dir / binary)
 
     # Replace unstripped python binary with stripped python.elf.
     stripped = repo_root / f"python{config.EXE}"
     if stripped.is_file():
         target = bin_dir / config.python_binary()
-        shutil.copy2(stripped, target)
+        _ = shutil.copy2(stripped, target)
         size = target.stat().st_size
         print(f"  Installed stripped python.elf into staging ({size // 1024}K)")
 
     # Copy guest-side test runner.
     regrtest_runner = repo_root / ".nanvix" / "run-regrtest.py"
     if regrtest_runner.is_file():
-        shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
+        _ = shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
 
     # Invalidate stale ramfs image and cache from previous runs.
     stale_ramfs = repo_root / ".nanvix" / "cpython-rootfs.img"
@@ -323,13 +348,13 @@ def stage_ramfs(
     # Copy sysroot from test staging.
     sysroot_src = staging / "sysroot"
     sysroot_dst = ramfs_cache / "sysroot"
-    shutil.copytree(sysroot_src, sysroot_dst)
+    _ = shutil.copytree(sysroot_src, sysroot_dst)
 
     # Create /tmp for tempfile.gettempdir().
     (sysroot_dst / "tmp").mkdir(exist_ok=True)
 
     # Trim and build ramfs image (keep tests for test pipeline).
-    ramfs_mod.trim_and_build(
+    _ = ramfs_mod.trim_and_build(
         ramfs_cache,
         nanvix_home,
         ramfs_img,
@@ -376,7 +401,7 @@ def run_hello(
             mkramfs_name = config.mkramfs_binary()
             mkramfs_src = nanvix_home / "bin" / mkramfs_name
             if mkramfs_src.is_file():
-                shutil.copy2(mkramfs_src, sysroot / "bin" / mkramfs_name)
+                _ = shutil.copy2(mkramfs_src, sysroot / "bin" / mkramfs_name)
 
     print(f"Test: Hello world ({process_mode})...")
 
@@ -391,8 +416,8 @@ def run_hello(
             *nanvixd_extra,
             "--",
             python_bin,
-            f"-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
-            f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}",
+            "-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
+            + f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}",
         ]
     else:
         # Direct mode: guest accesses host filesystem, no ramfs.
@@ -495,8 +520,8 @@ def run_regrtest(
         if nanvixd_extra:
             env["NANVIXD_EXTRA_ARGS"] = " ".join(nanvixd_extra)
         else:
-            env.pop("NANVIXD_EXTRA_ARGS", None)
-        env.pop("NANVIX_STANDALONE", None)
+            _ = env.pop("NANVIXD_EXTRA_ARGS", None)
+        _ = env.pop("NANVIX_STANDALONE", None)
 
     cmd = [sys.executable, str(run_tests_script)] + test_list
 
@@ -553,7 +578,7 @@ def run_all(
     release: bool = False,
     test_list: list[str] | None = None,
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
-    run_fn=None,
+    run_fn: build_mod.RunFn | None = None,
 ) -> None:
     """Run the complete test pipeline: stage → hello → regrtest → cleanup."""
     nanvix_home = Path(sysroot)

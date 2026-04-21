@@ -65,12 +65,23 @@ def main() -> int:
 
     # -- Run -------------------------------------------------------------------
     sys.argv[1:] = args
-    from test.libregrtest.main import main as regrtest_main
+    # `test.libregrtest` ships with the CPython source tree we're building,
+    # not the host venv, so static analyzers can't see it.
+    from test.libregrtest.main import (  # pyright: ignore[reportMissingImports]
+        main as regrtest_main,  # pyright: ignore[reportUnknownVariableType]
+    )
 
     try:
         regrtest_main()
     except SystemExit as e:
-        return e.code
+        code = e.code
+        if isinstance(code, int):
+            return code
+        if code is None:
+            return 0
+        # Non-int exit code (str): print and report as failure.
+        print(code, file=sys.stderr)
+        return 1
     return 0
 
 

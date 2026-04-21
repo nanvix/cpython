@@ -126,7 +126,7 @@ def main() -> int:
         posix=(sys.platform != "win32"),
     )
 
-    batches = []
+    batches: list[list[str]] = []
     for i in range(0, len(modules), BATCH_SIZE):
         batches.append(modules[i : i + BATCH_SIZE])
 
@@ -134,7 +134,7 @@ def main() -> int:
     mode_label = "standalone" if STANDALONE else "direct"
     print(
         f"  Running {len(modules)} modules in {total_batches} batches "
-        f"({BATCH_SIZE}/batch, sequential, {mode_label} mode)"
+        + f"({BATCH_SIZE}/batch, sequential, {mode_label} mode)"
     )
     for i, batch in enumerate(batches, 1):
         print(f"    Batch {i}: {' '.join(batch)}")

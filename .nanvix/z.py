@@ -29,7 +29,10 @@ import tarfile
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import override
+from typing import TYPE_CHECKING, TypedDict, cast, override
+
+if TYPE_CHECKING:
+    from nanvix_zutil import Sysroot
 
 # Ensure sibling modules (build, config, docker, package, ramfs, test) are
 # importable when this file is loaded via importlib (e.g. by the nanvix-zutil
@@ -94,10 +97,35 @@ _DEP_EXPECTED_LIBS: dict[str, list[str]] = {
 }
 
 
+class _BuildKwargs(TypedDict, total=False):
+    """Common kwargs threaded into build/test/package modules."""
+
+    platform: str
+    process_mode: str
+    memory_size: str
+    install_prefix: str
+    release: bool
+
+
+class _GhAsset(TypedDict):
+    """Subset of the GitHub release-asset JSON schema."""
+
+    name: str
+    browser_download_url: str
+
+
+class _GhRelease(TypedDict):
+    """Subset of the GitHub release JSON schema."""
+
+    tag_name: str
+    assets: list[_GhAsset]
+
+
 class CPythonBuild(ZScript):
     """Build script for nanvix/cpython."""
 
     _local_nanvix_path: str | None = None
+    sysroot: "Sysroot | None" = None
 
     if sys.platform == "win32":
         SYSROOT_REQUIRED_FILES: tuple[str, ...] = (
@@ -179,7 +207,7 @@ class CPythonBuild(ZScript):
         for name in binaries:
             src = bin_src / name
             if src.is_file():
-                shutil.copy2(src, bin_dst / name)
+                _ = shutil.copy2(src, bin_dst / name)
                 log.info(f"  Copied {name}")
 
         # -- Libraries -----------------------------------------------------
@@ -191,7 +219,7 @@ class CPythonBuild(ZScript):
             for lib_name in ["libposix.a"]:
                 src = lib_src / lib_name
                 if src.is_file():
-                    shutil.copy2(src, lib_dst / lib_name)
+                    _ = shutil.copy2(src, lib_dst / lib_name)
                     log.info(f"  Copied {lib_name}")
 
         # -- Linker script (user.ld) — check multiple locations ------------
@@ -202,7 +230,7 @@ class CPythonBuild(ZScript):
         ]
         for candidate in user_ld_candidates:
             if candidate.is_file():
-                shutil.copy2(candidate, lib_dst / "user.ld")
+                _ = shutil.copy2(candidate, lib_dst / "user.ld")
                 log.info(f"  Copied user.ld from {candidate}")
                 break
 
@@ -217,10 +245,13 @@ class CPythonBuild(ZScript):
                 code=EXIT_MISSING_DEP,
                 hint="Run `./z setup` first to download the sysroot.",
             )
-        toolchain = self.config.get(CFG_TOOLCHAIN, config.TOOLCHAIN_DEFAULT_PATH)
+        toolchain = (
+            self.config.get(CFG_TOOLCHAIN, config.TOOLCHAIN_DEFAULT_PATH)
+            or config.TOOLCHAIN_DEFAULT_PATH
+        )
         return sysroot, toolchain
 
-    def _build_kwargs(self, release: bool = False) -> dict:
+    def _build_kwargs(self, release: bool = False) -> _BuildKwargs:
         """Return common keyword arguments for build/test/package modules."""
         return {
             "platform": self.config.machine,
@@ -242,9 +273,9 @@ class CPythonBuild(ZScript):
         if sys.platform == "win32":
             raise RuntimeError(
                 "_run_make() is not supported on Windows. "
-                "Use build_mod.build() / build_mod.install() instead."
+                + "Use build_mod.build() / build_mod.install() instead."
             )
-        self.run(*make_args, cwd=self.repo_root, docker=False, kvm=kvm)
+        _ = self.run(*make_args, cwd=self.repo_root, docker=False, kvm=kvm)
 
     def _make_args(self, *targets: str) -> list[str]:
         """Build the make argument list for configure/build/install."""
@@ -279,7 +310,7 @@ class CPythonBuild(ZScript):
         else:
             # Base class handles: download sysroot, download Windows
             # binaries (if on Windows), verify required files.
-            super().setup()
+            _ = super().setup()
 
         self._install_missing_deps()
 
@@ -300,14 +331,15 @@ class CPythonBuild(ZScript):
             for item in src.iterdir():
                 target = dst / item.name
                 if item.is_dir():
-                    shutil.copytree(item, target, dirs_exist_ok=True)
+                    _ = shutil.copytree(item, target, dirs_exist_ok=True)
                     log.info(f"Merged directory {subdir}/{item.name} into sysroot")
                 else:
-                    shutil.copy2(item, target)
+                    _ = shutil.copy2(item, target)
                     log.info(f"Merged {subdir}/{item.name} into sysroot")
 
         # Overlay local Nanvix binaries last so they take precedence.
         self._overlay_local_nanvix()
+        return True
 
     @override
     def build(self) -> None:
@@ -320,7 +352,7 @@ class CPythonBuild(ZScript):
             toolchain,
             self.repo_root,
             **self._build_kwargs(release=release),
-            run_fn=lambda *args, **kw: self.run(*args, **kw),
+            run_fn=self.run,
         )
 
     @override
@@ -335,7 +367,7 @@ class CPythonBuild(ZScript):
             toolchain,
             self.repo_root,
             **kwargs,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),
+            run_fn=self.run,
         )
 
     @override
@@ -350,13 +382,13 @@ class CPythonBuild(ZScript):
             toolchain,
             self.repo_root,
             **kwargs,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),
+            run_fn=self.run,
         )
         package_mod.verify(
             self.repo_root,
-            platform=kwargs["platform"],
-            process_mode=kwargs["process_mode"],
-            memory_size=kwargs["memory_size"],
+            platform=self.config.machine,
+            process_mode=self.config.deployment_mode,
+            memory_size=self.config.memory_size,
         )
 
     @override
@@ -397,7 +429,7 @@ class CPythonBuild(ZScript):
         for name in binaries:
             src = local / "bin" / name
             if src.is_file():
-                shutil.copy2(src, bin_dst / name)
+                _ = shutil.copy2(src, bin_dst / name)
                 log.info(f"  Copied bin/{name}")
 
         lib_dst = sysroot_dir / "lib"
@@ -406,7 +438,7 @@ class CPythonBuild(ZScript):
         if lib_src.is_dir():
             for f in lib_src.iterdir():
                 if f.is_file():
-                    shutil.copy2(f, lib_dst / f.name)
+                    _ = shutil.copy2(f, lib_dst / f.name)
                     log.info(f"  Copied lib/{f.name}")
 
         if not (lib_dst / "user.ld").is_file():
@@ -415,7 +447,7 @@ class CPythonBuild(ZScript):
                 local / "build" / "user" / "linker" / "x86" / "user.ld",
             ]:
                 if candidate.is_file():
-                    shutil.copy2(candidate, lib_dst / "user.ld")
+                    _ = shutil.copy2(candidate, lib_dst / "user.ld")
                     log.info(f"  Copied user.ld from {candidate}")
                     break
 
@@ -430,7 +462,7 @@ class CPythonBuild(ZScript):
         buildroot.mkdir(parents=True, exist_ok=True)
         lib_dir = buildroot / "lib"
 
-        sysroot_tag = self.manifest.sysroot_ref.value
+        sysroot_tag = str(self.manifest.sysroot_ref.value)
         nanvix_version = sysroot_tag.removeprefix("v") if sysroot_tag else ""
 
         for dep in self.manifest.dependencies:
@@ -441,7 +473,7 @@ class CPythonBuild(ZScript):
                 continue
             resolved = suffix_dep(dep, nanvix_version) if nanvix_version else dep
             self._download_dep_fallback(
-                resolved.name, resolved.repo, resolved.ref.value, buildroot
+                resolved.name, resolved.repo, str(resolved.ref.value), buildroot
             )
 
     def _download_dep_fallback(
@@ -454,15 +486,19 @@ class CPythonBuild(ZScript):
         """Download *dep_name* using a fallback asset variant."""
         platform = self.config.machine
         memory = self.config.memory_size
-        release = None
+        release: _GhRelease | None = None
 
         api_url = f"https://api.github.com/repos/{repo}/releases/tags/{ref}"
         try:
             req = urllib.request.Request(api_url)
             req.add_header("Accept", "application/vnd.github+json")
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                release = json.loads(resp.read())
-        except (OSError, ValueError, urllib.error.URLError):
+            with urllib.request.urlopen(req, timeout=30) as resp:  # pyright: ignore[reportAny]
+                release = cast(
+                    _GhRelease,
+                    json.loads(resp.read()),  # pyright: ignore[reportAny]
+                )
+        except (OSError, ValueError):
+            # urllib.error.URLError is a subclass of OSError; covered above.
             pass
 
         if release is None:
@@ -471,9 +507,13 @@ class CPythonBuild(ZScript):
             try:
                 req = urllib.request.Request(releases_url)
                 req.add_header("Accept", "application/vnd.github+json")
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    all_releases = json.loads(resp.read())
-            except (OSError, ValueError, urllib.error.URLError) as exc:
+                with urllib.request.urlopen(req, timeout=30) as resp:  # pyright: ignore[reportAny]
+                    all_releases: list[_GhRelease] = cast(
+                        list[_GhRelease],
+                        json.loads(resp.read()),  # pyright: ignore[reportAny]
+                    )
+            except (OSError, ValueError) as exc:
+                # urllib.error.URLError is a subclass of OSError; covered above.
                 log.warning(f"Cannot query GitHub releases for {dep_name}: {exc}")
                 return
             for rel in all_releases:
@@ -529,7 +569,7 @@ class CPythonBuild(ZScript):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tarball_path = Path(tmpdir) / chosen
-            urllib.request.urlretrieve(download_url, str(tarball_path))
+            _ = urllib.request.urlretrieve(download_url, str(tarball_path))
 
             extract_dir = Path(tmpdir) / "extracted"
             extract_dir.mkdir()
@@ -542,7 +582,7 @@ class CPythonBuild(ZScript):
             lib_dst = buildroot / "lib"
             lib_dst.mkdir(parents=True, exist_ok=True)
             for lib_file in extract_dir.rglob("*.a"):
-                shutil.copy2(lib_file, lib_dst / lib_file.name)
+                _ = shutil.copy2(lib_file, lib_dst / lib_file.name)
                 log.info(f"Installed {lib_file.name}")
 
             inc_dst = buildroot / "include"
@@ -553,9 +593,9 @@ class CPythonBuild(ZScript):
                 for item in inc_src.iterdir():
                     target = inc_dst / item.name
                     if item.is_dir():
-                        shutil.copytree(item, target, dirs_exist_ok=True)
+                        _ = shutil.copytree(item, target, dirs_exist_ok=True)
                     else:
-                        shutil.copy2(item, target)
+                        _ = shutil.copy2(item, target)
                 log.info(f"Installed headers for {dep_name}")
                 break
 

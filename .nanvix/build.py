@@ -12,10 +12,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import config
 import docker as docker_mod
+
+# Callable that wraps subprocess execution.  Matches the signature of
+# ``ZScript.run`` from nanvix_zutil; loosely typed because we accept
+# bound methods, lambdas, and partials.
+RunFn = Callable[..., subprocess.CompletedProcess[str]]
 
 
 def make_args(
@@ -62,7 +68,7 @@ def run_make(
     *,
     cwd: Path | None = None,
     kvm: bool = False,
-    run_fn=None,
+    run_fn: RunFn | None = None,
 ) -> None:
     """Execute a make command.
 
@@ -74,9 +80,9 @@ def run_make(
             ``subprocess.run`` with check=True.
     """
     if run_fn:
-        run_fn(*args, cwd=cwd, docker=False, kvm=kvm)
+        _ = run_fn(*args, cwd=cwd, docker=False, kvm=kvm)
     else:
-        subprocess.run(args, cwd=cwd, check=True)
+        _ = subprocess.run(args, cwd=cwd, check=True)
 
 
 def build(
@@ -89,7 +95,7 @@ def build(
     memory_size: str = config.DEFAULT_MEMORY_SIZE,
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
     release: bool = False,
-    run_fn=None,
+    run_fn: RunFn | None = None,
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
     if config.IS_WINDOWS:
@@ -131,7 +137,7 @@ def install(
     memory_size: str = config.DEFAULT_MEMORY_SIZE,
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
     release: bool = False,
-    run_fn=None,
+    run_fn: RunFn | None = None,
 ) -> None:
     """Install CPython into a staging directory."""
     if config.IS_WINDOWS:
@@ -174,7 +180,7 @@ def clean(repo_root: Path) -> None:
                 shutil.rmtree(p)
                 print(f"Removed .nanvix/{name}/")
     else:
-        subprocess.run(
+        _ = subprocess.run(
             ["make", "-f", "Makefile.nanvix", "clean"],
             cwd=repo_root,
             check=False,
@@ -212,4 +218,4 @@ def distclean(repo_root: Path) -> None:
     cmd = ["git", "clean", "-fdx"]
     for exc in _DISTCLEAN_EXCLUDES:
         cmd.extend(["-e", exc])
-    subprocess.run(cmd, cwd=repo_root, check=True)
+    _ = subprocess.run(cmd, cwd=repo_root, check=True)

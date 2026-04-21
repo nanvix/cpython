@@ -59,7 +59,7 @@ def _docker_run_base(
 
 
 def sync_sources(
-    workspace: Path,
+    _workspace: Path,
     build_dir: str = config.DOCKER_WORKSPACE_PATH,
 ) -> str:
     """Generate a shell script that syncs sources into the container.
@@ -201,7 +201,7 @@ def docker_build(
     else:
         shell_cmd += f"; rc=$?; {copy_back}; exit $rc"
 
-    subprocess.run(
+    _ = subprocess.run(
         [*base, "sh", "-c", shell_cmd],
         check=True,
     )
@@ -256,7 +256,7 @@ def docker_install(
         f"exit $rc"
     )
 
-    subprocess.run(
+    _ = subprocess.run(
         [*base, "sh", "-c", shell_cmd],
         check=True,
     )
@@ -265,7 +265,7 @@ def docker_install(
 def clean_volume(workspace: Path) -> None:
     """Remove the persistent Docker build volume."""
     volume = _volume_name(workspace)
-    subprocess.run(
+    _ = subprocess.run(
         ["docker", "volume", "rm", volume],
         capture_output=True,
     )
@@ -296,12 +296,12 @@ def _inner_make_cmd(
     )
 
 
-def _copy_outputs_cmd(workspace: Path) -> str:
+def _copy_outputs_cmd(_workspace: Path) -> str:
     """Build shell command to copy build outputs back to host workspace."""
-    copies = []
+    copies: list[str] = []
     for f in config.DOCKER_OUTPUT_FILES:
         copies.append(
             f"[ -f {config.DOCKER_WORKSPACE_PATH}/{f} ] && "
-            f"cp -f {config.DOCKER_WORKSPACE_PATH}/{f} /mnt/host-workspace/{f}"
+            + f"cp -f {config.DOCKER_WORKSPACE_PATH}/{f} /mnt/host-workspace/{f}"
         )
     return " ; ".join(copies)

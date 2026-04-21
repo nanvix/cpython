@@ -106,14 +106,14 @@ def build_image(
     if not mkramfs.is_file():
         raise FileNotFoundError(
             f"{mkramfs_name} not found at {mkramfs}. "
-            "Run `./z setup` to download required binaries."
+            + "Run `./z setup` to download required binaries."
         )
 
     sysroot = staging / "sysroot"
     if not sysroot.is_dir():
         raise FileNotFoundError(f"{sysroot} does not exist")
 
-    subprocess.run(
+    _ = subprocess.run(
         [str(mkramfs), "-o", str(output), str(sysroot)],
         check=True,
     )

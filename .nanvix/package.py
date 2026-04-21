@@ -40,7 +40,7 @@ def package(
     memory_size: str = config.DEFAULT_MEMORY_SIZE,
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
     release: bool = True,
-    run_fn=None,
+    run_fn: build_mod.RunFn | None = None,
 ) -> None:
     """Package CPython release tarballs.
 
@@ -52,6 +52,9 @@ def package(
     release_staging = repo_root / ".nanvix" / "release"
     dist_dir = repo_root / "dist"
     artifact = _artifact_base(platform, process_mode, memory_size)
+    # XXX: `release` is currently ignored — see the `release=True` overrides
+    # below.  Tracked separately; preserved for ABI stability.
+    _ = release
 
     print("Packaging CPython release...")
 
@@ -68,6 +71,8 @@ def package(
         process_mode=process_mode,
         memory_size=memory_size,
         install_prefix=install_prefix,
+        # XXX: ignores the `release` parameter and always builds in release
+        # mode.  Intentional?  Preserved from pre-lint behavior.
         release=True,
         run_fn=run_fn,
     )
@@ -82,7 +87,7 @@ def package(
         process_mode=process_mode,
         memory_size=memory_size,
         install_prefix=install_prefix,
-        release=True,
+        release=True,  # XXX: see above.
         run_fn=run_fn,
     )
 
@@ -99,17 +104,17 @@ def package(
     # Copy include directory.
     inc_src = sysroot_installed / "include"
     if inc_src.is_dir():
-        shutil.copytree(inc_src, buildroot_pkg / "include")
+        _ = shutil.copytree(inc_src, buildroot_pkg / "include")
 
     # Copy static libraries.
     lib_src = sysroot_installed / "lib"
     if lib_src.is_dir():
         for lib_file in lib_src.glob("*.a"):
-            shutil.copy2(lib_file, buildroot_pkg / "lib" / lib_file.name)
+            _ = shutil.copy2(lib_file, buildroot_pkg / "lib" / lib_file.name)
         # Copy pkgconfig.
         pkgconfig = lib_src / "pkgconfig"
         if pkgconfig.is_dir():
-            shutil.copytree(pkgconfig, buildroot_pkg / "lib" / "pkgconfig")
+            _ = shutil.copytree(pkgconfig, buildroot_pkg / "lib" / "pkgconfig")
         # Copy config-3.12.
         config_dir = lib_src / config.PYTHON_LIB_DIR / f"config-{config.PYTHON_VERSION}"
         if config_dir.is_dir():
@@ -120,7 +125,7 @@ def package(
                 / f"config-{config.PYTHON_VERSION}"
             )
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(config_dir, dest)
+            _ = shutil.copytree(config_dir, dest)
 
     # Copy dev binaries.
     for f in [
@@ -135,12 +140,12 @@ def package(
     ]:
         src = sysroot_installed / "bin" / f
         if src.is_file():
-            shutil.copy2(src, buildroot_pkg / "bin" / f)
+            _ = shutil.copy2(src, buildroot_pkg / "bin" / f)
 
     # Copy share directory.
     share_src = sysroot_installed / "share"
     if share_src.is_dir():
-        shutil.copytree(share_src, buildroot_pkg / "share")
+        _ = shutil.copytree(share_src, buildroot_pkg / "share")
 
     # --- Sysroot: runtime stdlib (trimmed) ---
     ramfs_staging = release_staging / "sysroot-pkg-wrap"
@@ -149,7 +154,7 @@ def package(
 
     py_lib = sysroot_installed / "lib" / config.PYTHON_LIB_DIR
     if py_lib.is_dir():
-        shutil.copytree(py_lib, ramfs_sysroot / config.PYTHON_LIB_DIR)
+        _ = shutil.copytree(py_lib, ramfs_sysroot / config.PYTHON_LIB_DIR)
 
     ramfs_mod.trim_sysroot(ramfs_staging)
 
@@ -158,7 +163,7 @@ def package(
     python_elf = repo_root / f"python{config.EXE}"
     if python_elf.is_file():
         bin_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(python_elf, bin_dir / "python.elf")
+        _ = shutil.copy2(python_elf, bin_dir / "python.elf")
         size = (bin_dir / "python.elf").stat().st_size
         print(f"Included bin/python.elf ({size // 1024}K)")
     else:
@@ -166,7 +171,7 @@ def package(
 
     # --- Build ramfs image ---
     ramfs_img = release_staging / "cpython-ramfs.img"
-    ramfs_mod.build_image(ramfs_staging, nanvix_home, ramfs_img)
+    _ = ramfs_mod.build_image(ramfs_staging, nanvix_home, ramfs_img)
 
     # --- Create release tarballs ---
     dist_dir.mkdir(parents=True, exist_ok=True)
