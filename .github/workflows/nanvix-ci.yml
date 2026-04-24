@@ -25,12 +25,13 @@ concurrency:
 jobs:
   ci:
     if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
-    uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.11.0
+    uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.11.1
     with:
       zutil-version: "v0.7.25"
       platforms: '["microvm"]'
       memory-sizes: '["256mb"]'
       skip-full-test-modes: '[]'
+      windows-build: true
       caller-event-name: ${{ github.event_name }}
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
@@ -43,12 +44,13 @@ jobs:
       actions: write
       issues: write
       pull-requests: write
-    uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.11.0
+    uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.11.1
     with:
       zutil-version: "v0.7.25"
       platforms: '["microvm"]'
       memory-sizes: '["256mb"]'
       skip-full-test-modes: '[]'
+      windows-build: true
       caller-event-name: 'schedule'
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
