@@ -109,9 +109,9 @@ class MiscTests(unittest.TestCase):
         cwd = os.getcwd()
         self.assertIsInstance(cwd, str)
 
-    # NSKIP052 https://github.com/nanvix/cpython/issues/480
+    # NSKIP051 https://github.com/nanvix/cpython/issues/531
     @unittest.skipIf(support.is_nanvix_hosted,
-                     "NSKIP052: long-path mkdir fails with errno 77 on hosted Nanvix")
+                     "NSKIP051: long-path mkdir fails with errno 77 on hosted Nanvix")
     def test_getcwd_long_path(self):
         # bpo-37412: On Linux, PATH_MAX is usually around 4096 bytes. On
         # Windows, MAX_PATH is defined as 260 characters, but Windows supports
@@ -193,7 +193,7 @@ class FileTests(unittest.TestCase):
     @unittest.skipIf(
         support.is_wasi, "WASI does not support dup."
     )
-    # NSKIP035 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP035 https://github.com/nanvix/cpython/issues/515
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP035: os.dup() raises ENOTSUP via fcntl(F_DUPFD_CLOEXEC)")
     def test_closerange(self):
@@ -298,7 +298,7 @@ class FileTests(unittest.TestCase):
         self.fdopen_helper('r')
         self.fdopen_helper('r', 100)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_replace(self):
@@ -622,7 +622,7 @@ class StatAttributeTests(unittest.TestCase):
             self.skipTest("cannot encode %a for the filesystem" % self.fname)
         self.check_stat_attributes(fname)
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP001 https://github.com/nanvix/cpython/issues/469
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP001: pickle proto 0 corrupt on 32-bit Nanvix")
     def test_stat_result_pickle(self):
@@ -825,7 +825,7 @@ class UtimeTests(unittest.TestCase):
         self.assertEqual(st.st_atime_ns, atime_ns)
         self.assertEqual(st.st_mtime_ns, mtime_ns)
 
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime(self):
@@ -841,7 +841,7 @@ class UtimeTests(unittest.TestCase):
         # issue, os.utime() rounds towards minus infinity.
         return (ns * 1e-9) + 0.5e-9
 
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime_by_indexed(self):
@@ -855,7 +855,7 @@ class UtimeTests(unittest.TestCase):
             os.utime(filename, (atime, mtime))
         self._test_utime(set_time)
 
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime_by_times(self):
@@ -870,9 +870,9 @@ class UtimeTests(unittest.TestCase):
     @unittest.skipUnless(os.utime in os.supports_follow_symlinks,
                          "follow_symlinks support for utime required "
                          "for this test.")
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.symlink() not supported on FAT VFS")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.symlink()
     def test_utime_nofollow_symlinks(self):
         def set_time(filename, ns):
             # use follow_symlinks=False to test utimensat(timespec)
@@ -882,7 +882,7 @@ class UtimeTests(unittest.TestCase):
 
     @unittest.skipUnless(os.utime in os.supports_fd,
                          "fd support for utime required for this test.")
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime_fd(self):
@@ -895,7 +895,7 @@ class UtimeTests(unittest.TestCase):
 
     @unittest.skipUnless(os.utime in os.supports_dir_fd,
                          "dir_fd support for utime required for this test.")
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime_dir_fd(self):
@@ -906,7 +906,7 @@ class UtimeTests(unittest.TestCase):
                 os.utime(name, dir_fd=dirfd, ns=ns)
         self._test_utime(set_time)
 
-    # NSKIP034 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     def test_utime_directory(self):
@@ -937,7 +937,7 @@ class UtimeTests(unittest.TestCase):
         self.assertAlmostEqual(st.st_mtime, current,
                                delta=delta, msg=msg)
 
-    # NSKIP049 https://github.com/nanvix/cpython/issues/480
+    # NSKIP049 https://github.com/nanvix/cpython/issues/529
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP049: os.utime(path, None) raises EINVAL on Nanvix (utimensat NULL gap)")
     def test_utime_current(self):
@@ -946,7 +946,7 @@ class UtimeTests(unittest.TestCase):
             os.utime(self.fname)
         self._test_utime_current(set_time)
 
-    # NSKIP049 https://github.com/nanvix/cpython/issues/480
+    # NSKIP049 https://github.com/nanvix/cpython/issues/529
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP049: os.utime(path, None) raises EINVAL on Nanvix (utimensat NULL gap)")
     def test_utime_current_old(self):
@@ -1179,7 +1179,7 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
                                   stdout=subprocess.PIPE, text=True)
             self.assertEqual(proc.stdout.rstrip(), repr(None))
 
-    # NSKIP033 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP033 https://github.com/nanvix/cpython/issues/513
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP033: os.putenv('', val) does not raise")
     # On OS X < 10.6, unsetenv() doesn't return a value (bpo-13415).
@@ -1497,7 +1497,7 @@ class WalkTests(unittest.TestCase):
             self.assertRaises(FileNotFoundError, next, walk_it)
         self.assertRaises(StopIteration, next, walk_it)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_walk_bad_dir(self):
@@ -1780,7 +1780,7 @@ class MakedirTests(unittest.TestCase):
         support.is_emscripten or support.is_wasi,
         "Emscripten's/WASI's umask is a stub."
     )
-    # NSKIP027 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP027 https://github.com/nanvix/cpython/issues/507
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP027: FAT VFS does not honor file mode bits")
     def test_mode(self):
@@ -1975,7 +1975,7 @@ class RemoveDirsTests(unittest.TestCase):
 
 @unittest.skipIf(support.is_wasi, "WASI has no /dev/null")
 class DevNullTests(unittest.TestCase):
-    # NSKIP032 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP032 https://github.com/nanvix/cpython/issues/512
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP032: /dev/null does not exist on Nanvix standalone")
     def test_devnull(self):
@@ -2324,9 +2324,9 @@ class Win32ErrorTests(unittest.TestCase):
 
 
 @unittest.skipIf(support.is_wasi, "Cannot create invalid FD on WASI.")
-# NSKIP053 https://github.com/nanvix/cpython/issues/480
+# NSKIP052 https://github.com/nanvix/cpython/issues/532
 @unittest.skipIf(support.is_nanvix_hosted,
-                 "NSKIP053: os_helper.make_bad_fd() returns FD whose ops fail with EAGAIN(11) instead of EBADF(9) on hosted Nanvix")
+                 "NSKIP052: os_helper.make_bad_fd() returns FD whose ops fail with EAGAIN(11) instead of EBADF(9) on hosted Nanvix")
 class TestInvalidFD(unittest.TestCase):
     singles = ["fchdir", "dup", "fdatasync", "fstat",
                "fstatvfs", "fsync", "tcgetpgrp", "ttyname"]
@@ -2372,7 +2372,7 @@ class TestInvalidFD(unittest.TestCase):
                 "Unable to acquire a range of invalid file descriptors")
         self.assertEqual(os.closerange(fd, fd + i-1), None)
 
-    # NSKIP030 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP030 https://github.com/nanvix/cpython/issues/510
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP030: os.dup2() not implemented on Nanvix")
     @unittest.skipUnless(hasattr(os, 'dup2'), 'test needs os.dup2()')
@@ -2384,7 +2384,7 @@ class TestInvalidFD(unittest.TestCase):
         support.is_emscripten,
         "dup2() with negative fds is broken on Emscripten (see gh-102179)"
     )
-    # NSKIP030 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP030 https://github.com/nanvix/cpython/issues/510
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP030: os.dup2() not implemented on Nanvix")
     def test_dup2_negative_fd(self):
@@ -2402,16 +2402,16 @@ class TestInvalidFD(unittest.TestCase):
                         os.dup2(fd, fd2)
                     self.assertEqual(ctx.exception.errno, errno.EBADF)
 
-    # NSKIP029 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP029 https://github.com/nanvix/cpython/issues/509
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP029: os.fchmod accepts invalid fd silently")
+                     "NSKIP029: os.fchmod/fchown accepts invalid fd silently")  # detail: os.fchmod
     @unittest.skipUnless(hasattr(os, 'fchmod'), 'test needs os.fchmod()')
     def test_fchmod(self):
         self.check(os.fchmod, 0)
 
-    # NSKIP029 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP029 https://github.com/nanvix/cpython/issues/509
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP029: os.fchown accepts invalid fd silently")
+                     "NSKIP029: os.fchmod/fchown accepts invalid fd silently")  # detail: os.fchown
     @unittest.skipUnless(hasattr(os, 'fchown'), 'test needs os.fchown()')
     def test_fchown(self):
         self.check(os.fchown, -1, -1)
@@ -2462,7 +2462,7 @@ class TestInvalidFD(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, 'get_blocking'),
                          'needs os.get_blocking() and os.set_blocking()')
-    # NSKIP031 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP031 https://github.com/nanvix/cpython/issues/511
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP031: os.set_blocking() is a no-op on Nanvix")
     def test_blocking(self):
@@ -2491,22 +2491,22 @@ class LinkTests(unittest.TestCase):
         with open(file1, "rb") as f1, open(file2, "rb") as f2:
             self.assertTrue(os.path.sameopenfile(f1.fileno(), f2.fileno()))
 
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() not supported on FAT VFS")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link()
     def test_link(self):
         self._test_link(self.file1, self.file2)
 
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() not supported on FAT VFS")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link()
     def test_link_bytes(self):
         self._test_link(bytes(self.file1, sys.getfilesystemencoding()),
                         bytes(self.file2, sys.getfilesystemencoding()))
 
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() not supported on FAT VFS")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link()
     def test_unicode_name(self):
         try:
             os.fsencode("\xf1")
@@ -2914,9 +2914,9 @@ class ReadlinkTests(unittest.TestCase):
         self.assertRaises(OSError, os.readlink, self.filelink_target)
         self.assertRaises(OSError, os.readlink, filelink_target)
 
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.readlink() returns wrong errno (symlinks unsupported)")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.readlink( returns wrong errno)
     def test_missing_link(self):
         self.assertRaises(FileNotFoundError, os.readlink, 'missing-link')
         self.assertRaises(FileNotFoundError, os.readlink,
@@ -4016,7 +4016,7 @@ class TermsizeTests(unittest.TestCase):
         self.assertGreaterEqual(size.columns, 0)
         self.assertGreaterEqual(size.lines, 0)
 
-    # NSKIP003 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP003 https://github.com/nanvix/cpython/issues/471
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP003: no subprocess support")
     def test_stty_match(self):
@@ -4182,7 +4182,7 @@ class OSErrorTests(unittest.TestCase):
 
         self.filenames = self.bytes_filenames + self.unicode_filenames
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_oserror_filename(self):
@@ -4439,7 +4439,7 @@ class PathTConverterTests(unittest.TestCase):
                      'needs os.get_blocking() and os.set_blocking()')
 @unittest.skipIf(support.is_emscripten, "Cannot unset blocking flag")
 @unittest.skipIf(sys.platform == 'win32', 'Windows only supports blocking on pipes')
-# NSKIP031 https://github.com/nanvix/cpython/issues/TODO
+# NSKIP031 https://github.com/nanvix/cpython/issues/511
 @unittest.skipIf(support.is_nanvix,
                  "NSKIP031: os.set_blocking() is a no-op on Nanvix")
 class BlockingTests(unittest.TestCase):
@@ -4563,9 +4563,9 @@ class TestScandir(unittest.TestCase):
                                entry_lstat,
                                os.name == 'nt')
 
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() not supported on FAT VFS")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link()
     def test_attributes(self):
         link = hasattr(os, 'link')
         symlink = os_helper.can_symlink()
@@ -4773,9 +4773,9 @@ class TestScandir(unittest.TestCase):
                     st = os.stat(entry.name, dir_fd=fd, follow_symlinks=False)
                     self.assertEqual(entry.stat(follow_symlinks=False), st)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP026 https://github.com/nanvix/cpython/issues/506
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS scandir('') returns EINVAL not FileNotFoundError")
+                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: scandir('' returns EINVAL not FileNotFoundError)
     @unittest.skipIf(support.is_wasi, "WASI maps '' to cwd")
     def test_empty_path(self):
         self.assertRaises(FileNotFoundError, os.scandir, '')

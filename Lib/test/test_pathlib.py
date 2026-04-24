@@ -11,10 +11,10 @@ import stat
 import tempfile
 import unittest
 
-# NSKIP051 https://github.com/nanvix/cpython/issues/480
+# NSKIP050 https://github.com/nanvix/cpython/issues/530
 from test import support
 if support.is_nanvix_hosted:
-    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
+    raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 from unittest import mock
 
 from test.support import import_helper
@@ -1692,9 +1692,9 @@ class _BasePathTest(object):
             env['HOME'] = os.path.join(BASE, 'home')
             self._test_home(self.cls.home())
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS os.rename() hangs the kernel")
+                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_with_segments(self):
         class P(_BasePurePathSubclass, self.cls):
             pass
@@ -1716,7 +1716,7 @@ class _BasePathTest(object):
         for dirpath, dirnames, filenames in p.walk():
             self.assertEqual(42, dirpath.session_id)
 
-    # NSKIP022 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")
     def test_samefile(self):
@@ -1745,7 +1745,7 @@ class _BasePathTest(object):
         self.assertEqual(p.stat(), os.stat('.'))
 
     @unittest.skipIf(is_wasi, "WASI has no user accounts.")
-    # NSKIP025 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP025 https://github.com/nanvix/cpython/issues/505
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP025: no HOME env var and no pwd module on Nanvix")
     def test_expanduser_common(self):
@@ -2252,9 +2252,9 @@ class _BasePathTest(object):
         self.assertFileNotFound(p.unlink)
 
     @unittest.skipUnless(hasattr(os, "link"), "os.link() is not present")
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() ENOSYS on Nanvix despite hasattr(os,'link')")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link( ENOSYS despite hasattr)
     def test_hardlink_to(self):
         P = self.cls(BASE)
         target = P / 'fileA'
@@ -2281,9 +2281,9 @@ class _BasePathTest(object):
         with self.assertRaises(NotImplementedError):
             q.hardlink_to(p)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS os.rename() hangs the kernel")
+                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_rename(self):
         P = self.cls(BASE)
         p = P / 'fileA'
@@ -2301,9 +2301,9 @@ class _BasePathTest(object):
         self.assertEqual(os.stat(r).st_size, size)
         self.assertFileNotFound(q.stat)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS os.rename()/os.replace() hangs the kernel")
+                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: os.rename / os.replace
     def test_replace(self):
         P = self.cls(BASE)
         p = P / 'fileA'
@@ -2373,9 +2373,9 @@ class _BasePathTest(object):
             p.mkdir()
         self.assertEqual(cm.exception.errno, errno.EEXIST)
 
-    # NSKIP027 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP027 https://github.com/nanvix/cpython/issues/507
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP027: FAT VFS does not honor mkdir mode arg (mode bits not mutable)")
+                     "NSKIP027: FAT VFS does not honor file mode bits")  # detail: mkdir mode arg (mode bits not mutable)
     def test_mkdir_parents(self):
         # Creating a chain of directories.
         p = self.cls(BASE, 'newdirB', 'newdirC')
@@ -2431,9 +2431,9 @@ class _BasePathTest(object):
         self.assertEqual(p.stat().st_ctime, st_ctime_first)
 
     @unittest.skipIf(is_emscripten, "FS root cannot be modified on Emscripten.")
-    # NSKIP026 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP026 https://github.com/nanvix/cpython/issues/506
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS mkdir('/') returns ENOENT not EEXIST")
+                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir('/' returns ENOENT not EEXIST)
     def test_mkdir_exist_ok_root(self):
         # Issue #25803: A drive root could raise PermissionError on Windows.
         self.cls('/').resolve().mkdir(exist_ok=True)
@@ -2450,9 +2450,9 @@ class _BasePathTest(object):
         with self.assertRaises(OSError):
             (p / 'child' / 'path').mkdir(parents=True)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP026 https://github.com/nanvix/cpython/issues/506
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS mkdir-over-file returns EINVAL not EEXIST")
+                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir-over-file returns EINVAL not EEXIST
     def test_mkdir_with_child_file(self):
         p = self.cls(BASE, 'dirB', 'fileB')
         self.assertTrue(p.exists())
@@ -2465,9 +2465,9 @@ class _BasePathTest(object):
             p.mkdir(parents=True, exist_ok=True)
         self.assertEqual(cm.exception.errno, errno.EEXIST)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP026 https://github.com/nanvix/cpython/issues/506
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS mkdir-over-file returns EINVAL not EEXIST")
+                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir-over-file returns EINVAL not EEXIST
     def test_mkdir_no_parents_file(self):
         p = self.cls(BASE, 'fileA')
         self.assertTrue(p.exists())
@@ -2560,9 +2560,9 @@ class _BasePathTest(object):
         self.assertIs((P / 'fileA\udfff').is_file(), False)
         self.assertIs((P / 'fileA\x00').is_file(), False)
 
-    # NSKIP022 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files; ismount cascade")
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: ismount cascade
     def test_is_mount(self):
         P = self.cls(BASE)
         if os.name == 'nt':
@@ -2641,7 +2641,7 @@ class _BasePathTest(object):
     @unittest.skipIf(
         is_wasi, "Cannot create socket on WASI."
     )
-    # NSKIP020 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP020 https://github.com/nanvix/cpython/issues/500
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP020: AF_UNIX socket creation fails on Nanvix")
     def test_is_socket_true(self):
@@ -2936,9 +2936,9 @@ class WalkTests(unittest.TestCase):
                 self.assertIn("link", dirs)
                 break
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS os.rename() hangs the kernel")
+                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_walk_bad_dir(self):
         errors = []
         walk_it = self.walk_path.walk(on_error=errors.append)
@@ -3037,9 +3037,9 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
         is_emscripten or is_wasi,
         "umask is not implemented on Emscripten/WASI."
     )
-    # NSKIP027 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP027 https://github.com/nanvix/cpython/issues/507
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP027: FAT VFS umask/mode bits not honored on file creation")
+                     "NSKIP027: FAT VFS does not honor file mode bits")  # detail: umask on file creation
     def test_open_mode(self):
         old_mask = os.umask(0)
         self.addCleanup(os.umask, old_mask)
@@ -3067,9 +3067,9 @@ class PosixPathTest(_BasePathTest, unittest.TestCase):
         is_emscripten or is_wasi,
         "umask is not implemented on Emscripten/WASI."
     )
-    # NSKIP027 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP027 https://github.com/nanvix/cpython/issues/507
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP027: FAT VFS umask/mode bits not honored on file creation")
+                     "NSKIP027: FAT VFS does not honor file mode bits")  # detail: umask on file creation
     def test_touch_mode(self):
         old_mask = os.umask(0)
         self.addCleanup(os.umask, old_mask)

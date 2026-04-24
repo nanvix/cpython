@@ -6,10 +6,10 @@ import io
 import errno
 import unittest
 
-# NSKIP051 https://github.com/nanvix/cpython/issues/480
+# NSKIP050 https://github.com/nanvix/cpython/issues/530
 from test import support
 if support.is_nanvix_hosted:
-    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
+    raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 from array import array
 from weakref import proxy
 from functools import wraps
@@ -581,7 +581,7 @@ class COtherFileTests(OtherFileTests, unittest.TestCase):
     modulename = '_io'
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP002 https://github.com/nanvix/cpython/issues/470
     @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def testInvalidFd_overflow(self):
         # Issue 15989

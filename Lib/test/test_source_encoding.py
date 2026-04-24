@@ -115,9 +115,9 @@ class MiscSourceEncodingTest(unittest.TestCase):
         exec(b'# coding: cp949\na = "\xaa\xa7"\n', d)
         self.assertEqual(d['a'], '\u3047')
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/480
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix_hosted,
-                     "NSKIP021: __import__ writes __pycache__/*.pyc via atomic os.rename which hangs the kernel on Nanvix")
+                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: __import__ writes __pycache__/*.pyc via atomic os.rename
     def test_file_parse(self):
         # issue1134: all encodings outside latin-1 and utf-8 fail on
         # multiline strings and long lines (>512 columns)

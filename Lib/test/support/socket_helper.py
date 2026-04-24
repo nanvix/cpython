@@ -157,7 +157,7 @@ def skip_unless_bind_unix_socket(test):
         try:
             _sock = socket.socket(socket.AF_UNIX)
         except OSError as e:
-            # NSKIP020 https://github.com/nanvix/cpython/issues/TODO
+            # NSKIP020 https://github.com/nanvix/cpython/issues/500
             # Nanvix standalone does not support AF_UNIX socket creation;
             # socket() raises OSError before bind() is reached.
             _bind_nix_socket_error = e

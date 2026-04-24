@@ -5,10 +5,10 @@ import string
 import sys
 import unittest
 
-# NSKIP051 https://github.com/nanvix/cpython/issues/480
+# NSKIP050 https://github.com/nanvix/cpython/issues/530
 from test import support
 if support.is_nanvix_hosted:
-    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
+    raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 import warnings
 from test.support import cpython_only, os_helper
 from test.support import TestFailed, is_emscripten
@@ -876,7 +876,7 @@ class TestNtpath(NtpathTestCase):
                           ['Program Files', b'C:\\Program Files\\Foo'])
 
     @unittest.skipIf(is_emscripten, "Emscripten cannot fstat unnamed files.")
-    # NSKIP022 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")
     def test_sameopenfile(self):

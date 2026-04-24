@@ -85,7 +85,7 @@ class LineReader:
         pass
 
 class BufferSizesTests(BaseTests, unittest.TestCase):
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_buffer_sizes(self):
@@ -319,7 +319,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
             self.assertEqual(fi.readline(), b'')
             self.assertEqual(fi.readline(), b'')
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_inplace_binary_write_mode(self):
@@ -332,7 +332,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
         with open(temp_file, 'rb') as f:
             self.assertEqual(f.read(), b'New line.')
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_inplace_encoding_errors(self):
@@ -375,7 +375,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
         with FileInput(files=[], encoding="utf-8") as fi:
             self.assertEqual(fi._files, ('-',))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_nextfile_oserror_deleting_backup(self):
@@ -399,7 +399,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
         self.assertTrue(os_unlink_replacement.invoked,
                         "os.unlink() was not invoked")
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_readline_os_fstat_raises_OSError(self):
@@ -420,7 +420,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
         self.assertTrue(os_fstat_replacement.invoked,
                         "os.fstat() was not invoked")
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_readline_os_chmod_raises_OSError(self):
@@ -505,7 +505,7 @@ class FileInputTests(BaseTests, unittest.TestCase):
             self.assertEqual(fi.filelineno(), 1)
             self.assertEqual(fi.filename(), os.fspath(t1))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_pathlib_file_inplace(self):
@@ -882,7 +882,7 @@ class Test_hook_compressed(unittest.TestCase):
         self.do_test_use_builtin_open_text("abcd", "r")
 
     @unittest.skipUnless(gzip, "Requires gzip and zlib")
-    # NSKIP028 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP028 https://github.com/nanvix/cpython/issues/508
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP028: locale.getencoding() returns garbage on Nanvix standalone")
     def test_gz_ext_fake(self):
@@ -907,7 +907,7 @@ class Test_hook_compressed(unittest.TestCase):
         self.assertEqual(list(result), ['Ex-binary string'])
 
     @unittest.skipUnless(bz2, "Requires bz2")
-    # NSKIP028 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP028 https://github.com/nanvix/cpython/issues/508
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP028: locale.getencoding() returns garbage on Nanvix standalone")
     def test_bz2_ext_fake(self):

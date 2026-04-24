@@ -7,10 +7,10 @@ import os
 import sys
 import unittest
 
-# NSKIP051 https://github.com/nanvix/cpython/issues/480
+# NSKIP050 https://github.com/nanvix/cpython/issues/530
 from test import support
 if support.is_nanvix_hosted:
-    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
+    raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 import warnings
 from test.support import is_emscripten
 from test.support import os_helper
@@ -162,7 +162,7 @@ class GenericTest:
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
-    # NSKIP023 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP023 https://github.com/nanvix/cpython/issues/503
     @unittest.skipIf(support.is_nanvix_standalone,
                      "NSKIP023: os.pipe() ENOSYS in standalone mode")
     def test_exists_fd(self):
@@ -224,7 +224,7 @@ class GenericTest:
         finally:
             os_helper.rmdir(filename)
 
-    # NSKIP022 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")
     def test_samefile(self):
@@ -261,16 +261,16 @@ class GenericTest:
         self._test_samefile_on_link_func(os.symlink)
 
     @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() ENOSYS on Nanvix despite hasattr(os,'link')")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link( ENOSYS despite hasattr)
     def test_samefile_on_link(self):
         try:
             self._test_samefile_on_link_func(os.link)
         except PermissionError as e:
             self.skipTest('os.link(): %s' % e)
 
-    # NSKIP022 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
                      "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")
     def test_samestat(self):
@@ -310,9 +310,9 @@ class GenericTest:
         self._test_samestat_on_link_func(os.symlink)
 
     @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
-    # NSKIP024 https://github.com/nanvix/cpython/issues/TODO
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP024: os.link() ENOSYS on Nanvix despite hasattr(os,'link')")
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: os.link( ENOSYS despite hasattr)
     def test_samestat_on_link(self):
         try:
             self._test_samestat_on_link_func(os.link)
