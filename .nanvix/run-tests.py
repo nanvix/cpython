@@ -33,8 +33,11 @@
 #                              before the module list.  Use shell-style
 #                              quoting; parsed by shlex.  Examples:
 #                                NANVIX_REGRTEST_EXTRA='-m test_dircmp'
-#                                NANVIX_REGRTEST_EXTRA='-x test_slow'
 #                                NANVIX_REGRTEST_EXTRA='-v -m DirCompareTestCase'
+#                              Note: -x/--exclude is accepted but inverts the
+#                              meaning of the batch's positional module list,
+#                              so the modules you intended to run will instead
+#                              be excluded.  Use with care.
 
 import json
 import os
@@ -77,7 +80,10 @@ SYSCONFIGDATA_NAME = os.environ.get(
     "NANVIX_SYSCONFIGDATA_NAME", "_sysconfigdata__nanvix_"
 )
 REGRTEST_TIMEOUT = os.environ.get("REGRTEST_TIMEOUT", "120")
-REGRTEST_EXTRA = shlex.split(os.environ.get("NANVIX_REGRTEST_EXTRA", ""))
+REGRTEST_EXTRA = shlex.split(
+    os.environ.get("NANVIX_REGRTEST_EXTRA", ""),
+    posix=(sys.platform != "win32"),
+)
 
 
 def run_batch(
@@ -120,17 +126,21 @@ def run_batch(
             # Direct mode: separate argv elements, invoke run-regrtest.py
             # in the guest.  --tmpdir must come before the module list.
             #
+            # A literal "--" separates forwarded regrtest flags from
+            # positional module names so run-regrtest.py doesn't have to
+            # mirror libregrtest's option table to know which short flags
+            # take values.
+            #
             # NANVIX_PROCESS_MODE is published into the guest via nanvixd's
             # semicolon-env trick on the *trailing* argv token: nanvixd
             # strips the ";KEY=VAL ..." portion from any token containing
             # a semicolon and sets the env vars before exec.  The trick
             # MUST go on the trailing token because nanvixd truncates all
             # python-side argv after the first semicolon-bearing token.
-            argv_tail = list(REGRTEST_EXTRA) + list(batch)
-            if argv_tail:
-                argv_tail[-1] = (
-                    f"{argv_tail[-1]};NANVIX_PROCESS_MODE={PROCESS_MODE}"
-                )
+            argv_tail = list(REGRTEST_EXTRA) + ["--"] + list(batch)
+            argv_tail[-1] = (
+                f"{argv_tail[-1]};NANVIX_PROCESS_MODE={PROCESS_MODE}"
+            )
             cmd = [
                 NANVIXD,
                 *nanvixd_extra,

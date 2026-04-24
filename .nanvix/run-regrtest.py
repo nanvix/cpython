@@ -33,30 +33,26 @@ def main() -> int:
         argv = argv[2:]
 
     # -- Split forwarded regrtest flags from positional module names ----------
-    # Anything starting with "-" is a regrtest flag we should forward (and
-    # for short flags like -m/-x/-u, the immediately following token is its
-    # value, not a module name).
-    _FLAGS_WITH_VALUE = {"-m", "-x", "-u", "--match", "--matchfile",
-                         "--ignore", "--ignorefile", "-r", "--randomize"}
+    # The host caller (run-tests.py) places a literal "--" between forwarded
+    # regrtest flags and module names.  This is the POSIX-standard convention
+    # and avoids us having to mirror libregrtest/cmdline.py's option table
+    # (which is wrong-by-construction: any new value-taking option upstream
+    # would silently consume a module name as its value, corrupting the
+    # batch's test list).
+    #
+    # Legacy/ad-hoc invocation (no "--"): treat any token starting with "-"
+    # as a flag, everything else as a module.  Safe because no caller passes
+    # value-taking flags via ad-hoc CLI use.
     extra_flags: list[str] = []
     modules: list[str] | None = None
     if argv:
-        positional: list[str] = []
-        i = 0
-        while i < len(argv):
-            tok = argv[i]
-            if tok.startswith("-"):
-                extra_flags.append(tok)
-                # If it's a known flag-with-value and not joined by =, also
-                # consume the next token as its value.
-                if tok in _FLAGS_WITH_VALUE and "=" not in tok and i + 1 < len(argv):
-                    extra_flags.append(argv[i + 1])
-                    i += 2
-                    continue
-                i += 1
-            else:
-                positional.append(tok)
-                i += 1
+        if "--" in argv:
+            sep = argv.index("--")
+            extra_flags = argv[:sep]
+            positional = argv[sep + 1:]
+        else:
+            extra_flags = [t for t in argv if t.startswith("-")]
+            positional = [t for t in argv if not t.startswith("-")]
         if positional:
             modules = positional
 
