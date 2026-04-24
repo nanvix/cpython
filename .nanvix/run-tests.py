@@ -23,8 +23,20 @@
 #     NANVIX_TEST_BATCH_SIZE - modules per nanvixd invocation (default: 4)
 #     NANVIXD_EXTRA_ARGS     - extra flags passed to nanvixd (optional)
 #     NANVIX_STANDALONE      - set to "1" to enable standalone mode
+#     NANVIX_PROCESS_MODE    - "standalone" / "single-process" / "multi-process";
+#                              forwarded into the guest so support helpers
+#                              (is_nanvix_standalone / is_nanvix_hosted in
+#                              Lib/test/support) can discriminate.  Defaulted
+#                              from NANVIX_STANDALONE when unset.
 #     REGRTEST_TIMEOUT       - per-test timeout in seconds (default: 120)
+#     NANVIX_REGRTEST_EXTRA  - extra args appended to the regrtest invocation
+#                              before the module list.  Use shell-style
+#                              quoting; parsed by shlex.  Examples:
+#                                NANVIX_REGRTEST_EXTRA='-m test_dircmp'
+#                                NANVIX_REGRTEST_EXTRA='-x test_slow'
+#                                NANVIX_REGRTEST_EXTRA='-v -m DirCompareTestCase'
 
+import json
 import os
 import shlex
 import shutil
@@ -34,6 +46,29 @@ import tempfile
 
 BATCH_SIZE = int(os.environ.get("NANVIX_TEST_BATCH_SIZE", "4"))
 STANDALONE = os.environ.get("NANVIX_STANDALONE", "") == "1"
+
+
+def _detect_process_mode() -> str:
+    """Resolve NANVIX_PROCESS_MODE from env, manifest.json, or STANDALONE.
+
+    Precedence: explicit env var > sysroot manifest > STANDALONE fallback.
+    The sysroot manifest is written by ``./z setup`` and lives at
+    ``./manifest.json`` relative to cwd (we run from the sysroot dir).
+    """
+    env_mode = os.environ.get("NANVIX_PROCESS_MODE")
+    if env_mode:
+        return env_mode
+    try:
+        with open("manifest.json") as f:
+            mode = json.load(f).get("deployment_mode")
+            if mode:
+                return mode
+    except (OSError, ValueError):
+        pass
+    return "standalone" if STANDALONE else "single-process"
+
+
+PROCESS_MODE = _detect_process_mode()
 NANVIXD = "./bin/nanvixd.exe" if sys.platform == "win32" else "./bin/nanvixd.elf"
 # Must match config.PYTHON_VERSION / config.python_binary().
 PYTHON_BIN = os.environ.get("NANVIX_PYTHON_BIN", "./bin/python3.12")
@@ -42,6 +77,7 @@ SYSCONFIGDATA_NAME = os.environ.get(
     "NANVIX_SYSCONFIGDATA_NAME", "_sysconfigdata__nanvix_"
 )
 REGRTEST_TIMEOUT = os.environ.get("REGRTEST_TIMEOUT", "120")
+REGRTEST_EXTRA = shlex.split(os.environ.get("NANVIX_REGRTEST_EXTRA", ""))
 
 
 def run_batch(
@@ -62,12 +98,14 @@ def run_batch(
             # string.  nanvixd splits on spaces for argv and on semicolons
             # for environment variables.
             modules_str = " ".join(batch)
+            extra_str = (" " + " ".join(REGRTEST_EXTRA)) if REGRTEST_EXTRA else ""
             regrtest_args = (
-                f"-B -m test --timeout={REGRTEST_TIMEOUT} {modules_str}"
+                f"-B -m test --timeout={REGRTEST_TIMEOUT}{extra_str} {modules_str}"
             )
             python_arg = (
                 f"{regrtest_args};PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
                 f" TMPDIR=/tmp"
+                f" NANVIX_PROCESS_MODE={PROCESS_MODE}"
                 f" _PYTHON_SYSCONFIGDATA_NAME={SYSCONFIGDATA_NAME}"
             )
 
@@ -81,6 +119,18 @@ def run_batch(
         else:
             # Direct mode: separate argv elements, invoke run-regrtest.py
             # in the guest.  --tmpdir must come before the module list.
+            #
+            # NANVIX_PROCESS_MODE is published into the guest via nanvixd's
+            # semicolon-env trick on the *trailing* argv token: nanvixd
+            # strips the ";KEY=VAL ..." portion from any token containing
+            # a semicolon and sets the env vars before exec.  The trick
+            # MUST go on the trailing token because nanvixd truncates all
+            # python-side argv after the first semicolon-bearing token.
+            argv_tail = list(REGRTEST_EXTRA) + list(batch)
+            if argv_tail:
+                argv_tail[-1] = (
+                    f"{argv_tail[-1]};NANVIX_PROCESS_MODE={PROCESS_MODE}"
+                )
             cmd = [
                 NANVIXD,
                 *nanvixd_extra,
@@ -89,7 +139,7 @@ def run_batch(
                 "./run-regrtest.py",
                 "--tmpdir",
                 batch_tmpdir,
-                *batch,
+                *argv_tail,
             ]
 
         try:

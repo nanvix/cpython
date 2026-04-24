@@ -541,6 +541,29 @@ is_emscripten = sys.platform == "emscripten"
 is_wasi = sys.platform == "wasi"
 is_nanvix = sys.platform == "nanvix"
 
+# Nanvix process-mode discrimination.
+#
+# Nanvix exposes three deployment modes:
+#   * standalone     - guest runs against an in-memory FAT ramfs VFS
+#   * single-process - guest accesses host filesystem via linuxd passthrough
+#   * multi-process  - same host-FS passthrough, separate VM processes
+#
+# The two hosted modes (single-/multi-process) share a Linux-passthrough VFS
+# and exhibit a *different* bug surface than standalone (FAT VFS).  Many tests
+# need to skip on standalone only, or on hosted only — not on all of nanvix.
+#
+# The active mode is published by the test harness via NANVIX_PROCESS_MODE
+# (.nanvix/test.py sets it, .nanvix/run-tests.py forwards it into the guest
+# via nanvixd's semicolon-env trick — env-segment in standalone, trailing
+# argv token in direct mode).  When the variable is unset (e.g. a bare
+# invocation outside ./z test) we conservatively assume standalone, so
+# pre-existing standalone-targeted skips keep firing.
+_NANVIX_PROCESS_MODE = os.environ.get("NANVIX_PROCESS_MODE", "standalone")
+is_nanvix_standalone = is_nanvix and _NANVIX_PROCESS_MODE == "standalone"
+is_nanvix_hosted = is_nanvix and _NANVIX_PROCESS_MODE in (
+    "single-process", "multi-process",
+)
+
 # TODO: enable fork support once nanvix implements it
 # (https://github.com/nanvix/nanvix/issues/321)
 has_fork_support = hasattr(os, "fork") and not is_emscripten and not is_wasi and not is_nanvix
