@@ -210,8 +210,10 @@ def _force_run(path, func, *args):
         # every leaf); the test's actual assertions are already done by
         # the time framework teardown runs.  Standalone path doesn't go
         # through linuxd and is unaffected, so gate on is_nanvix_hosted
-        # only.  See https://github.com/nanvix/cpython/issues/480.
-        if err.errno == 88 and is_nanvix_hosted:
+        # only.  Restrict to os.rmdir so we don't mask unrelated errno-88
+        # failures from other ops (_force_run is also used for unlink and
+        # listdir).  See https://github.com/nanvix/cpython/issues/480.
+        if err.errno == 88 and is_nanvix_hosted and func is os.rmdir:
             global _nanvix_nskip012_warned
             if not _nanvix_nskip012_warned:
                 print_warning(

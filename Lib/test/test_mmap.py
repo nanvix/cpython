@@ -8,7 +8,6 @@ from test.support import (
 )
 from test.support.import_helper import import_module
 from test.support.os_helper import TESTFN, unlink
-import unittest
 import os
 import re
 import itertools

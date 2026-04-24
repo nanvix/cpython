@@ -14,7 +14,6 @@ from array import array
 from weakref import proxy
 from functools import wraps
 
-from test import support
 from test.support import (
     cpython_only, swap_attr, gc_collect, is_emscripten, is_wasi
 )

@@ -1,11 +1,10 @@
+"""Test script for the dbm.open function based on testdumbdbm.py"""
+
 from test.support import is_nanvix
 import unittest
 if is_nanvix:
     raise unittest.SkipTest("NSKIP047: _dbm/_gdbm/_ndbm C backends N/A on Nanvix (configure.ac:7268)")
 
-"""Test script for the dbm.open function based on testdumbdbm.py"""
-
-import unittest
 import dbm
 import os
 from test.support import import_helper

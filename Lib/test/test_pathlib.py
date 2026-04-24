@@ -22,7 +22,6 @@ from test.support import set_recursion_limit
 from test.support import is_emscripten, is_wasi
 from test.support import os_helper
 from test.support.os_helper import TESTFN, FakePath
-from test import support
 
 try:
     import grp, pwd

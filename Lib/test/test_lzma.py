@@ -11,7 +11,6 @@ import pickle
 import random
 import sys
 from test import support
-import unittest
 
 from test.support import _4G, bigmemtest
 from test.support.import_helper import import_module

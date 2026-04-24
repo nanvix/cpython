@@ -17,7 +17,6 @@ from test.support import os_helper
 from test.support import warnings_helper
 from test.support.script_helper import assert_python_ok
 from test.support.os_helper import FakePath
-from test import support
 
 
 def create_file(filename, data=b'foo'):

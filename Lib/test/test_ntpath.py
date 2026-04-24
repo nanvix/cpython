@@ -14,7 +14,6 @@ from test.support import cpython_only, os_helper
 from test.support import TestFailed, is_emscripten
 from test.support.os_helper import FakePath
 from test import test_genericpath
-from test import support
 from tempfile import TemporaryFile
 
 

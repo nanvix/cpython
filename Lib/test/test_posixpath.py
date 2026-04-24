@@ -12,7 +12,6 @@ from test import test_genericpath
 from test.support import import_helper
 from test.support import os_helper
 from test.support.os_helper import FakePath
-from test import support
 from unittest import mock
 
 try:

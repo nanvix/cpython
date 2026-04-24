@@ -14,7 +14,6 @@ if support.is_nanvix_hosted:
     raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 import warnings
 
-from test import support
 from test.support import import_helper
 from test.support import os_helper
 
