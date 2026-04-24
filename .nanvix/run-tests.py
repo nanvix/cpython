@@ -29,15 +29,7 @@
 #                              Lib/test/support) can discriminate.  Defaulted
 #                              from NANVIX_STANDALONE when unset.
 #     REGRTEST_TIMEOUT       - per-test timeout in seconds (default: 120)
-#     NANVIX_QUIET           - [NOTE(split-PR): held for hosted-mode tooling PR]
-#                              set to "1" to suppress known-benign in-VM kernel
-#                              [ERROR] lines from syscalls that the test
-#                              framework expects to fail (ENOENT probes,
-#                              unsupported AF_UNIX socket, standalone-mode
-#                              poll/pipe).  Panics, tracebacks, and the
-#                              regrtest summary are always preserved.
-#     NANVIX_REGRTEST_EXTRA  - [NOTE(split-PR): held for hosted-mode tooling PR]
-#                              extra args appended to the regrtest invocation
+#     NANVIX_REGRTEST_EXTRA  - extra args appended to the regrtest invocation
 #                              before the module list.  Use shell-style
 #                              quoting; parsed by shlex.  Examples:
 #                                NANVIX_REGRTEST_EXTRA='-m test_dircmp'
@@ -45,7 +37,6 @@
 #                                NANVIX_REGRTEST_EXTRA='-v -m DirCompareTestCase'
 
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -54,24 +45,6 @@ import tempfile
 
 BATCH_SIZE = int(os.environ.get("NANVIX_TEST_BATCH_SIZE", "4"))
 STANDALONE = os.environ.get("NANVIX_STANDALONE", "") == "1"
-QUIET = os.environ.get("NANVIX_QUIET", "") == "1"
-# NOTE(split-PR): _QUIET_NOISE_RE, QUIET handling, REGRTEST_EXTRA injection,
-# and _run_quiet() below are held back for a separate "hosted-mode tooling"
-# PR; do NOT include in the filesystem-and-io PR.
-# Lines matching this pattern are dropped when NANVIX_QUIET=1.  Keep this
-# list narrow: each entry must correspond to a syscall the test framework
-# is *expected* to handle gracefully.  Never filter [TRACE][nvx::panic],
-# [FATAL], or Python tracebacks.
-_QUIET_NOISE_RE = re.compile(
-    r"^\[(?:ERROR|WARN)\]\["
-    r"(?:posix::sys::stat"
-    r"|syscall::dirent::bindings::opendir"
-    r"|syscall::unistd::bindings::(?:symlink|linkat|unlink|unlinkat|readlink)"
-    r"|syscall::poll::bindings"
-    r"|syscall::unistd::syscall::pipe::bindings"
-    r"|syscall::sys::socket::bindings::socket"
-    r")\]"
-)
 # Forwarded into the guest via nanvixd's semicolon-env trick so guest-side
 # Lib/test/support helpers can read it.  Defaults from STANDALONE so that
 # bare invocations (e.g. vault tooling that only sets NANVIX_STANDALONE)
@@ -154,47 +127,15 @@ def run_batch(
             ]
 
         try:
-            if QUIET:
-                rc = _run_quiet(cmd, timeout=600)
-            else:
-                rc = subprocess.run(
-                    cmd, stdin=subprocess.DEVNULL, timeout=600
-                ).returncode
+            rc = subprocess.run(
+                cmd, stdin=subprocess.DEVNULL, timeout=600
+            ).returncode
         except subprocess.TimeoutExpired:
             print(f"  TIMEOUT: batch {batch_num} exceeded 600s")
             rc = 124  # match GNU timeout exit code
         return batch_num, rc, batch
     finally:
         shutil.rmtree(batch_tmpdir, ignore_errors=True)
-
-
-def _run_quiet(cmd: list[str], timeout: int) -> int:
-    """Run cmd, streaming stdout/stderr but dropping known-benign noise lines.
-
-    Merges stderr into stdout (the in-VM kernel logger writes to stdout in
-    standalone mode anyway) and filters line-by-line.  Output is flushed
-    per line so the user sees progress in real time.
-    """
-    proc = subprocess.Popen(
-        cmd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        text=True,
-    )
-    try:
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            if _QUIET_NOISE_RE.match(line):
-                continue
-            sys.stdout.write(line)
-            sys.stdout.flush()
-        return proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-        raise
 
 
 def main() -> int:
