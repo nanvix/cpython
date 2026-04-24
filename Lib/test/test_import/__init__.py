@@ -20,8 +20,17 @@ import threading
 import time
 import types
 import unittest
+
+# NSKIP051 https://github.com/nanvix/cpython/issues/480
+from test import support
+if support.is_nanvix_hosted:
+    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 from unittest import mock
-import _testinternalcapi
+try:
+    import _testinternalcapi
+except ImportError:
+    # NSKIP002: _testinternalcapi not available on Nanvix
+    _testinternalcapi = None
 import _imp
 
 from test.support import os_helper

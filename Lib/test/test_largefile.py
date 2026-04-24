@@ -1,3 +1,8 @@
+from test.support import is_nanvix
+import unittest
+if is_nanvix:
+    raise unittest.SkipTest("NSKIP015: test requires >2 GB disk I/O; exceeds Nanvix VM resources")
+
 """Test largefile support on system where this makes sense.
 """
 

@@ -8,6 +8,11 @@ import os
 import struct
 import sys
 import unittest
+
+# NSKIP051 https://github.com/nanvix/cpython/issues/480
+from test import support
+if support.is_nanvix_hosted:
+    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 from subprocess import PIPE, Popen
 from test.support import import_helper
 from test.support import os_helper

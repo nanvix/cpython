@@ -3,6 +3,11 @@ from test.support import bigmemtest, _4G
 
 import array
 import unittest
+
+# NSKIP051 https://github.com/nanvix/cpython/issues/480
+from test import support
+if support.is_nanvix_hosted:
+    raise unittest.SkipTest("NSKIP051: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues); not bisected, see #480")
 import io
 from io import BytesIO, DEFAULT_BUFFER_SIZE
 import os

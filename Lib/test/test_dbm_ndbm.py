@@ -1,3 +1,8 @@
+from test.support import is_nanvix
+import unittest
+if is_nanvix:
+    raise unittest.SkipTest("NSKIP047: _dbm C backend N/A on Nanvix (configure.ac:7268)")
+
 from test.support import import_helper
 from test.support import os_helper
 import_helper.import_module("dbm.ndbm") #skip if not supported

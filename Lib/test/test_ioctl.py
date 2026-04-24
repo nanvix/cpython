@@ -1,3 +1,8 @@
+from test.support import is_nanvix
+import unittest
+if is_nanvix:
+    raise unittest.SkipTest("NSKIP048: fcntl/ioctl C extension N/A on Nanvix (configure.ac:7275)")
+
 import array
 import unittest
 from test.support import get_attribute
