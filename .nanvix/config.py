@@ -186,6 +186,37 @@ NANVIX_TEST_LIST: list[str] = [
     "test_copy", "test_copyreg",
     "test_collections", "test_defaultdict", "test_ordered_dict", "test_deque", "test_array",
     "test_weakref", "test_weakset", "test_buffer",
+
+    # Filesystem & I/O — paths & helpers
+    "test_genericpath", "test_posixpath", "test_ntpath", "test_pathlib",
+    "test_fnmatch", "test_glob", "test_filecmp", "test_linecache", "test_stat",
+
+    # Filesystem & I/O — stream / memory I/O
+    # (test_bytesio and test_stringio do not exist as separate files;
+    #  their content lives inside test_memoryio.py)
+    "test_memoryio", "test_bufio", "test_fileinput",
+
+    # Filesystem & I/O — core file I/O
+    # (test_open does not exist as a separate file; covered by test_io)
+    "test_io", "test_fileio", "test_file", "test_file_eintr",
+    "test_source_encoding",
+
+    # Filesystem & I/O — OS interfaces
+    "test_os", "test_posix",
+
+    # Filesystem & I/O — tempfiles & utilities
+    "test_tempfile", "test_shutil",
+
+    # Filesystem & I/O — archives & compression
+    "test_zipfile", "test_zipapp", "test_zipimport",
+    "test_tarfile", "test_gzip", "test_bz2", "test_zlib",
+
+    # Filesystem & I/O — file-backed databases (pure-Python only)
+    "test_dbm_dumb", "test_shelve",
+
+    # Filesystem & I/O — import system (single-file modules only;
+    # test_importlib is a 45-file sub-package deferred to Sub-issue B)
+    "test_import", "test_pkgutil", "test_modulefinder",
 ]
 
 # Default batch size for regrtest VM invocations.
@@ -196,6 +227,9 @@ STANDALONE_EXCLUDE: list[str] = [
     "test_queue",      # NSKIP019: standalone 32 MB heap too small for module
     "test_itertools",  # NSKIP019: standalone 32 MB heap too small for module
     "test_functools",  # NSKIP019: standalone 32 MB heap too small for module
+    "test_io",         # NSKIP019: standalone 32 MB heap too small for module
+    "test_zipfile",    # NSKIP019: standalone too slow / heap too small for module
+    "test_import",     # NSKIP019: standalone 32 MB heap too small for module
 ]
 
 # Platform-specific nanvixd extra arguments.

@@ -460,6 +460,15 @@ def run_regrtest(
     env = os.environ.copy()
     env["NANVIX_TEST_BATCH_SIZE"] = str(batch_size)
     env["NANVIX_PYTHON_BIN"] = f"./bin/{config.python_binary()}"
+    # Publish the active process mode to run-tests.py, which forwards it
+    # into the guest via nanvixd's semicolon-env trick.  Guest-side support
+    # helpers (is_nanvix_standalone / is_nanvix_hosted in
+    # Lib/test/support) read NANVIX_PROCESS_MODE to discriminate between
+    # the standalone FAT VFS and the host-FS passthrough used by single-
+    # and multi-process modes.  nanvixd does NOT inherit host env into
+    # the guest, so this variable must be propagated explicitly through
+    # the run-tests.py argv plumbing.
+    env["NANVIX_PROCESS_MODE"] = process_mode
 
     if standalone:
         # Standalone: ramfs + semicolon env syntax.

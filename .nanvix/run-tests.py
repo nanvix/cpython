@@ -23,9 +23,29 @@
 #     NANVIX_TEST_BATCH_SIZE - modules per nanvixd invocation (default: 4)
 #     NANVIXD_EXTRA_ARGS     - extra flags passed to nanvixd (optional)
 #     NANVIX_STANDALONE      - set to "1" to enable standalone mode
+#     NANVIX_PROCESS_MODE    - "standalone" / "single-process" / "multi-process";
+#                              forwarded into the guest so support helpers
+#                              (is_nanvix_standalone / is_nanvix_hosted in
+#                              Lib/test/support) can discriminate.  Defaulted
+#                              from NANVIX_STANDALONE when unset.
 #     REGRTEST_TIMEOUT       - per-test timeout in seconds (default: 120)
+#     NANVIX_QUIET           - [NOTE(split-PR): held for hosted-mode tooling PR]
+#                              set to "1" to suppress known-benign in-VM kernel
+#                              [ERROR] lines from syscalls that the test
+#                              framework expects to fail (ENOENT probes,
+#                              unsupported AF_UNIX socket, standalone-mode
+#                              poll/pipe).  Panics, tracebacks, and the
+#                              regrtest summary are always preserved.
+#     NANVIX_REGRTEST_EXTRA  - [NOTE(split-PR): held for hosted-mode tooling PR]
+#                              extra args appended to the regrtest invocation
+#                              before the module list.  Use shell-style
+#                              quoting; parsed by shlex.  Examples:
+#                                NANVIX_REGRTEST_EXTRA='-m test_dircmp'
+#                                NANVIX_REGRTEST_EXTRA='-x test_slow'
+#                                NANVIX_REGRTEST_EXTRA='-v -m DirCompareTestCase'
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -34,6 +54,32 @@ import tempfile
 
 BATCH_SIZE = int(os.environ.get("NANVIX_TEST_BATCH_SIZE", "4"))
 STANDALONE = os.environ.get("NANVIX_STANDALONE", "") == "1"
+QUIET = os.environ.get("NANVIX_QUIET", "") == "1"
+# NOTE(split-PR): _QUIET_NOISE_RE, QUIET handling, REGRTEST_EXTRA injection,
+# and _run_quiet() below are held back for a separate "hosted-mode tooling"
+# PR; do NOT include in the filesystem-and-io PR.
+# Lines matching this pattern are dropped when NANVIX_QUIET=1.  Keep this
+# list narrow: each entry must correspond to a syscall the test framework
+# is *expected* to handle gracefully.  Never filter [TRACE][nvx::panic],
+# [FATAL], or Python tracebacks.
+_QUIET_NOISE_RE = re.compile(
+    r"^\[(?:ERROR|WARN)\]\["
+    r"(?:posix::sys::stat"
+    r"|syscall::dirent::bindings::opendir"
+    r"|syscall::unistd::bindings::(?:symlink|linkat|unlink|unlinkat|readlink)"
+    r"|syscall::poll::bindings"
+    r"|syscall::unistd::syscall::pipe::bindings"
+    r"|syscall::sys::socket::bindings::socket"
+    r")\]"
+)
+# Forwarded into the guest via nanvixd's semicolon-env trick so guest-side
+# Lib/test/support helpers can read it.  Defaults from STANDALONE so that
+# bare invocations (e.g. vault tooling that only sets NANVIX_STANDALONE)
+# still announce a sensible value.  nanvixd does NOT inherit host env into
+# the guest in any mode; this variable must be propagated explicitly.
+PROCESS_MODE = os.environ.get(
+    "NANVIX_PROCESS_MODE", "standalone" if STANDALONE else "single-process"
+)
 NANVIXD = "./bin/nanvixd.exe" if sys.platform == "win32" else "./bin/nanvixd.elf"
 # Must match config.PYTHON_VERSION / config.python_binary().
 PYTHON_BIN = os.environ.get("NANVIX_PYTHON_BIN", "./bin/python3.12")
@@ -42,6 +88,7 @@ SYSCONFIGDATA_NAME = os.environ.get(
     "NANVIX_SYSCONFIGDATA_NAME", "_sysconfigdata__nanvix_"
 )
 REGRTEST_TIMEOUT = os.environ.get("REGRTEST_TIMEOUT", "120")
+REGRTEST_EXTRA = shlex.split(os.environ.get("NANVIX_REGRTEST_EXTRA", ""))
 
 
 def run_batch(
@@ -62,12 +109,14 @@ def run_batch(
             # string.  nanvixd splits on spaces for argv and on semicolons
             # for environment variables.
             modules_str = " ".join(batch)
+            extra_str = (" " + " ".join(REGRTEST_EXTRA)) if REGRTEST_EXTRA else ""
             regrtest_args = (
-                f"-B -m test --timeout={REGRTEST_TIMEOUT} {modules_str}"
+                f"-B -m test --timeout={REGRTEST_TIMEOUT}{extra_str} {modules_str}"
             )
             python_arg = (
                 f"{regrtest_args};PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
                 f" TMPDIR=/tmp"
+                f" NANVIX_PROCESS_MODE={PROCESS_MODE}"
                 f" _PYTHON_SYSCONFIGDATA_NAME={SYSCONFIGDATA_NAME}"
             )
 
@@ -81,6 +130,18 @@ def run_batch(
         else:
             # Direct mode: separate argv elements, invoke run-regrtest.py
             # in the guest.  --tmpdir must come before the module list.
+            #
+            # NANVIX_PROCESS_MODE is published into the guest via nanvixd's
+            # semicolon-env trick on the *trailing* argv token: nanvixd
+            # strips the ";KEY=VAL ..." portion from any token containing
+            # a semicolon and sets the env vars before exec.  The trick
+            # MUST go on the trailing token because nanvixd truncates all
+            # python-side argv after the first semicolon-bearing token.
+            argv_tail = list(REGRTEST_EXTRA) + list(batch)
+            if argv_tail:
+                argv_tail[-1] = (
+                    f"{argv_tail[-1]};NANVIX_PROCESS_MODE={PROCESS_MODE}"
+                )
             cmd = [
                 NANVIXD,
                 *nanvixd_extra,
@@ -89,19 +150,51 @@ def run_batch(
                 "./run-regrtest.py",
                 "--tmpdir",
                 batch_tmpdir,
-                *batch,
+                *argv_tail,
             ]
 
         try:
-            rc = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, timeout=600
-            ).returncode
+            if QUIET:
+                rc = _run_quiet(cmd, timeout=600)
+            else:
+                rc = subprocess.run(
+                    cmd, stdin=subprocess.DEVNULL, timeout=600
+                ).returncode
         except subprocess.TimeoutExpired:
             print(f"  TIMEOUT: batch {batch_num} exceeded 600s")
             rc = 124  # match GNU timeout exit code
         return batch_num, rc, batch
     finally:
         shutil.rmtree(batch_tmpdir, ignore_errors=True)
+
+
+def _run_quiet(cmd: list[str], timeout: int) -> int:
+    """Run cmd, streaming stdout/stderr but dropping known-benign noise lines.
+
+    Merges stderr into stdout (the in-VM kernel logger writes to stdout in
+    standalone mode anyway) and filters line-by-line.  Output is flushed
+    per line so the user sees progress in real time.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        text=True,
+    )
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            if _QUIET_NOISE_RE.match(line):
+                continue
+            sys.stdout.write(line)
+            sys.stdout.flush()
+        return proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        raise
 
 
 def main() -> int:
