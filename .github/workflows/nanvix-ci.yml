@@ -7,9 +7,9 @@ on:
   schedule:
     - cron: "0 11 * * *"
   push:
-    branches: ["nanvix/**"]
+    branches: [ "nanvix/**" ]
   pull_request:
-    branches: ["nanvix/**"]
+    branches: [ "nanvix/**" ]
   workflow_dispatch:
 
 permissions:
@@ -28,9 +28,10 @@ jobs:
     uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.12.0
     with:
       zutil-version: "v0.7.26"
-      platforms: '["microvm"]'
-      memory-sizes: '["256mb"]'
-      skip-full-test-modes: '[]'
+      platforms: "[\"hyperlight\",\"microvm\"]"
+      process-modes: "[\"multi-process\",\"single-process\",\"standalone\"]"
+      memory-sizes: "[\"128mb\",\"256mb\"]"
+      skip-full-test-modes: "[]"
       caller-event-name: ${{ github.event_name }}
       windows-test: true
     secrets:
@@ -47,10 +48,11 @@ jobs:
     uses: nanvix/workflows/.github/workflows/nanvix-ci.yml@v1.12.0
     with:
       zutil-version: "v0.7.26"
-      platforms: '["microvm"]'
-      memory-sizes: '["256mb"]'
-      skip-full-test-modes: '[]'
-      caller-event-name: 'schedule'
+      platforms: "[\"hyperlight\",\"microvm\"]"
+      process-modes: "[\"multi-process\",\"single-process\",\"standalone\"]"
+      memory-sizes: "[\"128mb\",\"256mb\"]"
+      skip-full-test-modes: "[]"
+      caller-event-name: "schedule"
       windows-test: true
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
@@ -64,14 +66,16 @@ jobs:
   # uploads it to the same release.
   # -------------------------------------------------------------------
   windows-zip:
-    needs: [ci, ci-scheduled]
+    needs: [ ci, ci-scheduled ]
     if: >-
-      !cancelled() &&
-      (needs.ci.result == 'success' || needs.ci-scheduled.result == 'success') &&
-      github.event_name != 'pull_request'
+      !cancelled() && (needs.ci.result == 'success' || needs.ci-scheduled.result
+      == 'success') && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ (needs.ci.outputs.package_version || needs.ci-scheduled.outputs.package_version) }}-nanvix-${{ (needs.ci.outputs.nanvix_version || needs.ci-scheduled.outputs.nanvix_version) }}
+      RELEASE_TAG: ${{ (needs.ci.outputs.package_version ||
+        needs.ci-scheduled.outputs.package_version) }}-nanvix-${{
+        (needs.ci.outputs.nanvix_version ||
+        needs.ci-scheduled.outputs.nanvix_version) }}
     steps:
       - uses: actions/checkout@v5
 
@@ -90,93 +94,106 @@ jobs:
           gh release download "$RELEASE_TAG" --pattern "*standalone*.tar.bz2" --dir release-download || true
           ls -la release-download/
 
-      - name: Create Windows zip
+      - name: Create and upload Windows zips
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # Find the main standalone tarball (not buildroot)
-          TARBALL=$(find release-download -name "*standalone*.tar.bz2" ! -name "*buildroot*" | head -1)
-          if [[ -z "$TARBALL" ]]; then
-            echo "::warning::No standalone tarball found (excluding buildroot)"
+          # Find all standalone tarballs (exclude buildroot variants)
+          TARBALLS=$(find release-download -name "*standalone*.tar.bz2" ! -name "*buildroot*" | sort)
+          if [[ -z "$TARBALLS" ]]; then
+            echo "::warning::No standalone tarballs found (excluding buildroot)"
             ls release-download/ 2>/dev/null || true
             exit 0
           fi
-          echo "Using tarball: $TARBALL"
 
-          mkdir -p extract windows-zip
-          tar -xjf "$TARBALL" -C extract
-
-          # Find the python binary — it's at bin/python.elf
-          PYTHON_ELF=$(find extract -name "python.elf" -type f | head -1)
-
-          if [[ -z "$PYTHON_ELF" ]]; then
-            echo "::error::Could not find python.elf binary in standalone tarball"
-            echo "Files in tarball:"
-            find extract -type f | head -20 || true
-            exit 1
-          fi
-
-          cp "$PYTHON_ELF" windows-zip/python.elf
-          echo "Included: python.elf ($(stat -c%s windows-zip/python.elf) bytes)"
-
-          # --- Build ramfs from the stdlib in the tarball ---
-          SYSROOT=$(find extract -type d -name "sysroot" | head -1)
-          PYLIB="${SYSROOT}/lib/python3.12"
-          if [[ -d "$PYLIB" ]]; then
-            echo "Building ramfs from stdlib at: $PYLIB"
-
-            # Trim stdlib (same as Makefile.nanvix ramfs target)
-            find "$SYSROOT" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-            find "$SYSROOT" -name "*.pyc" -delete 2>/dev/null || true
-            find "$SYSROOT" -name "*.a" -delete 2>/dev/null || true
-            find "$SYSROOT" -name "*.h" -delete 2>/dev/null || true
-            rm -rf "$SYSROOT/bin" "$SYSROOT/include" "$SYSROOT/share" "$SYSROOT/lib/pkgconfig"
-            for d in test tests idlelib tkinter ensurepip lib2to3 distutils unittest \
-                     turtledemo pydoc_data config-3.12*; do
-              rm -rf "$PYLIB/$d" 2>/dev/null || true
-            done
-            find "$SYSROOT" -type d -name "config-3.12*" -exec rm -rf {} + 2>/dev/null || true
-
-            echo "Trimmed stdlib: $(find "$SYSROOT" -type f | wc -l) files"
-
-            # Get mkramfs from the NanVix standalone tarball
-            echo "Downloading NanVix release for mkramfs..."
-            curl -fsSL https://raw.githubusercontent.com/nanvix/nanvix/refs/heads/dev/scripts/get-nanvix.sh \
-              | bash -s -- --force nanvix-dl
-            MKRAMFS=""
-            NVX_TAR=$(find nanvix-dl -name "nanvix-microvm-standalone-*.tar.bz2" | head -1)
-            if [[ -n "$NVX_TAR" ]]; then
-              mkdir -p nanvix-extract
-              tar -xjf "$NVX_TAR" -C nanvix-extract
-              MKRAMFS=$(find nanvix-extract -name "mkramfs.elf" -type f | head -1)
-            fi
-
+          # Download mkramfs once (shared across all zips)
+          echo "Downloading NanVix release for mkramfs..."
+          curl -fsSL https://raw.githubusercontent.com/nanvix/nanvix/refs/heads/dev/scripts/get-nanvix.sh \
+            | bash -s -- --force nanvix-dl
+          MKRAMFS=""
+          NVX_TAR=$(find nanvix-dl -name "nanvix-*-standalone-*.tar.bz2" | head -1)
+          if [[ -n "$NVX_TAR" ]]; then
+            mkdir -p nanvix-extract
+            tar -xjf "$NVX_TAR" -C nanvix-extract
+            MKRAMFS=$(find nanvix-extract -name "mkramfs.elf" -type f | head -1)
             if [[ -n "$MKRAMFS" ]]; then
               chmod +x "$MKRAMFS"
-              # mkramfs expects the parent dir so FAT32 has sysroot/ prefix
-              STAGING_PARENT=$(dirname "$SYSROOT")
-              "$MKRAMFS" -o windows-zip/cpython-ramfs.img "$STAGING_PARENT"
-              echo "Included: cpython-ramfs.img ($(stat -c%s windows-zip/cpython-ramfs.img) bytes)"
-            else
-              echo "::warning::mkramfs not found — zip will not contain ramfs"
             fi
-          else
-            echo "::warning::No stdlib found in tarball — zip will not contain ramfs"
           fi
 
-          ZIP_NAME="cpython-windows-microvm-standalone-256mb-${GITHUB_SHA::7}.zip"
-          (cd windows-zip && zip "../${ZIP_NAME}" *)
-          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
-          echo "Created: $ZIP_NAME ($(stat -c%s "$ZIP_NAME") bytes)"
-          echo "Contents:"
-          unzip -l "$ZIP_NAME"
+          # Process each standalone tarball
+          for TARBALL in $TARBALLS; do
+            echo "=== Processing: $TARBALL ==="
 
-      - name: Upload zip to release
-        if: ${{ env.zip_name != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$RELEASE_TAG" "${{ env.zip_name }}" --clobber
-          echo "Uploaded ${{ env.zip_name }} to release $RELEASE_TAG"
+            # Extract platform and memory from tarball name
+            # Expected pattern: cpython-<platform>-standalone-<memory>-*.tar.bz2
+            BASENAME=$(basename "$TARBALL" .tar.bz2)
+            PLATFORM=$(echo "$BASENAME" | sed -n 's/^cpython-\([^-]*\)-standalone-.*/\1/p')
+            MEMORY=$(echo "$BASENAME" | sed -n 's/^cpython-[^-]*-standalone-\([^-]*\)-.*/\1/p')
+            if [[ -z "$PLATFORM" ]]; then
+              echo "::warning::Could not extract platform from $BASENAME, skipping"
+              continue
+            fi
+            if [[ -z "$MEMORY" ]]; then
+              MEMORY="256mb"
+            fi
+            echo "Platform: $PLATFORM, Memory: $MEMORY"
+
+            rm -rf extract windows-zip
+            mkdir -p extract windows-zip
+            tar -xjf "$TARBALL" -C extract
+
+            # Find the python binary
+            PYTHON_ELF=$(find extract -name "python.elf" -type f | head -1)
+            if [[ -z "$PYTHON_ELF" ]]; then
+              echo "::error::Could not find python.elf in $TARBALL"
+              find extract -type f | head -20 || true
+              continue
+            fi
+
+            cp "$PYTHON_ELF" windows-zip/python.elf
+            echo "Included: python.elf ($(stat -c%s windows-zip/python.elf) bytes)"
+
+            # --- Build ramfs from the stdlib in the tarball ---
+            SYSROOT=$(find extract -type d -name "sysroot" | head -1)
+            PYLIB="${SYSROOT}/lib/python3.12"
+            if [[ -d "$PYLIB" ]]; then
+              echo "Building ramfs from stdlib at: $PYLIB"
+
+              # Trim stdlib (same as Makefile.nanvix ramfs target)
+              find "$SYSROOT" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+              find "$SYSROOT" -name "*.pyc" -delete 2>/dev/null || true
+              find "$SYSROOT" -name "*.a" -delete 2>/dev/null || true
+              find "$SYSROOT" -name "*.h" -delete 2>/dev/null || true
+              rm -rf "$SYSROOT/bin" "$SYSROOT/include" "$SYSROOT/share" "$SYSROOT/lib/pkgconfig"
+              for d in test tests idlelib tkinter ensurepip lib2to3 distutils unittest \
+                       turtledemo pydoc_data config-3.12*; do
+                rm -rf "$PYLIB/$d" 2>/dev/null || true
+              done
+              find "$SYSROOT" -type d -name "config-3.12*" -exec rm -rf {} + 2>/dev/null || true
+
+              echo "Trimmed stdlib: $(find "$SYSROOT" -type f | wc -l) files"
+
+              if [[ -n "$MKRAMFS" ]]; then
+                STAGING_PARENT=$(dirname "$SYSROOT")
+                "$MKRAMFS" -o windows-zip/cpython-ramfs.img "$STAGING_PARENT"
+                echo "Included: cpython-ramfs.img ($(stat -c%s windows-zip/cpython-ramfs.img) bytes)"
+              else
+                echo "::warning::mkramfs not found — zip will not contain ramfs"
+              fi
+            else
+              echo "::warning::No stdlib found in tarball — zip will not contain ramfs"
+            fi
+
+            ZIP_NAME="cpython-windows-${PLATFORM}-standalone-${MEMORY}-${GITHUB_SHA::7}.zip"
+            (cd windows-zip && zip "../${ZIP_NAME}" *)
+            echo "Created: $ZIP_NAME ($(stat -c%s "$ZIP_NAME") bytes)"
+            echo "Contents:"
+            unzip -l "$ZIP_NAME"
+
+            # Upload each zip to the release
+            gh release upload "$RELEASE_TAG" "$ZIP_NAME" --clobber
+            echo "Uploaded $ZIP_NAME to release $RELEASE_TAG"
+          done
