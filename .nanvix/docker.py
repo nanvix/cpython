@@ -191,6 +191,42 @@ def docker_build_lxml_deps(
     subprocess.run([*base, "sh", "-c", shell_cmd], check=True)
 
 
+def _purge_stale_setup_local_cmd() -> str:
+    """Return a shell snippet that removes a stale pptx-generated
+    Modules/Setup.local from the Docker workspace volume when the host
+    copy has already been deleted (e.g. because PPTX was disabled).
+
+    The tar-based sync fallback (used when rsync is unavailable) does
+    not delete files from the Docker volume that have been removed on
+    the host.  This command fills that gap for the specific case of
+    our generated Setup.local.
+
+    Safe heuristic (mirrors :func:`pptx._is_pptx_generated_setup_local`):
+    - ``_sl_active``: all non-blank, non-comment lines in the file.
+    - ``_sl_lxml``:   lines starting with ``_lxml_etree`` or
+      ``_lxml_elementpath``.
+    - Remove the file only when ``_sl_active`` is non-empty AND equals
+      ``_sl_lxml`` (i.e. every active entry is one of our lxml lines).
+    - A Setup.local with any unrelated active entry is never removed.
+
+    The command is a no-op when the host workspace still has its own
+    Setup.local (rsync already handled the sync in that case).
+    """
+    sl_host = "/mnt/host-workspace/Modules/Setup.local"
+    sl_work = f"{config.DOCKER_WORKSPACE_PATH}/Modules/Setup.local"
+    # Shell single-quotes protect the regex patterns from variable expansion.
+    # $() and $varname are intentional shell syntax, not Python interpolation.
+    return (
+        f'if [ ! -f "{sl_host}" ] && [ -f "{sl_work}" ]; then '
+        f'_sl_active=$(grep -vE \'^[[:space:]]*(#|$)\' "{sl_work}" 2>/dev/null || true); '
+        f'_sl_lxml=$(grep -E \'^_lxml_(etree|elementpath) \' "{sl_work}" 2>/dev/null || true); '
+        f'if [ -n "$_sl_active" ] && [ "$_sl_active" = "$_sl_lxml" ]; then '
+        f'rm -f "{sl_work}"; '
+        f'echo "[pptx] Removed stale generated Modules/Setup.local from Docker workspace"; '
+        f'fi; fi'
+    )
+
+
 def docker_build(
     workspace: Path,
     nanvix_home: Path,
@@ -260,6 +296,7 @@ def docker_build(
 
     shell_cmd = (
         f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
+        f"{_purge_stale_setup_local_cmd()} && "
         f"{sysroot_check} && {inner_make} && {strip_build}"
     )
 
