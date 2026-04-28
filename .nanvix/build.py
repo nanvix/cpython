@@ -99,14 +99,30 @@ def build(
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
     if pptx_mod.enabled():
-        # build_lxml_deps skips itself silently when sysroot is a
-        # Docker-internal path (e.g. /mnt/sysroot on Windows or Docker
-        # Linux hosts); generate_setup_local always runs so that
-        # Modules/Setup.local exists before make begins linking.
-        pptx_mod.build_lxml_deps(
-            repo_root, Path(sysroot), Path(toolchain), run_fn=run_fn
-        )
+        if config.IS_WINDOWS:
+            # Windows: no host bash/toolchain available.  Build lxml archives
+            # inside Docker before the main docker_build invocation so that
+            # the sysroot on the host gains the archives.  The main
+            # docker_build then finds them via the read-only sysroot mount.
+            docker_mod.docker_build_lxml_deps(
+                repo_root, Path(sysroot),
+                platform=platform,
+                process_mode=process_mode,
+                memory_size=memory_size,
+                install_prefix=install_prefix,
+            )
+        else:
+            # Non-Windows: build lxml archives directly on the host.
+            # build_lxml_deps() skips gracefully if sysroot is not
+            # accessible (e.g. Docker-internal path on --with-docker builds).
+            pptx_mod.build_lxml_deps(
+                repo_root, Path(sysroot), Path(toolchain), run_fn=run_fn
+            )
         pptx_mod.generate_setup_local(repo_root)
+    else:
+        # PPTX disabled: remove any previously generated Setup.local so
+        # stale lxml link flags do not bleed into the current build.
+        pptx_mod.clear_generated_setup_local(repo_root)
     if config.IS_WINDOWS:
         # Build and install in one Docker invocation so the install tree
         # is cached for later use by ``./z test`` (no Docker during tests).
@@ -190,6 +206,10 @@ def install(
 
 def clean(repo_root: Path) -> None:
     """Remove build artifacts."""
+    # Always remove a pptx-generated Setup.local so it does not outlive
+    # the build artifacts it was created for.  A user-authored Setup.local
+    # (without the generated marker) is left untouched.
+    pptx_mod.clear_generated_setup_local(repo_root)
     if config.IS_WINDOWS:
         for name in (".nanvix-configured", "python.elf", "python.exe"):
             p = repo_root / name
