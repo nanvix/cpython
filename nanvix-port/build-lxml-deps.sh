@@ -25,9 +25,11 @@ die() {
     exit 1
 }
 
-if [[ -z "${NANVIX_HOME:-}" ]] && [[ -f "${ROOT_DIR}/.nanvix/env.sh" ]]; then
-    # shellcheck source=/dev/null
-    source "${ROOT_DIR}/.nanvix/env.sh"
+if [[ -z "${NANVIX_HOME:-}" ]]; then
+    ENV_JSON="${ROOT_DIR}/.nanvix/env.json"
+    if [[ -f "${ENV_JSON}" ]]; then
+        NANVIX_HOME="$(python3 -c "import json; print(json.load(open('${ENV_JSON}'))['NANVIX_SYSROOT'])" 2>/dev/null || true)"
+    fi
 fi
 
 NANVIX_HOME="${NANVIX_HOME:-}"
@@ -40,6 +42,7 @@ CXX="${NANVIX_TOOLCHAIN}/bin/i686-nanvix-g++"
 AR="${NANVIX_TOOLCHAIN}/bin/i686-nanvix-ar"
 RANLIB="${NANVIX_TOOLCHAIN}/bin/i686-nanvix-ranlib"
 STRIP="${NANVIX_TOOLCHAIN}/bin/i686-nanvix-strip"
+BUILD_TRIPLET="$(${ROOT_DIR}/config.guess 2>/dev/null || echo x86_64-linux-gnu)"
 SYSROOT="${NANVIX_HOME}"
 COMMON_CFLAGS="-m32 -march=pentiumpro -Os -fdata-sections -ffunction-sections -I${SYSROOT}/include"
 
@@ -101,7 +104,7 @@ CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" \
     CFLAGS="${COMMON_CFLAGS}" \
     ./configure \
     --host=i686-nanvix \
-    --build=x86_64-linux-gnu \
+    --build="${BUILD_TRIPLET}" \
     --prefix="${SYSROOT}" \
     --enable-static \
     --disable-shared \
@@ -148,7 +151,7 @@ CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" \
     XML_CONFIG="${XML2_CONFIG}" \
     ./configure \
     --host=i686-nanvix \
-    --build=x86_64-linux-gnu \
+    --build="${BUILD_TRIPLET}" \
     --prefix="${SYSROOT}" \
     --enable-static \
     --disable-shared \
