@@ -22,6 +22,7 @@ from _loader import load_sibling
 
 config = load_sibling("config", __file__)
 docker_mod = load_sibling("docker", __file__)
+pptx_mod = load_sibling("pptx", __file__)
 
 
 def make_args(
@@ -97,6 +98,15 @@ def build(
     docker: bool = False,
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
+    if pptx_mod.enabled():
+        # build_lxml_deps skips itself silently when sysroot is a
+        # Docker-internal path (e.g. /mnt/sysroot on Windows or Docker
+        # Linux hosts); generate_setup_local always runs so that
+        # Modules/Setup.local exists before make begins linking.
+        pptx_mod.build_lxml_deps(
+            repo_root, Path(sysroot), Path(toolchain), run_fn=run_fn
+        )
+        pptx_mod.generate_setup_local(repo_root)
     if config.IS_WINDOWS:
         # Build and install in one Docker invocation so the install tree
         # is cached for later use by ``./z test`` (no Docker during tests).
@@ -216,6 +226,7 @@ _DISTCLEAN_EXCLUDES: list[str] = [
     ".nanvix/package.py",
     ".nanvix/run-regrtest.py",
     ".nanvix/run-tests.py",
+    ".nanvix/pptx.py",
     "z",
     "z.sh",
     "z.ps1",
