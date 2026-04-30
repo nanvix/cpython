@@ -212,4 +212,4 @@ assert_file "${LXML_STAGE_DIR}/etree.py"
 assert_file "${LXML_STAGE_DIR}/_elementpath.py"
 
 log "Done. Installed archives in ${SYSROOT}/lib and headers in ${SYSROOT}/include"
-log "Staged Python package in ${LXML_STAGE_DIR}"
+log "Staged lxml Python package in ${LXML_STAGE_DIR}"

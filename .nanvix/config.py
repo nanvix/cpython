@@ -326,6 +326,8 @@ NANVIX_TEST_LIST: list[str] = [
     # #323 wave 8 — regex and plistlib
     "test_re",
     "test_plistlib",
+    "test_nanvix_lxml",
+    "test_nanvix_pptx",
 ]
 
 # Default batch size for regrtest VM invocations.
@@ -411,6 +413,7 @@ DOCKER_CRLF_FILES: list[str] = [
     "install-sh",
     "Modules/makesetup",
     "Modules/Setup",
+    "Modules/Setup.local",
     "Modules/Setup.bootstrap.in",
     "Modules/Setup.stdlib.in",
     "Modules/config.c.in",
@@ -423,6 +426,7 @@ DOCKER_CRLF_FILES: list[str] = [
     "Misc/python-embed.pc.in",
     "Misc/python-config.sh.in",
     "Misc/python-config.in",
+    "nanvix-port/build-lxml-deps.sh",
 ]
 
 # Docker output files to copy back to host workspace.

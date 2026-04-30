@@ -10,12 +10,29 @@ import builtins
 import os
 import struct
 
+MAX_IMAGE_HEADER_BYTES = 1024 * 1024
+MAX_IMAGE_DIMENSION = 100_000
+MAX_IMAGE_PIXELS = 100_000_000
+
+
+def _validate_size(width, height):
+    width = int(width)
+    height = int(height)
+    if width <= 0 or height <= 0:
+        raise OSError("image dimensions must be positive")
+    if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
+        raise OSError("image dimensions exceed supported limit")
+    if width * height > MAX_IMAGE_PIXELS:
+        raise OSError("image pixel count exceeds supported limit")
+    return width, height
+
 
 class Image:
-    def __init__(self, size=(0, 0), fmt=None, mode="RGB"):
+    def __init__(self, size=(0, 0), fmt=None, mode="RGB", color=None):
         self.size = size
         self.format = fmt
         self.mode = mode
+        self.color = color
 
     @property
     def width(self):
@@ -51,7 +68,7 @@ def _read_all_bytes(fp):
                 pos = fp.tell()
             except Exception:
                 pos = None
-        data = fp.read()
+        data = fp.read(MAX_IMAGE_HEADER_BYTES + 1)
         if pos is not None:
             try:
                 fp.seek(pos)
@@ -59,10 +76,12 @@ def _read_all_bytes(fp):
                 pass
     else:
         with builtins.open(os.fspath(fp), "rb") as fobj:
-            data = fobj.read()
+            data = fobj.read(MAX_IMAGE_HEADER_BYTES + 1)
 
     if not isinstance(data, (bytes, bytearray)):
         raise OSError("image stream must return bytes")
+    if len(data) > MAX_IMAGE_HEADER_BYTES:
+        raise OSError("image header exceeds supported limit")
     return bytes(data)
 
 
@@ -74,6 +93,7 @@ def _parse_png(data):
     if data[12:16] != b"IHDR":
         raise OSError("invalid PNG: missing IHDR")
     width, height = struct.unpack(">II", data[16:24])
+    width, height = _validate_size(width, height)
     color_type = data[25]
     mode_map = {0: "L", 2: "RGB", 3: "P", 4: "LA", 6: "RGBA"}
     return Image(size=(width, height), fmt="PNG", mode=mode_map.get(color_type, "RGB"))
@@ -85,6 +105,7 @@ def _parse_gif(data):
     if len(data) < 10:
         raise OSError("truncated GIF header")
     width, height = struct.unpack("<HH", data[6:10])
+    width, height = _validate_size(width, height)
     return Image(size=(width, height), fmt="GIF", mode="P")
 
 
@@ -96,8 +117,9 @@ def _parse_bmp(data):
     dib_header_size = struct.unpack("<I", data[14:18])[0]
     if dib_header_size < 40:
         raise OSError("unsupported BMP header")
-    width = struct.unpack("<i", data[18:22])[0]
+    width = abs(struct.unpack("<i", data[18:22])[0])
     height = abs(struct.unpack("<i", data[22:26])[0])
+    width, height = _validate_size(width, height)
     bpp = struct.unpack("<H", data[28:30])[0]
     mode = "RGBA" if bpp == 32 else ("RGB" if bpp >= 24 else "P")
     return Image(size=(width, height), fmt="BMP", mode=mode)
@@ -148,10 +170,11 @@ def _parse_jpeg(data):
             raise OSError("truncated JPEG segment payload")
 
         if marker in sof_markers:
-            if seglen < 7:
+            if seglen < 8:
                 raise OSError("invalid JPEG SOF segment")
             height, width = struct.unpack(">HH", data[i + 3 : i + 7])
-            components = data[i + 7] if i + 7 < len(data) else 3
+            width, height = _validate_size(width, height)
+            components = data[i + 7]
             mode = {1: "L", 3: "RGB", 4: "CMYK"}.get(components, "RGB")
             return Image(size=(width, height), fmt="JPEG", mode=mode)
 
@@ -225,6 +248,7 @@ def _parse_tiff(data):
         cursor += 12
 
         if width is not None and height is not None:
+            width, height = _validate_size(width, height)
             return Image(size=(width, height), fmt="TIFF", mode=mode)
 
     raise OSError("TIFF width/height tags not found")
@@ -264,10 +288,10 @@ def open(fp, mode="r", formats=None):
 
 
 def new(mode, size, color=0):
-    del color  # Compatibility placeholder.
     if not (isinstance(size, tuple) and len(size) == 2):
         raise ValueError("size must be a (width, height) tuple")
-    width, height = int(size[0]), int(size[1])
-    if width < 0 or height < 0:
-        raise ValueError("size dimensions must be >= 0")
-    return Image(size=(width, height), fmt=None, mode=mode)
+    try:
+        width, height = _validate_size(size[0], size[1])
+    except OSError as exc:
+        raise ValueError(str(exc)) from exc
+    return Image(size=(width, height), fmt=None, mode=mode, color=color)

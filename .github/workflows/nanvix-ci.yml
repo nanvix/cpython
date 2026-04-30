@@ -60,6 +60,28 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
 
+  pptx-e2e:
+    name: PPTX/lxml E2E
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup NanVix CPython
+        run: ./z setup
+
+      - name: Build with PPTX support
+        run: ./z build
+
+      - name: Verify lxml built-ins are linked
+        run: |
+          set -euo pipefail
+          nm -g python.elf | grep -w "PyInit__lxml_etree"
+          nm -g python.elf | grep -w "PyInit__lxml_elementpath"
+
+      - name: Run NanVix tests
+        run: ./z test
+
   # -------------------------------------------------------------------
   # Create a Windows zip release asset for MXC consumption.
   # The reusable workflow creates a GitHub release with .tar.bz2 assets.

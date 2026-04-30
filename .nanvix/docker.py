@@ -34,6 +34,29 @@ def _volume_name(workspace: Path) -> str:
     return f"cpython-nanvix-build-{_workspace_id(workspace)}"
 
 
+def _host_sysroot_path(workspace: Path, nanvix_home: Path) -> Path:
+    """Return a host-mountable NanVix sysroot path."""
+    def valid_sysroot(path: Path) -> bool:
+        return (
+            path.is_dir()
+            and (path / "lib" / "libposix.a").is_file()
+            and (path / "lib" / "user.ld").is_file()
+        )
+
+    nanvix_home = Path(nanvix_home)
+    if valid_sysroot(nanvix_home):
+        return nanvix_home
+
+    for candidate in (
+        Path(workspace) / ".nanvix" / "sysroot",
+        Path(workspace) / ".nanvix" / "extracted" / "nanvix",
+    ):
+        if valid_sysroot(candidate):
+            return candidate
+
+    return nanvix_home
+
+
 def _docker_run_base(
     workspace: Path,
     nanvix_home: Path,
@@ -43,6 +66,7 @@ def _docker_run_base(
     volume = _volume_name(workspace)
     uid = getattr(os, "getuid", lambda: 1000)()
     gid = getattr(os, "getgid", lambda: 1000)()
+    host_sysroot = _host_sysroot_path(workspace, nanvix_home)
     return [
         "docker",
         "run",
@@ -54,7 +78,7 @@ def _docker_run_base(
         "-v",
         f"{workspace}:/mnt/host-workspace",
         "-v",
-        f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
+        f"{host_sysroot.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
         "-w",
         config.DOCKER_WORKSPACE_PATH,
         "-e",
@@ -136,12 +160,16 @@ def docker_build_lxml_deps(
         memory_size: Make ``MEMORY_SIZE`` variable.
         install_prefix: Make ``INSTALL_PREFIX`` variable.
     """
+    nanvix_home = _host_sysroot_path(workspace, nanvix_home)
     pptx_mod = load_sibling("pptx", __file__)
     if not pptx_mod.enabled():
         return
 
-    if pptx_mod._lxml_archives_present(nanvix_home):
-        print("[pptx] lxml archives already present in sysroot; skipping Docker prebuild.")
+    if (
+        pptx_mod._lxml_archives_present(nanvix_home)
+        and pptx_mod._staged_runtime_present(workspace)
+    ):
+        print("[pptx] lxml archives and runtime packages already present; skipping Docker prebuild.")
         return
 
     print(f"[pptx] Building lxml deps inside Docker (sysroot={nanvix_home})")
@@ -182,13 +210,21 @@ def docker_build_lxml_deps(
         f"NANVIX_TOOLCHAIN={config.DOCKER_TOOLCHAIN_PATH} "
         f"bash {config.DOCKER_WORKSPACE_PATH}/nanvix-port/build-lxml-deps.sh"
     )
+    copy_pptx_deps = (
+        f'test -f /mnt/host-workspace/Makefile.nanvix && '
+        f"rm -rf /mnt/host-workspace/.nanvix/pptx-deps && "
+        f"mkdir -p /mnt/host-workspace/.nanvix && "
+        f"cp -a {config.DOCKER_WORKSPACE_PATH}/.nanvix/pptx-deps "
+        f"/mnt/host-workspace/.nanvix/pptx-deps"
+    )
 
     shell_cmd = (
         f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
-        f"{configure_cmd} && {build_deps_cmd}"
+        f"{configure_cmd} && {build_deps_cmd} && {copy_pptx_deps}"
     )
 
     subprocess.run([*base, "sh", "-c", shell_cmd], check=True)
+    pptx_mod.stage_pure_python_packages(workspace)
 
 
 def _purge_stale_setup_local_cmd() -> str:

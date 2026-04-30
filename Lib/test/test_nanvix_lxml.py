@@ -1,10 +1,15 @@
 """Smoke tests for lxml built-in on NanVix."""
 
+import os
 import unittest
+
+PPTX_EXPECTED = os.environ.get("NANVIX_PPTX", "1") != "0"
 
 try:
     from lxml import etree
 except ImportError:
+    if PPTX_EXPECTED:
+        raise
     etree = None
 
 

@@ -8,6 +8,7 @@ Pillow is unavailable.
 class FreeTypeFont:
     def __init__(self, font=None, size=10):
         self.font = font
+        self.path = font
         self._size = max(1, int(size))
 
     def _char_width(self, ch):

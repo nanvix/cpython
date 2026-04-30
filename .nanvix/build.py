@@ -118,7 +118,8 @@ def build(
             pptx_mod.build_lxml_deps(
                 repo_root, Path(sysroot), Path(toolchain), run_fn=run_fn
             )
-        pptx_mod.generate_setup_local(repo_root)
+        link_sysroot = config.DOCKER_SYSROOT_PATH if config.IS_WINDOWS else Path(sysroot)
+        pptx_mod.generate_setup_local(repo_root, link_sysroot)
     else:
         # PPTX disabled: remove any previously generated Setup.local so
         # stale lxml link flags do not bleed into the current build.
