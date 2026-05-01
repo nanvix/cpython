@@ -64,8 +64,10 @@ def _docker_run_base(
 ) -> list[str]:
     """Build the common ``docker run`` prefix."""
     volume = _volume_name(workspace)
-    uid = getattr(os, "getuid", lambda: 1000)()
-    gid = getattr(os, "getgid", lambda: 1000)()
+    # Run as root inside ephemeral containers — matches the reusable CI
+    # workflow and avoids permission issues with named volumes on CI runners.
+    uid = 0
+    gid = 0
     host_sysroot = _host_sysroot_path(workspace, nanvix_home)
     return [
         "docker",
@@ -175,8 +177,8 @@ def docker_build_lxml_deps(
     print(f"[pptx] Building lxml deps inside Docker (sysroot={nanvix_home})")
 
     volume = _volume_name(workspace)
-    uid = os.getuid() if hasattr(os, "getuid") else 1000
-    gid = os.getgid() if hasattr(os, "getgid") else 1000
+    uid = 0
+    gid = 0
 
     # Mount sysroot writable (no :ro) so build-lxml-deps.sh can write archives.
     base = [
