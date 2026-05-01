@@ -61,7 +61,7 @@ jobs:
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
 
   pptx-e2e:
-    name: PPTX/lxml E2E
+    name: lxml build verification
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -73,7 +73,9 @@ jobs:
       - name: Setup NanVix CPython
         run: ./z setup --with-docker
 
-      - name: Build with PPTX support
+      - name: Build with lxml support
+        env:
+          NANVIX_PPTX: "1"
         run: ./z build
 
       - name: Verify lxml built-ins are linked

@@ -169,9 +169,9 @@ def docker_build_lxml_deps(
 
     if (
         pptx_mod._lxml_archives_present(nanvix_home)
-        and pptx_mod._staged_runtime_present(workspace)
+        and pptx_mod._staged_lxml_present(workspace)
     ):
-        print("[pptx] lxml archives and runtime packages already present; skipping Docker prebuild.")
+        print("[pptx] lxml archives and staged package already present; skipping Docker prebuild.")
         return
 
     print(f"[pptx] Building lxml deps inside Docker (sysroot={nanvix_home})")
@@ -227,7 +227,6 @@ def docker_build_lxml_deps(
     )
 
     subprocess.run([*base, "sh", "-c", shell_cmd], check=True)
-    pptx_mod.stage_pure_python_packages(workspace)
 
 
 def _purge_stale_setup_local_cmd() -> str:

@@ -388,7 +388,7 @@ def stage_ramfs(
     # Create /tmp for tempfile.gettempdir().
     (sysroot_dst / "tmp").mkdir(exist_ok=True)
 
-    pptx_mod.stage_runtime(repo_root, sysroot_dst)
+    pptx_mod.stage_lxml_runtime(repo_root, sysroot_dst)
 
     # Trim and build ramfs image (keep tests for test pipeline).
     ramfs_mod.trim_and_build(
@@ -576,57 +576,6 @@ def run_regrtest(
         raise RuntimeError(f"regrtest failed with exit code {result.returncode}")
 
 
-def run_pptx_smoke(
-    staging: Path,
-    repo_root: Path,
-    *,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    platform: str = config.DEFAULT_PLATFORM,
-    nanvixd_extra: list[str] | None = None,
-    ramfs_img: Path | None = None,
-) -> None:
-    """Run focused lxml/PIL/python-pptx smoke test."""
-    if not pptx_mod.enabled():
-        print("Test: PPTX smoke skipped (NANVIX_PPTX=0)")
-        return
-
-    sysroot = staging / "sysroot"
-    script = pptx_mod.write_smoke_script(repo_root, sysroot)
-    nanvixd_extra = nanvixd_extra or config.PLATFORM_NANVIXD_ARGS.get(platform, [])
-    standalone = process_mode == "standalone"
-    nanvixd = str((sysroot / "bin" / config.nanvixd_binary()).resolve())
-    python_bin = f"./bin/{config.python_binary()}"
-
-    if standalone:
-        if ramfs_img is None:
-            raise ValueError("ramfs_img is required for standalone mode")
-        cmd = [
-            nanvixd,
-            "-bin-dir", "./bin", "-ramfs", str(ramfs_img),
-            *nanvixd_extra,
-            "--", python_bin,
-            f"-B ./{script.name};PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
-            f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}",
-        ]
-    else:
-        cmd = [nanvixd, *nanvixd_extra, "--", python_bin, f"./{script.name}"]
-
-    print(f"Test: PPTX smoke ({process_mode})...")
-    result = subprocess.run(
-        cmd,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        cwd=sysroot,
-    )
-    output = (result.stdout + "\n" + result.stderr).strip()
-    if result.returncode != 0 or "NANVIX_PPTX_SMOKE_OK" not in output:
-        print(output)
-        raise RuntimeError("PPTX smoke test failed")
-    print("  PASS")
-
-
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
@@ -695,12 +644,7 @@ def run_all(
         run_fn=run_fn,
         docker=docker,
     )
-    pptx_mod.stage_runtime(repo_root, staging / "sysroot")
-
-    # Write the PPTX smoke script into the sysroot *before* building the
-    # ramfs so that standalone mode can find it inside the FAT image.
-    if pptx_mod.enabled():
-        pptx_mod.write_smoke_script(repo_root, staging / "sysroot")
+    pptx_mod.stage_lxml_runtime(repo_root, staging / "sysroot")
 
     # Ramfs — only needed for standalone mode.  Multi-process and
     # single-process use host-filesystem access (no ramfs).
@@ -727,13 +671,6 @@ def run_all(
         batch_size=batch_size,
         ramfs_img=ramfs_img,
         release=release,
-    )
-
-    run_pptx_smoke(
-        staging, repo_root,
-        process_mode=process_mode,
-        platform=platform,
-        ramfs_img=ramfs_img,
     )
 
     # Cleanup.

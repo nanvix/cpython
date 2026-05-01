@@ -368,8 +368,8 @@ SYSROOT_TRIM_DIRS: list[str] = [
     "lib/pkgconfig",
 ]
 
-# When PPTX C extensions are installed, site-packages contains lxml,
-# Pillow, and python-pptx — do NOT trim it. When empty, it is trimmed
+# When lxml support is enabled, site-packages contains lxml — do NOT
+# trim it. When empty, it is trimmed
 # automatically by ramfs.py (rmdir on empty dir).
 # To force-trim even populated site-packages (e.g. for minimal images),
 # add the path back into SYSROOT_TRIM_DIRS above.

@@ -21,7 +21,6 @@ from _loader import load_sibling
 
 config = load_sibling("config", __file__)
 build_mod = load_sibling("build", __file__)
-pptx_mod = load_sibling("pptx", __file__)
 ramfs_mod = load_sibling("ramfs", __file__)
 
 
@@ -162,8 +161,6 @@ def package(
     py_lib = sysroot_installed / "lib" / config.PYTHON_LIB_DIR
     if py_lib.is_dir():
         shutil.copytree(py_lib, ramfs_sysroot / config.PYTHON_LIB_DIR)
-
-    pptx_mod.stage_runtime(repo_root, ramfs_staging / "sysroot")
 
     ramfs_mod.trim_sysroot(ramfs_staging)
 

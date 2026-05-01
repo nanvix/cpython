@@ -42,7 +42,6 @@ SYSCONFIGDATA_NAME = os.environ.get(
     "NANVIX_SYSCONFIGDATA_NAME", "_sysconfigdata__nanvix_"
 )
 REGRTEST_TIMEOUT = os.environ.get("REGRTEST_TIMEOUT", "120")
-NANVIX_PPTX = os.environ.get("NANVIX_PPTX", "1")
 
 
 def run_batch(
@@ -68,7 +67,6 @@ def run_batch(
                 f"{regrtest_args};PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
                 f" TMPDIR=/tmp"
                 f" NANVIX_STANDALONE=1"
-                f" NANVIX_PPTX={NANVIX_PPTX}"
                 f" _PYTHON_SYSCONFIGDATA_NAME={SYSCONFIGDATA_NAME}"
             )
 
