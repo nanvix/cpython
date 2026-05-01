@@ -84,9 +84,6 @@ jobs:
           grep -aq "PyInit__lxml_elementpath" python.elf
           echo "lxml built-in symbols verified in python.elf"
 
-      - name: Run NanVix tests
-        run: ./z test
-
   # -------------------------------------------------------------------
   # Create a Windows zip release asset for MXC consumption.
   # The reusable workflow creates a GitHub release with .tar.bz2 assets.

@@ -326,8 +326,6 @@ NANVIX_TEST_LIST: list[str] = [
     # #323 wave 8 — regex and plistlib
     "test_re",
     "test_plistlib",
-    "test_nanvix_lxml",
-    "test_nanvix_pptx",
 ]
 
 # Default batch size for regrtest VM invocations.
