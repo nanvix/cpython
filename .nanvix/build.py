@@ -22,7 +22,7 @@ from _loader import load_sibling
 
 config = load_sibling("config", __file__)
 docker_mod = load_sibling("docker", __file__)
-pptx_mod = load_sibling("pptx", __file__)
+lxml_mod = load_sibling("lxml", __file__)
 
 
 def make_args(
@@ -99,30 +99,25 @@ def build(
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
     sysroot_p = Path(sysroot)
-    uses_docker = config.IS_WINDOWS or not pptx_mod._sysroot_is_local(sysroot_p)
+    uses_docker = config.IS_WINDOWS or not lxml_mod._sysroot_is_local(sysroot_p)
 
-    if pptx_mod.enabled():
-        if uses_docker:
-            # Docker path: build lxml archives inside the toolchain container
-            # so they end up in the host-mounted sysroot.
-            docker_mod.docker_build_lxml_deps(
-                repo_root, sysroot_p,
-                platform=platform,
-                process_mode=process_mode,
-                memory_size=memory_size,
-                install_prefix=install_prefix,
-            )
-        else:
-            # Non-Docker: build lxml archives directly on the host.
-            pptx_mod.build_lxml_deps(
-                repo_root, sysroot_p, Path(toolchain), run_fn=run_fn
-            )
-        link_sysroot = config.DOCKER_SYSROOT_PATH if uses_docker else sysroot_p
-        pptx_mod.generate_setup_local(repo_root, link_sysroot)
+    if uses_docker:
+        # Docker path: build lxml archives inside the toolchain container
+        # so they end up in the host-mounted sysroot.
+        docker_mod.docker_build_lxml_deps(
+            repo_root, sysroot_p,
+            platform=platform,
+            process_mode=process_mode,
+            memory_size=memory_size,
+            install_prefix=install_prefix,
+        )
     else:
-        # PPTX disabled: remove any previously generated Setup.local so
-        # stale lxml link flags do not bleed into the current build.
-        pptx_mod.clear_generated_setup_local(repo_root)
+        # Non-Docker: build lxml archives directly on the host.
+        lxml_mod.build_lxml_deps(
+            repo_root, sysroot_p, Path(toolchain), run_fn=run_fn
+        )
+    link_sysroot = config.DOCKER_SYSROOT_PATH if uses_docker else sysroot_p
+    lxml_mod.generate_setup_local(repo_root, link_sysroot)
     if uses_docker:
         # Build and install in one Docker invocation so the install tree
         # is cached for later use by ``./z test`` (no Docker during tests).
@@ -206,10 +201,10 @@ def install(
 
 def clean(repo_root: Path) -> None:
     """Remove build artifacts."""
-    # Always remove a pptx-generated Setup.local so it does not outlive
+    # Always remove an lxml-generated Setup.local so it does not outlive
     # the build artifacts it was created for.  A user-authored Setup.local
     # (without the generated marker) is left untouched.
-    pptx_mod.clear_generated_setup_local(repo_root)
+    lxml_mod.clear_generated_setup_local(repo_root)
     if config.IS_WINDOWS:
         for name in (".nanvix-configured", "python.elf", "python.exe"):
             p = repo_root / name
@@ -246,7 +241,7 @@ _DISTCLEAN_EXCLUDES: list[str] = [
     ".nanvix/package.py",
     ".nanvix/run-regrtest.py",
     ".nanvix/run-tests.py",
-    ".nanvix/pptx.py",
+    ".nanvix/lxml.py",
     "z",
     "z.sh",
     "z.ps1",

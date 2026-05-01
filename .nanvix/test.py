@@ -31,7 +31,7 @@ from _loader import load_sibling
 
 config = load_sibling("config", __file__)
 build_mod = load_sibling("build", __file__)
-pptx_mod = load_sibling("pptx", __file__)
+lxml_mod = load_sibling("lxml", __file__)
 ramfs_mod = load_sibling("ramfs", __file__)
 
 
@@ -388,7 +388,7 @@ def stage_ramfs(
     # Create /tmp for tempfile.gettempdir().
     (sysroot_dst / "tmp").mkdir(exist_ok=True)
 
-    pptx_mod.stage_lxml_runtime(repo_root, sysroot_dst)
+    lxml_mod.stage_lxml_runtime(repo_root, sysroot_dst)
 
     # Trim and build ramfs image (keep tests for test pipeline).
     ramfs_mod.trim_and_build(
@@ -547,7 +547,6 @@ def run_regrtest(
     env = os.environ.copy()
     env["NANVIX_TEST_BATCH_SIZE"] = str(batch_size)
     env["NANVIX_PYTHON_BIN"] = f"./bin/{config.python_binary()}"
-    env["NANVIX_PPTX"] = "1" if pptx_mod.enabled() else "0"
 
     if standalone:
         # Standalone: ramfs + semicolon env syntax.
@@ -644,7 +643,7 @@ def run_all(
         run_fn=run_fn,
         docker=docker,
     )
-    pptx_mod.stage_lxml_runtime(repo_root, staging / "sysroot")
+    lxml_mod.stage_lxml_runtime(repo_root, staging / "sysroot")
 
     # Ramfs — only needed for standalone mode.  Multi-process and
     # single-process use host-filesystem access (no ramfs).

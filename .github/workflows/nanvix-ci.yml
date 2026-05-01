@@ -60,7 +60,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
 
-  pptx-e2e:
+  lxml-verify:
     name: lxml build verification
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -74,8 +74,6 @@ jobs:
         run: ./z setup --with-docker
 
       - name: Build with lxml support
-        env:
-          NANVIX_PPTX: "1"
         run: ./z build
 
       - name: Verify lxml built-ins are linked

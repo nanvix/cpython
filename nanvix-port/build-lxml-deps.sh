@@ -7,7 +7,7 @@ LIBXSLT_VERSION="1.1.42"
 LXML_VERSION="5.3.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK_DIR="${ROOT_DIR}/.nanvix/pptx-deps"
+WORK_DIR="${ROOT_DIR}/.nanvix/lxml-deps"
 DOWNLOAD_DIR="${WORK_DIR}/downloads"
 BUILD_DIR="${WORK_DIR}/build"
 SITE_PACKAGES_DIR="${WORK_DIR}/site-packages"

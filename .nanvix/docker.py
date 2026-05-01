@@ -149,7 +149,7 @@ def docker_build_lxml_deps(
       3. ``bash nanvix-port/build-lxml-deps.sh`` — compiles libxml2,
          libxslt, lxml archives and stages the Python package.
 
-    Skips immediately when all :data:`pptx.LXML_ARCHIVES` are already
+    Skips immediately when all :data:`lxml.LXML_ARCHIVES` are already
     present in *nanvix_home*/lib (idempotent across repeated builds).
 
     Args:
@@ -163,18 +163,16 @@ def docker_build_lxml_deps(
         install_prefix: Make ``INSTALL_PREFIX`` variable.
     """
     nanvix_home = _host_sysroot_path(workspace, nanvix_home)
-    pptx_mod = load_sibling("pptx", __file__)
-    if not pptx_mod.enabled():
-        return
+    lxml_mod = load_sibling("lxml", __file__)
 
     if (
-        pptx_mod._lxml_archives_present(nanvix_home)
-        and pptx_mod._staged_lxml_present(workspace)
+        lxml_mod._lxml_archives_present(nanvix_home)
+        and lxml_mod._staged_lxml_present(workspace)
     ):
-        print("[pptx] lxml archives and staged package already present; skipping Docker prebuild.")
+        print("[lxml] lxml archives and staged package already present; skipping Docker prebuild.")
         return
 
-    print(f"[pptx] Building lxml deps inside Docker (sysroot={nanvix_home})")
+    print(f"[lxml] Building lxml deps inside Docker (sysroot={nanvix_home})")
 
     volume = _volume_name(workspace)
     uid = 0
@@ -212,34 +210,34 @@ def docker_build_lxml_deps(
         f"NANVIX_TOOLCHAIN={config.DOCKER_TOOLCHAIN_PATH} "
         f"bash {config.DOCKER_WORKSPACE_PATH}/nanvix-port/build-lxml-deps.sh"
     )
-    copy_pptx_deps = (
+    copy_lxml_deps = (
         f'test -f /mnt/host-workspace/Makefile.nanvix && '
-        f"rm -rf /mnt/host-workspace/.nanvix/pptx-deps && "
+        f"rm -rf /mnt/host-workspace/.nanvix/lxml-deps && "
         f"mkdir -p /mnt/host-workspace/.nanvix && "
-        f"cp -a {config.DOCKER_WORKSPACE_PATH}/.nanvix/pptx-deps "
-        f"/mnt/host-workspace/.nanvix/pptx-deps && "
-        f"chmod -R a+rwX /mnt/host-workspace/.nanvix/pptx-deps"
+        f"cp -a {config.DOCKER_WORKSPACE_PATH}/.nanvix/lxml-deps "
+        f"/mnt/host-workspace/.nanvix/lxml-deps && "
+        f"chmod -R a+rwX /mnt/host-workspace/.nanvix/lxml-deps"
     )
 
     shell_cmd = (
         f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
-        f"{configure_cmd} && {build_deps_cmd} && {copy_pptx_deps}"
+        f"{configure_cmd} && {build_deps_cmd} && {copy_lxml_deps}"
     )
 
     subprocess.run([*base, "sh", "-c", shell_cmd], check=True)
 
 
 def _purge_stale_setup_local_cmd() -> str:
-    """Return a shell snippet that removes a stale pptx-generated
+    """Return a shell snippet that removes a stale lxml-generated
     Modules/Setup.local from the Docker workspace volume when the host
-    copy has already been deleted (e.g. because PPTX was disabled).
+    copy has already been deleted.
 
     The tar-based sync fallback (used when rsync is unavailable) does
     not delete files from the Docker volume that have been removed on
     the host.  This command fills that gap for the specific case of
     our generated Setup.local.
 
-    Safe heuristic (mirrors :func:`pptx._is_pptx_generated_setup_local`):
+    Safe heuristic (mirrors :func:`lxml._is_lxml_generated_setup_local`):
     - ``_sl_active``: all non-blank, non-comment lines in the file.
     - ``_sl_lxml``:   lines starting with ``_lxml_etree`` or
       ``_lxml_elementpath``.
@@ -260,7 +258,7 @@ def _purge_stale_setup_local_cmd() -> str:
         f'_sl_lxml=$(grep -E \'^_lxml_(etree|elementpath) \' "{sl_work}" 2>/dev/null || true); '
         f'if [ -n "$_sl_active" ] && [ "$_sl_active" = "$_sl_lxml" ]; then '
         f'rm -f "{sl_work}"; '
-        f'echo "[pptx] Removed stale generated Modules/Setup.local from Docker workspace"; '
+        f'echo "[lxml] Removed stale generated Modules/Setup.local from Docker workspace"; '
         f'fi; fi'
     )
 

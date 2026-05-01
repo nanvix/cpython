@@ -82,13 +82,13 @@ def trim_sysroot(
         if cache_dir.is_dir():
             shutil.rmtree(cache_dir)
 
-    # Remove site-packages if empty (no PPTX/C extensions installed).
+    # Remove site-packages if empty (no lxml runtime package installed).
     sp = sysroot / "lib" / config.PYTHON_LIB_DIR / "site-packages"
     if sp.is_dir():
         try:
             sp.rmdir()  # succeeds only if empty
         except OSError:
-            pass  # non-empty — keep it (PPTX deps present)
+            pass  # non-empty — keep it (lxml deps present)
 
 
 def build_image(
