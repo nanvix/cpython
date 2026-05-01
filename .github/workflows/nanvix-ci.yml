@@ -67,8 +67,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Pull Docker image
+        run: docker pull nanvix/toolchain:latest-minimal
+
       - name: Setup NanVix CPython
-        run: ./z setup
+        run: ./z setup --with-docker
 
       - name: Build with PPTX support
         run: ./z build
