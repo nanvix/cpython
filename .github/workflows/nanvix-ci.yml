@@ -79,8 +79,10 @@ jobs:
       - name: Verify lxml built-ins are linked
         run: |
           set -euo pipefail
-          nm -g python.elf | grep -w "PyInit__lxml_etree"
-          nm -g python.elf | grep -w "PyInit__lxml_elementpath"
+          # python.elf is stripped; use binary string search instead of nm
+          grep -aq "PyInit__lxml_etree" python.elf
+          grep -aq "PyInit__lxml_elementpath" python.elf
+          echo "lxml built-in symbols verified in python.elf"
 
       - name: Run NanVix tests
         run: ./z test
