@@ -348,9 +348,11 @@ def stage_pure_python_packages(repo_root: Path) -> None:
         ),
     )
 
+    # Use the system Python (not the nanvix venv, which may lack pip).
+    python_bin = shutil.which("python3") or shutil.which("python") or sys.executable
     subprocess.run(
         [
-            sys.executable,
+            python_bin,
             "-m",
             "pip",
             "install",
