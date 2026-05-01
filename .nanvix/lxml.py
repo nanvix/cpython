@@ -170,9 +170,20 @@ def copy_tree(src: Path, dst: Path) -> None:
 
 
 def stage_lxml_runtime(repo_root: Path, sysroot: Path) -> None:
+    """Copy staged lxml Python files into the test/package sysroot.
+
+    Skips gracefully when ``.nanvix/lxml-deps`` is not available (e.g.
+    Windows CI where the lxml deps were built in a Linux Docker container
+    and not transferred to the Windows runner).
+    """
+    staged = staged_site_packages(repo_root)
+    lxml_src = staged / "lxml"
+    if not lxml_src.is_dir():
+        print(f"[lxml] Staged lxml package not found at {lxml_src}; skipping runtime staging.")
+        return
+
     py_lib = Path(sysroot) / "lib" / config.PYTHON_LIB_DIR
     if not py_lib.is_dir():
         raise RuntimeError(f"Python runtime library directory is missing: {py_lib}")
 
-    staged = staged_site_packages(repo_root)
-    copy_tree(staged / "lxml", py_lib / "lxml")
+    copy_tree(lxml_src, py_lib / "lxml")
