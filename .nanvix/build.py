@@ -98,33 +98,32 @@ def build(
     docker: bool = False,
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
+    sysroot_p = Path(sysroot)
+    uses_docker = config.IS_WINDOWS or not pptx_mod._sysroot_is_local(sysroot_p)
+
     if pptx_mod.enabled():
-        if config.IS_WINDOWS:
-            # Windows: no host bash/toolchain available.  Build lxml archives
-            # inside Docker before the main docker_build invocation so that
-            # the sysroot on the host gains the archives.  The main
-            # docker_build then finds them via the read-only sysroot mount.
+        if uses_docker:
+            # Docker path: build lxml archives inside the toolchain container
+            # so they end up in the host-mounted sysroot.
             docker_mod.docker_build_lxml_deps(
-                repo_root, Path(sysroot),
+                repo_root, sysroot_p,
                 platform=platform,
                 process_mode=process_mode,
                 memory_size=memory_size,
                 install_prefix=install_prefix,
             )
         else:
-            # Non-Windows: build lxml archives directly on the host.
-            # build_lxml_deps() skips gracefully if sysroot is not
-            # accessible (e.g. Docker-internal path on --with-docker builds).
+            # Non-Docker: build lxml archives directly on the host.
             pptx_mod.build_lxml_deps(
-                repo_root, Path(sysroot), Path(toolchain), run_fn=run_fn
+                repo_root, sysroot_p, Path(toolchain), run_fn=run_fn
             )
-        link_sysroot = config.DOCKER_SYSROOT_PATH if config.IS_WINDOWS else Path(sysroot)
+        link_sysroot = config.DOCKER_SYSROOT_PATH if uses_docker else sysroot_p
         pptx_mod.generate_setup_local(repo_root, link_sysroot)
     else:
         # PPTX disabled: remove any previously generated Setup.local so
         # stale lxml link flags do not bleed into the current build.
         pptx_mod.clear_generated_setup_local(repo_root)
-    if config.IS_WINDOWS:
+    if uses_docker:
         # Build and install in one Docker invocation so the install tree
         # is cached for later use by ``./z test`` (no Docker during tests).
         install_cache = repo_root / ".nanvix" / "_install_cache"
