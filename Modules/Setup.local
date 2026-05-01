@@ -1,5 +1,0 @@
-# Edit this file for local setup changes
-# lxml built-in modules (requires liblxml_etree.a and liblxml_elementpath.a from build-lxml-deps.sh)
-# Uncomment after running: bash nanvix-port/build-lxml-deps.sh
-# _lxml_etree lxml_etree_builtin.c -llxml_etree -lxslt -lexslt -lxml2 -lz
-# _lxml_elementpath lxml_elementpath_builtin.c -llxml_elementpath -lxml2 -lz
