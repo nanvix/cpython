@@ -217,7 +217,8 @@ def docker_build_lxml_deps(
         f"rm -rf /mnt/host-workspace/.nanvix/pptx-deps && "
         f"mkdir -p /mnt/host-workspace/.nanvix && "
         f"cp -a {config.DOCKER_WORKSPACE_PATH}/.nanvix/pptx-deps "
-        f"/mnt/host-workspace/.nanvix/pptx-deps"
+        f"/mnt/host-workspace/.nanvix/pptx-deps && "
+        f"chmod -R a+rwX /mnt/host-workspace/.nanvix/pptx-deps"
     )
 
     shell_cmd = (
