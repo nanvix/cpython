@@ -34,13 +34,14 @@ This document describes the port of [CPython](https://www.python.org/) interpret
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Prerequisites](#prerequisites)
-3. [Building](#building)
-4. [Testing](#testing)
+2. [Building with Networking (Local Nanvix)](#building-with-networking-local-nanvix)
+3. [Prerequisites](#prerequisites)
+4. [Building](#building)
+5. [Testing](#testing)
    - [Test Suite Status](#test-suite-status)
-5. [Changes Summary](#changes-summary)
-6. [Known Limitations](#known-limitations)
-7. [CI/CD](#cicd)
+6. [Changes Summary](#changes-summary)
+7. [Known Limitations](#known-limitations)
+8. [CI/CD](#cicd)
 
 ---
 
@@ -95,6 +96,84 @@ make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME="$NANVIX_HOME" test
 ```
 
 Continue reading for detailed instructions.
+
+---
+
+## Building with Networking (Local Nanvix)
+
+This branch (`feature-standalone-networking`) includes networking support (BSD
+sockets, OpenSSL/TLS) for the **microvm/standalone** configuration. It requires a
+local Nanvix build with the `networking` feature enabled in `libposix.a`.
+
+### Prerequisites
+
+1. Clone the Nanvix repository and checkout the `feature-standalone-networking` branch:
+
+```bash
+git clone https://github.com/nanvix/nanvix.git ~/src/nanvix/nanvix
+cd ~/src/nanvix/nanvix
+git checkout feature-standalone-networking
+```
+
+2. Build Nanvix with the `networking` feature:
+
+```bash
+make all-guest-staticlib-posix \
+  FEATURES=networking \
+  DEPLOYMENT_MODE=standalone \
+  MACHINE=microvm \
+  TARGET=x86
+```
+
+This produces `lib/libposix.a` containing the full BSD socket API (`socket`,
+`bind`, `listen`, `accept`, `connect`, `send`, `recv`, `sendto`, `recvfrom`,
+`sendmsg`, `recvmsg`, `socketpair`, `setsockopt`, `getsockopt`, `getsockname`,
+`getpeername`, `shutdown`) along with DNS resolution (`getaddrinfo`,
+`freeaddrinfo`, `inet_pton`, `inet_ntop`) and I/O multiplexing (`select`,
+`poll`).
+
+### Build CPython with Networking
+
+```bash
+cd /path/to/cpython
+
+# Setup — points to local Nanvix build with networking-enabled libposix.a
+./z setup --with-nanvix ~/src/nanvix/nanvix
+
+# Build
+./z build
+
+# (Optional) Test
+./z test
+```
+
+The `--with-nanvix` flag copies the local Nanvix binaries and libraries
+(including the networking-enabled `libposix.a`) into the CPython sysroot.
+The path is persisted in `.nanvix/env.json`, so subsequent `./z build`
+commands reuse it automatically.
+
+### Networking Modules Available
+
+After a successful build, the following Python networking modules are
+statically linked into `python.elf`:
+
+| Module | Description |
+|--------|-------------|
+| `socket` | BSD socket interface (`_socket` C extension) |
+| `ssl` | TLS/SSL wrapper (`_ssl` C extension, backed by OpenSSL) |
+| `select` | I/O multiplexing (`select`/`poll`) |
+
+### Verification
+
+To verify networking is available in the built binary:
+
+```bash
+# Check that socket symbols are linked
+nm python | grep -E "^[0-9a-f]+ T (socket|connect|send|recv)$"
+
+# Check that Python networking modules are built-in
+nm python | grep "PyInit__socket\|PyInit__ssl"
+```
 
 ---
 
@@ -352,12 +431,12 @@ The following changes were made to support Nanvix.
 ## Known Limitations
 
 | Limitation | Impact |
-|------------|--------|
+  |------------|--------|
 | **No shared libraries** | Only static library (`libpython3.12.a`) is built |
 | **No pip** | Package installer not available (`--with-ensurepip=no`) |
 | **No IPv6** | IPv6 networking disabled |
 | **Static linking only** | All executables are statically linked |
-| **No sockets** | `socketpair()` unavailable; asyncio event loop cannot start |
+| **No network isolation** | Guest sockets are proxied to the host's network stack via IKC; no virtual NIC or dedicated IP — the guest shares the host's network namespace |
 | **No subprocess/fork** | `os.fork()`, `subprocess.Popen()` not supported |
 | **Pickle corruption** | `pickle` produces corrupt data on 32-bit Nanvix; likely C accelerator issue |
 | **Missing C test extensions** | `_testcapi` and `_testinternalcapi` not built |
