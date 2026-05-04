@@ -301,12 +301,22 @@ def stage(
             f"  Verified: {scdata_name} installed ({scdata_dst.stat().st_size} bytes)"
         )
 
-    # Copy test script — a simple smoke test that validates the interpreter.
+    # Copy test script — a simple smoke test that validates the interpreter
+    # and verifies that lxml (statically linked) imports correctly.
     hello_script = sysroot_dir / "test_hello.py"
     hello_script.write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
         "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
+        "try:\n"
+        "    import lxml.etree\n"
+        "    doc = lxml.etree.fromstring(b'<root><child>lxml OK</child></root>')\n"
+        "    assert doc.tag == 'root'\n"
+        "    assert doc[0].text == 'lxml OK'\n"
+        "    print('CPYTHON_TEST_LXML: lxml.etree import and parse OK')\n"
+        "except Exception as e:\n"
+        "    print(f'CPYTHON_TEST_LXML_FAIL: {e}')\n"
+        "    sys.exit(1)\n",
     )
 
     # Copy Nanvix runtime binaries.
@@ -494,17 +504,25 @@ def run_hello(
 
     # Validate output.
     found_hello = False
+    found_lxml = False
     for line in output.splitlines():
         if line.startswith("CPYTHON_TEST_"):
             tag = line.split(":")[0].replace("CPYTHON_TEST_", "")
             print(f"  {tag}: {line.strip()}")
             if tag == "HELLO":
                 found_hello = True
+            elif tag == "LXML":
+                found_lxml = True
 
     if not found_hello:
         print("  FAIL: Hello test did not produce expected output")
         print(output)
         raise RuntimeError("Hello test did not produce expected output")
+
+    if not found_lxml:
+        print("  FAIL: lxml import/parse test did not produce expected output")
+        print(output)
+        raise RuntimeError("lxml import/parse test failed")
 
     print("  PASS")
 
