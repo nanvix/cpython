@@ -424,7 +424,6 @@ DOCKER_CRLF_FILES: list[str] = [
     "Misc/python-embed.pc.in",
     "Misc/python-config.sh.in",
     "Misc/python-config.in",
-    "nanvix-port/build-lxml-deps.sh",
 ]
 
 # Docker output files to copy back to host workspace.

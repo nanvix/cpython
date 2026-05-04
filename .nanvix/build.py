@@ -99,26 +99,13 @@ def build(
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
     sysroot_p = Path(sysroot)
-    uses_docker = (
-        config.IS_WINDOWS or docker or not lxml_mod._sysroot_is_local(sysroot_p)
-    )
+    uses_docker = config.IS_WINDOWS or docker
 
-    if uses_docker:
-        # Docker path: build lxml archives inside the toolchain container
-        # so they end up in the host-mounted sysroot.
-        docker_mod.docker_build_lxml_deps(
-            repo_root,
-            sysroot_p,
-            platform=platform,
-            process_mode=process_mode,
-            memory_size=memory_size,
-            install_prefix=install_prefix,
-        )
-    else:
-        # Non-Docker: build lxml archives directly on the host.
-        lxml_mod.build_lxml_deps(repo_root, sysroot_p, Path(toolchain), run_fn=run_fn)
+    # Generate Modules/Setup.local with correct library path.
+    # Docker builds need the container-internal sysroot path.
     link_sysroot = config.DOCKER_SYSROOT_PATH if uses_docker else sysroot_p
     lxml_mod.generate_setup_local(repo_root, link_sysroot)
+
     if uses_docker:
         # Build and install in one Docker invocation so the install tree
         # is cached for later use by ``./z test`` (no Docker during tests).

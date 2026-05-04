@@ -73,13 +73,23 @@ jobs:
       - name: Setup NanVix CPython
         run: ./z setup --with-docker
 
+      - name: Verify lxml archives downloaded
+        run: |
+          set -euo pipefail
+          test -f .nanvix/buildroot/lib/liblxml_etree.a
+          test -f .nanvix/buildroot/lib/liblxml_elementpath.a
+          test -f .nanvix/buildroot/lib/libxml2.a
+          test -f .nanvix/buildroot/lib/libxslt.a
+          test -f .nanvix/buildroot/lib/libexslt.a
+          test -f .nanvix/buildroot/python-packages/lxml/__init__.py
+          echo "All lxml dependencies downloaded successfully"
+
       - name: Build with lxml support
         run: ./z build
 
       - name: Verify lxml built-ins are linked
         run: |
           set -euo pipefail
-          # python.elf is stripped; use binary string search instead of nm
           grep -aq "PyInit__lxml_etree" python.elf
           grep -aq "PyInit__lxml_elementpath" python.elf
           echo "lxml built-in symbols verified in python.elf"
