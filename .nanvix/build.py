@@ -99,7 +99,9 @@ def build(
 ) -> None:
     """Cross-compile python.elf for Nanvix."""
     sysroot_p = Path(sysroot)
-    uses_docker = config.IS_WINDOWS or not lxml_mod._sysroot_is_local(sysroot_p)
+    uses_docker = (
+        config.IS_WINDOWS or docker or not lxml_mod._sysroot_is_local(sysroot_p)
+    )
 
     if uses_docker:
         # Docker path: build lxml archives inside the toolchain container

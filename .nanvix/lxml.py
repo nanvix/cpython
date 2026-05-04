@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 import sys as _sys
 
@@ -119,7 +120,7 @@ def build_lxml_deps(
     repo_root: Path,
     sysroot: Path,
     toolchain: Path,
-    run_fn=None,
+    run_fn: Any = None,
 ) -> None:
     sysroot_p = Path(sysroot)
     toolchain_p = Path(toolchain)
@@ -147,7 +148,9 @@ def build_lxml_deps(
         "NANVIX_HOME": str(sysroot_p),
         "NANVIX_TOOLCHAIN": str(toolchain_p),
     }
-    cmd = ["bash", str(script)]
+    # Use a relative path so the command works both natively (cwd=repo_root)
+    # and inside Docker via run_fn (where -w sets the workspace root).
+    cmd = ["bash", "nanvix-port/build-lxml-deps.sh"]
 
     print(
         f"[lxml] Building lxml deps "
