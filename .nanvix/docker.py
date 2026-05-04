@@ -11,7 +11,6 @@ invocation for configure/build/install only.
 from __future__ import annotations
 
 import hashlib
-import os
 import subprocess
 from pathlib import Path
 
@@ -36,6 +35,7 @@ def _volume_name(workspace: Path) -> str:
 
 def _host_sysroot_path(workspace: Path, nanvix_home: Path) -> Path:
     """Return a host-mountable NanVix sysroot path."""
+
     def valid_sysroot(path: Path) -> bool:
         return (
             path.is_dir()
@@ -165,11 +165,12 @@ def docker_build_lxml_deps(
     nanvix_home = _host_sysroot_path(workspace, nanvix_home)
     lxml_mod = load_sibling("lxml", __file__)
 
-    if (
-        lxml_mod._lxml_archives_present(nanvix_home)
-        and lxml_mod._staged_lxml_present(workspace)
+    if lxml_mod._lxml_archives_present(nanvix_home) and lxml_mod._staged_lxml_present(
+        workspace
     ):
-        print("[lxml] lxml archives and staged package already present; skipping Docker prebuild.")
+        print(
+            "[lxml] lxml archives and staged package already present; skipping Docker prebuild."
+        )
         return
 
     print(f"[lxml] Building lxml deps inside Docker (sysroot={nanvix_home})")
@@ -180,13 +181,21 @@ def docker_build_lxml_deps(
 
     # Mount sysroot writable (no :ro) so build-lxml-deps.sh can write archives.
     base = [
-        "docker", "run", "--rm",
-        "--user", f"{uid}:{gid}",
-        "-v", f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
-        "-v", f"{workspace}:/mnt/host-workspace",
-        "-v", f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}",
-        "-w", config.DOCKER_WORKSPACE_PATH,
-        "-e", "HOME=/tmp",
+        "docker",
+        "run",
+        "--rm",
+        "--user",
+        f"{uid}:{gid}",
+        "-v",
+        f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
+        "-v",
+        f"{workspace}:/mnt/host-workspace",
+        "-v",
+        f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}",
+        "-w",
+        config.DOCKER_WORKSPACE_PATH,
+        "-e",
+        "HOME=/tmp",
         config.DOCKER_IMAGE,
     ]
 
@@ -211,7 +220,7 @@ def docker_build_lxml_deps(
         f"bash {config.DOCKER_WORKSPACE_PATH}/nanvix-port/build-lxml-deps.sh"
     )
     copy_lxml_deps = (
-        f'test -f /mnt/host-workspace/Makefile.nanvix && '
+        f"test -f /mnt/host-workspace/Makefile.nanvix && "
         f"rm -rf /mnt/host-workspace/.nanvix/lxml-deps && "
         f"mkdir -p /mnt/host-workspace/.nanvix && "
         f"cp -a {config.DOCKER_WORKSPACE_PATH}/.nanvix/lxml-deps "
@@ -254,12 +263,12 @@ def _purge_stale_setup_local_cmd() -> str:
     # $() and $varname are intentional shell syntax, not Python interpolation.
     return (
         f'if [ ! -f "{sl_host}" ] && [ -f "{sl_work}" ]; then '
-        f'_sl_active=$(grep -vE \'^[[:space:]]*(#|$)\' "{sl_work}" 2>/dev/null || true); '
-        f'_sl_lxml=$(grep -E \'^_lxml_(etree|elementpath) \' "{sl_work}" 2>/dev/null || true); '
+        f"_sl_active=$(grep -vE '^[[:space:]]*(#|$)' \"{sl_work}\" 2>/dev/null || true); "
+        f"_sl_lxml=$(grep -E '^_lxml_(etree|elementpath) ' \"{sl_work}\" 2>/dev/null || true); "
         f'if [ -n "$_sl_active" ] && [ "$_sl_active" = "$_sl_lxml" ]; then '
         f'rm -f "{sl_work}"; '
         f'echo "[lxml] Removed stale generated Modules/Setup.local from Docker workspace"; '
-        f'fi; fi'
+        f"fi; fi"
     )
 
 

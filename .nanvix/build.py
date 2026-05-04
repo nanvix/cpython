@@ -105,7 +105,8 @@ def build(
         # Docker path: build lxml archives inside the toolchain container
         # so they end up in the host-mounted sysroot.
         docker_mod.docker_build_lxml_deps(
-            repo_root, sysroot_p,
+            repo_root,
+            sysroot_p,
             platform=platform,
             process_mode=process_mode,
             memory_size=memory_size,
@@ -113,9 +114,7 @@ def build(
         )
     else:
         # Non-Docker: build lxml archives directly on the host.
-        lxml_mod.build_lxml_deps(
-            repo_root, sysroot_p, Path(toolchain), run_fn=run_fn
-        )
+        lxml_mod.build_lxml_deps(repo_root, sysroot_p, Path(toolchain), run_fn=run_fn)
     link_sysroot = config.DOCKER_SYSROOT_PATH if uses_docker else sysroot_p
     lxml_mod.generate_setup_local(repo_root, link_sysroot)
     if uses_docker:
