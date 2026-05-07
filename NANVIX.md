@@ -55,13 +55,13 @@ pip install nanvix-zutil
 # 2. Setup (downloads Nanvix sysroot and all dependencies automatically)
 ./z setup
 
-# 3. Build
+# 3. Build (compiles + produces release-ready sysroot, buildroot, and ramfs)
 ./z build
 
-# 4. Test
+# 4. Test (builds test sysroot with test files and runs tests)
 ./z test
 
-# 5. Package release tarballs
+# 5. Package release archives (tarballs on Linux, zip on Windows)
 ./z release
 ```
 
@@ -193,12 +193,20 @@ make -f Makefile.nanvix CONFIG_NANVIX=y all
 
 ### Build Outputs
 
-After a successful build, you will have:
+After a successful `./z build`, you will have:
 
 | File | Description |
 |------|-------------|
-| `python.elf` | Python interpreter executable |
-| `libpython3.12.a` | Python static library |
+| `python.elf` | Python interpreter executable (in repo root) |
+| `libpython3.12.a` | Python static library (in repo root) |
+| `.nanvix/_build_output/sysroot/` | Trimmed runtime stdlib (no tests) |
+| `.nanvix/_build_output/buildroot/` | Build dependencies (headers, .a, pkgconfig) |
+| `.nanvix/_build_output/bin/python.elf` | Stripped interpreter binary |
+| `.nanvix/_build_output/cpython-ramfs.img` | RAM filesystem image (no tests) |
+| `.nanvix/_build_output/manifest.json` | Build metadata for release validation |
+
+The build output directory is persistent and is consumed by `./z release`
+to produce distributable archives.
 
 ---
 
@@ -220,6 +228,10 @@ make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix test
 > created by `make test` and removed automatically at the end of a successful
 > run. To use the interactive or individual-module commands below, run
 > `make test` first (or interrupt it after the staging step completes).
+>
+> Alternatively, after `./z build`, you can use the persistent build output
+> directly with the ramfs image at `.nanvix/_build_output/cpython-ramfs.img`
+> (which does not include test files).
 
 ### Running Interactively
 
@@ -227,7 +239,7 @@ To start an interactive CPython session on Nanvix (standalone/microvm):
 
 ```bash
 cd .nanvix/_test_staging/sysroot && \
-  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython-rootfs.img \
+  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython_test-ramfs.img \
     -- ./bin/python3.12 \
     "-i;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```
@@ -251,7 +263,7 @@ To run a one-shot script instead of the REPL:
 
 ```bash
 cd .nanvix/_test_staging/sysroot && \
-  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython-rootfs.img \
+  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython_test-ramfs.img \
     -- ./bin/python3.12 \
     "-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```
@@ -262,7 +274,7 @@ To run a single test module inside the Nanvix VM:
 
 ```bash
 cd .nanvix/_test_staging/sysroot && \
-  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython-rootfs.img \
+  ./bin/nanvixd.elf -bin-dir ./bin -ramfs ../../cpython_test-ramfs.img \
     -- ./bin/python3.12 \
     "-B -m test --verbose test_int;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 NANVIX_STANDALONE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```

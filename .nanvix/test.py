@@ -428,7 +428,7 @@ def stage(
         shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
 
     # Invalidate stale ramfs image and cache from previous runs.
-    stale_ramfs = repo_root / ".nanvix" / "cpython-rootfs.img"
+    stale_ramfs = repo_root / ".nanvix" / "cpython_test-ramfs.img"
     if stale_ramfs.is_file():
         stale_ramfs.unlink()
     stale_cache = repo_root / ".nanvix" / "_ramfs_cache"
@@ -456,7 +456,7 @@ def stage_ramfs(
     Returns the path to the ramfs image.
     """
     if ramfs_img is None:
-        ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
+        ramfs_img = repo_root / ".nanvix" / "cpython_test-ramfs.img"
 
     ramfs_cache = repo_root / ".nanvix" / "_ramfs_cache"
 
@@ -646,7 +646,7 @@ def run_regrtest(
     if standalone:
         # Standalone: ramfs + semicolon env syntax.
         if ramfs_img is None:
-            ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
+            ramfs_img = repo_root / ".nanvix" / "cpython_test-ramfs.img"
         extra_str = f"-bin-dir ./bin -ramfs {ramfs_img}"
         if resolved_nanvixd_extra:
             extra_str += " " + " ".join(resolved_nanvixd_extra)
@@ -680,6 +680,13 @@ def cleanup(repo_root: Path) -> None:
     staging = repo_root / ".nanvix" / "_test_staging"
     if staging.is_dir():
         shutil.rmtree(staging)
+    # Remove test ramfs image.
+    test_ramfs = repo_root / ".nanvix" / "cpython_test-ramfs.img"
+    if test_ramfs.is_file():
+        test_ramfs.unlink()
+    ramfs_cache = repo_root / ".nanvix" / "_ramfs_cache"
+    if ramfs_cache.is_dir():
+        shutil.rmtree(ramfs_cache)
     for name in [
         "cpython_test.log",
         "cpython_regrtest.log",
@@ -688,17 +695,6 @@ def cleanup(repo_root: Path) -> None:
         p = repo_root / ".nanvix" / name
         if p.is_file():
             p.unlink()
-
-
-def deep_cleanup(repo_root: Path) -> None:
-    """Deep clean: remove cached ramfs template."""
-    cleanup(repo_root)
-    ramfs_cache = repo_root / ".nanvix" / "_ramfs_cache"
-    if ramfs_cache.is_dir():
-        shutil.rmtree(ramfs_cache)
-    ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
-    if ramfs_img.is_file():
-        ramfs_img.unlink()
 
 
 # ---------------------------------------------------------------------------

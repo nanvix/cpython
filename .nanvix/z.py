@@ -5,9 +5,9 @@
 
 Usage:
     ./z setup      # Download Nanvix sysroot and dependencies
-    ./z build      # Cross-compile python.elf and libpython.a
-    ./z test       # Run test suite (hello-world on nanvixd.elf)
-    ./z release    # Package release tarballs (sysroot + buildroot)
+    ./z build      # Cross-compile + produce release-ready sysroot/buildroot/ramfs
+    ./z test       # Build test sysroot, run test suite
+    ./z release    # Package build output into archives (tar.bz2 or zip)
     ./z clean      # Remove build artifacts
     ./z distclean  # Deep clean (build artifacts + untracked files)
 
@@ -314,17 +314,33 @@ class CPythonBuild(ZScript):
         return used_fallback
 
     def build(self) -> None:
-        """Cross-compile python.elf and libpython.a for Nanvix."""
+        """Cross-compile python.elf and libpython.a, then stage build output."""
         self._overlay_local_nanvix()
         sysroot, toolchain = self._get_host_paths()
         release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
+        docker = self.docker is not None
+
+        # Compile.
         build_mod.build(
             sysroot,
             toolchain,
             self.repo_root,
             **self._build_kwargs(release=release),
             run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
+            docker=docker,
+        )
+
+        # Produce persistent release-ready output (sysroot, buildroot, ramfs).
+        stage_kwargs = self._build_kwargs(release=True)
+        stage_kwargs.pop("release", None)
+        package_mod.stage_build_output(
+            sysroot,
+            toolchain,
+            self.repo_root,
+            **stage_kwargs,
+            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
+            nanvix_home=sysroot,
+            docker=docker,
         )
 
     def test(self) -> None:
@@ -343,18 +359,15 @@ class CPythonBuild(ZScript):
         )
 
     def release(self) -> None:
-        """Package the CPython release tarballs and verify them."""
+        """Package the build output into release archives and verify them."""
         self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
         kwargs = self._build_kwargs(release=True)
 
         package_mod.package(
-            sysroot,
-            toolchain,
             self.repo_root,
-            **kwargs,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
+            platform=kwargs["platform"],
+            process_mode=kwargs["process_mode"],
+            memory_size=kwargs["memory_size"],
         )
         package_mod.verify(
             self.repo_root,

@@ -188,7 +188,14 @@ def clean(repo_root: Path) -> None:
             if p.is_file():
                 p.unlink()
                 print(f"Removed {name}")
-        for name in ("_test_staging", "staging", "_install_cache", "_ramfs_cache"):
+        for name in (
+            "_test_staging",
+            "staging",
+            "_install_cache",
+            "_ramfs_cache",
+            "_build_output",
+            "_build_output.tmp",
+        ):
             p = repo_root / ".nanvix" / name
             if p.is_dir():
                 shutil.rmtree(p)

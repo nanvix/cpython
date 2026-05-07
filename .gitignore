@@ -156,3 +156,9 @@ Python/frozen_modules/MANIFEST
 # Ignore ./python binary on Unix but still look into ./Python/ directory.
 /python
 !/Python/
+
+# Nanvix build artifacts
+.nanvix-configured
+.nanvix/_build_output/
+.nanvix/_build_output.tmp/
+/python.elf
