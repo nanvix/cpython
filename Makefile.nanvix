@@ -161,7 +161,24 @@ CONFIGURE_OPTS = \
 	ac_cv_pthread=yes \
 	ac_cv_kthread=no \
 	ac_cv_func_dlopen=yes \
-	ac_cv_header_dlfcn_h=yes
+	ac_cv_header_dlfcn_h=yes \
+	ac_cv_header_sys_socket_h=yes \
+	ac_cv_header_netinet_in_h=yes \
+	ac_cv_header_arpa_inet_h=yes \
+	ac_cv_header_netdb_h=yes \
+	ac_cv_func_socket=yes \
+	ac_cv_func_bind=yes \
+	ac_cv_func_listen=yes \
+	ac_cv_func_accept=yes \
+	ac_cv_func_connect=yes \
+	ac_cv_func_sendto=yes \
+	ac_cv_func_recvfrom=yes \
+	ac_cv_func_setsockopt=yes \
+	ac_cv_func_getpeername=yes \
+	ac_cv_func_getsockname=yes \
+	ac_cv_func_inet_aton=no \
+	ac_cv_func_inet_ntoa=yes \
+	ac_cv_func_inet_pton=no
 
 # Marker file to track if configure has been run
 CONFIGURED_MARKER = .nanvix-configured

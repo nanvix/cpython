@@ -466,6 +466,45 @@ remove_unusable_flags(PyObject *m)
 #include "getnameinfo.c"
 #endif // HAVE_GETNAMEINFO
 
+#ifdef __nanvix__
+/* Nanvix libc's inet_addr() is a stub that always returns INADDR_NONE.
+   Provide a simple replacement for dotted-decimal IPv4 addresses. */
+#ifndef INADDR_NONE
+#define INADDR_NONE ((in_addr_t)0xffffffff)
+#endif
+static in_addr_t
+_Py_nanvix_inet_addr(const char *cp)
+{
+    unsigned int a, b, c, d;
+    char trailing;
+    if (sscanf(cp, "%u.%u.%u.%u%c", &a, &b, &c, &d, &trailing) != 4)
+        return INADDR_NONE;
+    if (a > 255 || b > 255 || c > 255 || d > 255)
+        return INADDR_NONE;
+    return htonl((a << 24) | (b << 16) | (c << 8) | d);
+}
+#define inet_addr(cp) _Py_nanvix_inet_addr(cp)
+
+/* Nanvix libc's inet_ntop() is a stub that always returns ENOSYS.
+   Provide a simple replacement for AF_INET. */
+static const char *
+_Py_nanvix_inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{
+    if (af == AF_INET) {
+        const unsigned char *b = (const unsigned char *)src;
+        int n = snprintf(dst, size, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+        if (n < 0 || (socklen_t)n >= size) {
+            errno = ENOSPC;
+            return NULL;
+        }
+        return dst;
+    }
+    errno = EAFNOSUPPORT;
+    return NULL;
+}
+#define inet_ntop(af, src, dst, size) _Py_nanvix_inet_ntop(af, src, dst, size)
+#endif /* __nanvix__ */
+
 #ifdef MS_WINDOWS
 #define SOCKETCLOSE closesocket
 #endif
@@ -5516,8 +5555,9 @@ sock_initobj_impl(PySocketSockObject *self, int family, int type, int proto,
                 if (fd >= 0) {
                     state->sock_cloexec_works = 1;
                 }
-                else if (errno == EINVAL) {
-                    /* Linux older than 2.6.27 does not support SOCK_CLOEXEC */
+                else if (errno == EINVAL || errno == EPROTOTYPE) {
+                    /* Linux older than 2.6.27 does not support SOCK_CLOEXEC.
+                     * Nanvix returns EPROTOTYPE for unsupported socket flags. */
                     state->sock_cloexec_works = 0;
                     fd = socket(family, type, proto);
                 }
@@ -6283,8 +6323,9 @@ socket_socketpair(PyObject *self, PyObject *args)
             if (ret >= 0) {
                 state->sock_cloexec_works = 1;
             }
-            else if (errno == EINVAL) {
-                /* Linux older than 2.6.27 does not support SOCK_CLOEXEC */
+            else if (errno == EINVAL || errno == EPROTOTYPE) {
+                /* Linux older than 2.6.27 does not support SOCK_CLOEXEC.
+                 * Nanvix returns EPROTOTYPE for unsupported socket flags. */
                 state->sock_cloexec_works = 0;
                 ret = socketpair(family, type, proto, sv);
             }

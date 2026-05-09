@@ -132,6 +132,10 @@ static struct gai_afd {
 #define IN_LOOPBACKNET      127
 #endif
 
+#ifndef IN_CLASSA_NSHIFT
+#define IN_CLASSA_NSHIFT    24
+#endif
+
 static int get_name(const char *, struct gai_afd *,
                           struct addrinfo **, char *, struct addrinfo *,
                           int);
