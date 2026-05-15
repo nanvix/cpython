@@ -721,6 +721,7 @@ def run_all(
     release: bool = False,
     test_list: list[str] | None = None,
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
+    nanvixd_extra: list[str] | None = None,
     run_fn: Any = None,
     docker: bool = False,
 ) -> None:
@@ -754,6 +755,7 @@ def run_all(
         staging,
         process_mode=process_mode,
         platform=platform,
+        nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
         nanvix_home=nanvix_home,
     )
@@ -766,6 +768,7 @@ def run_all(
         platform=platform,
         test_list=test_list,
         batch_size=batch_size,
+        nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
         release=release,
     )

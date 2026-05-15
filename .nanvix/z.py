@@ -256,11 +256,16 @@ class CPythonBuild(ZScript):
         sysroot, toolchain = self._get_host_paths()
         kwargs = self._build_kwargs()
 
+        nanvixd_extra = None
+        if self.config.deployment_mode == "standalone":
+            nanvixd_extra = ["-allow-host-networking"]
+
         test_mod.run_all(
             sysroot,
             toolchain,
             self.repo_root,
             **kwargs,
+            nanvixd_extra=nanvixd_extra,
             run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
         )
