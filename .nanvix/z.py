@@ -34,10 +34,12 @@ from pathlib import Path
 
 from nanvix_zutil import (
     CFG_SYSROOT,
-    TOOLCHAIN_CONTAINER_PATH,
     EXIT_MISSING_DEP,
+    TOOLCHAIN_CONTAINER_PATH,
     ZScript,
     log,
+    make_initrd,
+    run,
     suffix_dep,
 )
 from nanvix_zutil.buildroot import (
@@ -179,7 +181,7 @@ class CPythonBuild(ZScript):
                 "_run_make() is not supported on Windows. "
                 "Use build_mod.build() / build_mod.install() instead."
             )
-        self.run(*make_args, cwd=self.repo_root, docker=False)
+        run(*make_args, cwd=self.repo_root)
 
     def _make_args(self, *targets: str) -> list[str]:
         """Build the make argument list for configure/build/install."""
@@ -187,7 +189,7 @@ class CPythonBuild(ZScript):
         release = os.environ.get(_MAKE_VAR_RELEASE, "no")
 
         return build_mod.make_args(
-            str(self.translate_path(Path(sysroot))),
+            str(self.docker.translate_path(Path(sysroot)) if self.docker else Path(sysroot)),
             toolchain,
             *targets,
             platform=self.config.machine,
@@ -247,14 +249,14 @@ class CPythonBuild(ZScript):
             toolchain,
             self.repo_root,
             **self._build_kwargs(release=release),
-            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
         )
 
         # For standalone deployment mode, produce an initrd image
         # containing the system daemons and the application binary.
         if self.config.deployment_mode == "standalone":
-            self.make_initrd(f"python{config.EXE}")
+            make_initrd(self, f"python{config.EXE}")
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
@@ -270,7 +272,7 @@ class CPythonBuild(ZScript):
             self.repo_root,
             **kwargs,
             nanvixd_extra=nanvixd_extra,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
         )
 
@@ -291,7 +293,7 @@ class CPythonBuild(ZScript):
             self.repo_root,
             **bench_kwargs,
             nanvixd_extra=nanvixd_extra,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
         )
 
@@ -306,7 +308,7 @@ class CPythonBuild(ZScript):
             toolchain,
             self.repo_root,
             **kwargs,
-            run_fn=lambda *args, **kw: self.run(*args, **kw),  # type: ignore[arg-type]
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
         )
         package_mod.verify(
