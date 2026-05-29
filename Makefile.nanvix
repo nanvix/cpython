@@ -91,6 +91,14 @@ ifdef CONFIG_NANVIX
     LIBSQLITE3 := $(DOCKER_SYSROOT_PATH)/lib/libsqlite3.a
     LIBSSL := $(DOCKER_SYSROOT_PATH)/lib/libssl.a
     LIBCRYPTO := $(DOCKER_SYSROOT_PATH)/lib/libcrypto.a
+    # libnvx_crt0 ships the executable startup symbols (`_do_start`, `_start`,
+    # `c_trampoline`).  It must be present in the Nanvix sysroot ahead of this
+    # cpython build; the existence check below fails loudly when it is not.
+    LIBNVX_CRT0 := $(DOCKER_SYSROOT_PATH)/lib/libnvx_crt0.a
+    # Host-side path used by the parse-time existence guard below.  The
+    # docker build sees the sysroot at $(DOCKER_SYSROOT_PATH); the host
+    # only sees it at $(NANVIX_HOME).
+    LIBNVX_CRT0_HOST := $(abspath $(NANVIX_HOME))/lib/libnvx_crt0.a
     BUILD_PYTHON := $(DOCKER_TOOLCHAIN_PATH)/bin/python3
   else
     TOOLCHAIN_PREFIX := $(NANVIX_TOOLCHAIN)
@@ -102,6 +110,8 @@ ifdef CONFIG_NANVIX
     LIBSQLITE3 := $(abspath $(NANVIX_HOME))/lib/libsqlite3.a
     LIBSSL := $(abspath $(NANVIX_HOME))/lib/libssl.a
     LIBCRYPTO := $(abspath $(NANVIX_HOME))/lib/libcrypto.a
+    LIBNVX_CRT0 := $(abspath $(NANVIX_HOME))/lib/libnvx_crt0.a
+    LIBNVX_CRT0_HOST := $(LIBNVX_CRT0)
     BUILD_PYTHON := $(NANVIX_TOOLCHAIN)/bin/python3
   endif
 
@@ -120,6 +130,26 @@ else
     endif
   endif
   EXE=.elf
+endif
+
+# Existence check for libnvx_crt0.a.
+#
+# libnvx_crt0.a is the executable startup archive (`_do_start` / `_start` /
+# `c_trampoline`) introduced by the Nanvix `nvx-crt0` crate split. cpython
+# requires a Nanvix sysroot that ships it. If the user is building against
+# an older sysroot snapshot, fail at make-parse time with an actionable
+# message rather than producing a python.elf with no entry point.
+#
+# Skip the guard for `clean` / `distclean` (which should work against any
+# sysroot, including ones with no libnvx_crt0.a).  Empty MAKECMDGOALS is
+# treated as a build because `make` with no target invokes `all`.
+ifdef CONFIG_NANVIX
+GUARD_GOALS := $(filter-out clean distclean,$(or $(MAKECMDGOALS),build))
+ifneq ($(GUARD_GOALS),)
+ifeq ($(wildcard $(LIBNVX_CRT0_HOST)),)
+$(error libnvx_crt0.a not found at $(LIBNVX_CRT0_HOST). Update the Nanvix sysroot to one that ships libnvx_crt0.a (the nvx-crt0 crate must be present and built into the sysroot lib/ directory).)
+endif
+endif
 endif
 
 # Configure environment variables
@@ -147,13 +177,23 @@ endif
 # resolved upstream.
 #
 # `LIBS` segment 1 (`--whole-archive ... --no-whole-archive`): force every
-# object from libposix, libc, libm, libstdc++, and libgcc into python.elf
-# so the runtime symbols extension `.so`s depend on are embedded and
-# re-exported via `--export-dynamic`. Without `--whole-archive`, the static
-# linker drops unreferenced objects (e.g. `fscanf`, `longjmp`, `strtold_l`
-# for numpy; `operator new/delete[]`, `__cxa_*`, `_Unwind_*`,
+# object from libnvx_crt0, libposix, libc, libm, libstdc++, and libgcc into
+# python.elf so the runtime symbols extension `.so`s depend on are embedded
+# and re-exported via `--export-dynamic`. Without `--whole-archive`, the
+# static linker drops unreferenced objects (e.g. `fscanf`, `longjmp`,
+# `strtold_l` for numpy; `operator new/delete[]`, `__cxa_*`, `_Unwind_*`,
 # `std::type_info` vtables for any C++ extension) and subsequent dlopen()
 # of those `.so`s fails with "symbol not found".
+#
+# `libnvx_crt0` is listed first inside `--whole-archive`. Today, libposix.a
+# still ships its own copy of the startup symbols (`_start`, `_do_start`,
+# `c_trampoline`) because `nvx` builds them in under the `staticlib`
+# feature. With `--allow-multiple-definition` (above) the linker takes the
+# first definition, so listing libnvx_crt0 first selects the standalone
+# crt0 copy of `_start` and friends. This is an intentional behaviour
+# change: future Nanvix versions remove the duplicate from libposix, after
+# which libnvx_crt0 is the sole provider. Listing it first today keeps
+# python.elf using a consistent `_start` source across both states.
 #
 # `LIBS` segment 2 (`--start-group ... --end-group`): the external add-on
 # libraries (sqlite3, ssl, crypto, z, bz2, lzma, ffi). The group is needed
@@ -169,7 +209,7 @@ CONFIGURE_ENV = \
 	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--whole-archive $(LIBPOSIX) $(LIBC) $(LIBM) $(LIBSTDCXX) $(LIBGCC) -Wl,--no-whole-archive -Wl,--start-group -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
+	LIBS="-Wl,--whole-archive $(LIBNVX_CRT0) $(LIBPOSIX) $(LIBC) $(LIBM) $(LIBSTDCXX) $(LIBGCC) -Wl,--no-whole-archive -Wl,--start-group -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
 	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
 	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \

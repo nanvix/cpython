@@ -72,6 +72,7 @@ def toolchain_paths(
         "libssl": sr / "lib" / "libssl.a",
         "libcrypto": sr / "lib" / "libcrypto.a",
         "liblzma": sr / "lib" / "liblzma.a",
+        "libnvx_crt0": sr / "lib" / "libnvx_crt0.a",
     }
 
 
@@ -104,7 +105,8 @@ def configure_env(toolchain: str | Path, sysroot: str | Path) -> dict[str, str]:
             f"-Wl,--export-dynamic -Wl,--no-dynamic-linker"
         ),
         "LIBS": (
-            f"-Wl,--whole-archive {tp['libposix']} {tp['libc']} {tp['libm']} "
+            f"-Wl,--whole-archive {tp['libnvx_crt0']} {tp['libposix']} "
+            f"{tp['libc']} {tp['libm']} "
             f"-lstdc++ -lgcc -Wl,--no-whole-archive "
             f"-Wl,--start-group "
             f"-lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group"
