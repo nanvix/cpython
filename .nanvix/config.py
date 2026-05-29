@@ -76,7 +76,15 @@ def toolchain_paths(
 
 
 def configure_env(toolchain: str | Path, sysroot: str | Path) -> dict[str, str]:
-    """Return the environment dict for ./configure."""
+    """Return the environment dict for ./configure.
+
+    NOTE: This helper is currently unused; the actual cpython build invokes
+    ``make -f Makefile.nanvix`` which has its own inline CONFIGURE_ENV. This
+    function is kept in sync so a future caller does not pick up stale link
+    flags. See ``Makefile.nanvix`` for the authoritative comment block
+    explaining the ``--whole-archive`` / ``--export-dynamic`` /
+    ``--allow-multiple-definition`` rationale.
+    """
     tp = toolchain_paths(toolchain, sysroot)
     sr = Path(sysroot)
     return {
@@ -96,7 +104,9 @@ def configure_env(toolchain: str | Path, sysroot: str | Path) -> dict[str, str]:
             f"-Wl,--export-dynamic -Wl,--no-dynamic-linker"
         ),
         "LIBS": (
-            f"-Wl,--start-group {tp['libposix']} {tp['libc']} {tp['libm']} "
+            f"-Wl,--whole-archive {tp['libposix']} {tp['libc']} {tp['libm']} "
+            f"-lstdc++ -lgcc -Wl,--no-whole-archive "
+            f"-Wl,--start-group "
             f"-lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group"
         ),
         "LIBSQLITE3_LIBS": f"-L{sr}/lib -lsqlite3",

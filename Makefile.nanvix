@@ -104,6 +104,15 @@ ifdef CONFIG_NANVIX
     LIBCRYPTO := $(abspath $(NANVIX_HOME))/lib/libcrypto.a
     BUILD_PYTHON := $(NANVIX_TOOLCHAIN)/bin/python3
   endif
+
+  # libstdc++ / libgcc are referenced via `-l` rather than absolute paths so
+  # the GCC driver resolves them: libgcc lives under a versioned dir
+  # (`lib/gcc/i686-nanvix/<gcc-version>/libgcc.a`) and hardcoding a version
+  # would be fragile across toolchain upgrades.  Defined once at top-level
+  # because the `-l` form is identical between the docker and host build
+  # paths above.
+  LIBSTDCXX := -lstdc++
+  LIBGCC := -lgcc
 else
   ifneq ($(MAKECMDGOALS),clean)
     ifneq ($(MAKECMDGOALS),distclean)
@@ -114,6 +123,43 @@ else
 endif
 
 # Configure environment variables
+#
+# Linker flag rationale:
+#
+# `-Wl,--export-dynamic`: put every globally-defined symbol from python.elf
+# into its `.dynsym`. Extension `.so`s (numpy's `_multiarray_umath.so`, ssl,
+# etc.) leave C/C++ runtime symbols UND and resolve them against python.elf
+# at dlopen() time. Without this, those `.so`s fail to load.
+#
+# `-Wl,--allow-multiple-definition`: tolerates duplicate symbol definitions
+# that arise from forcing every libposix / libc / libm / libstdc++ / libgcc
+# object into python.elf via `--whole-archive` below. The biggest set is
+# newlib's long-double math helpers (`frexpl`, `llrintl`, `lrintl`, `rintl`
+# are defined in three different newlib directories simultaneously — a
+# newlib build-system bug). Other known overlaps include libposix vs. libc
+# (`_start`, `copysign[f]`, `getenv`, `setenv`, `unsetenv`, `environ`,
+# `isatty`), libc vs. libm (`frexp`, `ldexp`, `modf`, `isnan`, `isinf`,
+# `scalbn`, …), libm vs. libstdc++ (`hypotf`), libgcc internal duplicates
+# (`__x86.get_pc_thunk.*`), and a libc / libgcc `__eprintf`. The set is
+# large and toolchain-build-version-dependent; treating the link as
+# multiple-definition-tolerant is the only practical workaround until each
+# upstream is fixed. Remove this flag once the contributing duplicates are
+# resolved upstream.
+#
+# `LIBS` segment 1 (`--whole-archive ... --no-whole-archive`): force every
+# object from libposix, libc, libm, libstdc++, and libgcc into python.elf
+# so the runtime symbols extension `.so`s depend on are embedded and
+# re-exported via `--export-dynamic`. Without `--whole-archive`, the static
+# linker drops unreferenced objects (e.g. `fscanf`, `longjmp`, `strtold_l`
+# for numpy; `operator new/delete[]`, `__cxa_*`, `_Unwind_*`,
+# `std::type_info` vtables for any C++ extension) and subsequent dlopen()
+# of those `.so`s fails with "symbol not found".
+#
+# `LIBS` segment 2 (`--start-group ... --end-group`): the external add-on
+# libraries (sqlite3, ssl, crypto, z, bz2, lzma, ffi). The group is needed
+# only for their inter-archive circular dependencies; they resolve symbols
+# from libposix/libc/libm/libstdc++ against the already-embedded objects
+# from segment 1.
 CONFIGURE_ENV = \
 	CC="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-gcc" \
 	CXX="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-g++" \
@@ -123,7 +169,7 @@ CONFIGURE_ENV = \
 	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
+	LIBS="-Wl,--whole-archive $(LIBPOSIX) $(LIBC) $(LIBM) $(LIBSTDCXX) $(LIBGCC) -Wl,--no-whole-archive -Wl,--start-group -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
 	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
 	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
