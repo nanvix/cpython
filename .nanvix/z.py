@@ -235,19 +235,34 @@ class CPythonBuild(ZScript):
         return used_fallback
 
     def build(self) -> None:
-        """Cross-compile python.elf and libpython.a for Nanvix."""
+        """
+        Cross-compile python.elf and libpython.a for Nanvix.
+        Builds for release mode.
+        """
         self._overlay_local_nanvix()
         sysroot, toolchain = self._get_host_paths()
         release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
+        kwargs = self._build_kwargs(release=release)
         build_mod.build(
             sysroot,
             toolchain,
             repo_root(),
-            **self._build_kwargs(
-                release=release
-            ),  # pyright: ignore[reportArgumentType]
+            **kwargs,  # pyright: ignore[reportArgumentType]
             run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
+        )
+
+        package_mod.package(
+            sysroot,
+            toolchain,
+            **kwargs,  # pyright: ignore[reportArgumentType]
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
+            docker=self.docker is not None,
+        )
+        package_mod.verify(
+            kwargs["platform"],  # pyright: ignore[reportArgumentType]
+            kwargs["process_mode"],  # pyright: ignore[reportArgumentType]
+            kwargs["memory_size"],  # pyright: ignore[reportArgumentType]
         )
 
         # For standalone deployment mode, produce an initrd image
@@ -292,27 +307,6 @@ class CPythonBuild(ZScript):
             nanvixd_extra=nanvixd_extra,
             run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
             docker=self.docker is not None,
-        )
-
-    def release(self) -> None:
-        """Package the CPython release tarballs and verify them."""
-        self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
-        kwargs = self._build_kwargs(release=True)
-
-        package_mod.package(
-            sysroot,
-            toolchain,
-            repo_root(),
-            **kwargs,  # pyright: ignore[reportArgumentType]
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
-        )
-        package_mod.verify(
-            repo_root(),
-            platform=kwargs["platform"],  # pyright: ignore[reportArgumentType]
-            process_mode=kwargs["process_mode"],  # pyright: ignore[reportArgumentType]
-            memory_size=kwargs["memory_size"],  # pyright: ignore[reportArgumentType]
         )
 
     def clean(self) -> None:

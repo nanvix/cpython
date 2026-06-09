@@ -32,7 +32,6 @@ def _artifact_base(
 def package(
     sysroot: str | Path,
     toolchain: str | Path,
-    repo_root: Path,
     *,
     platform: str = config.DEFAULT_PLATFORM,
     process_mode: str = config.DEFAULT_PROCESS_MODE,
@@ -54,7 +53,7 @@ def package(
             file operations (mkramfs, etc.).  Defaults to *sysroot*.
     """
     nanvix_home = Path(nanvix_home) if nanvix_home else Path(sysroot)
-    release_staging = repo_root / ".nanvix" / "release"
+    release_staging = paths.nanvix_root() / "release"
     dist_dir = paths.dist_dir()
     artifact = _artifact_base(platform, process_mode, memory_size)
 
@@ -68,7 +67,7 @@ def package(
     build_mod.build(
         sysroot,
         toolchain,
-        repo_root,
+        paths.repo_root(),
         platform=platform,
         process_mode=process_mode,
         memory_size=memory_size,
@@ -82,7 +81,7 @@ def package(
     build_mod.install(
         sysroot,
         toolchain,
-        repo_root,
+        paths.repo_root(),
         release_staging,
         platform=platform,
         process_mode=process_mode,
@@ -93,12 +92,11 @@ def package(
         docker=docker,
     )
 
+    # Stage lxml Python package into the installed sysroot.
     sysroot_installed = release_staging / "sysroot"
     if not sysroot_installed.is_dir():
         raise FileNotFoundError(f"Install did not produce {sysroot_installed}")
-
-    # Stage lxml Python package into the installed sysroot.
-    lxml_mod.stage_lxml_runtime(repo_root, sysroot_installed)
+    lxml_mod.stage_lxml_runtime(paths.repo_root(), sysroot_installed)
 
     # --- Buildroot: build dependencies ---
     buildroot_pkg = release_staging / "buildroot-pkg"
@@ -165,7 +163,7 @@ def package(
 
     # --- Include python.elf binary ---
     bin_dir = release_staging / "bin"
-    python_elf = repo_root / f"python{config.EXE}"
+    python_elf = paths.repo_root() / f"python{config.EXE}"
     if python_elf.is_file():
         bin_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(python_elf, bin_dir / "python.elf")
@@ -206,8 +204,6 @@ def package(
 
 
 def verify(
-    repo_root: Path,
-    *,
     platform: str = config.DEFAULT_PLATFORM,
     process_mode: str = config.DEFAULT_PROCESS_MODE,
     memory_size: str = config.DEFAULT_MEMORY_SIZE,
