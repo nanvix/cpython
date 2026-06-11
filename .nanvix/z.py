@@ -10,7 +10,6 @@ Usage:
     ./z benchmark  # Run hello-world benchmark with release ramfs
     ./z release    # Package release tarballs (sysroot + buildroot)
     ./z clean      # Remove build artifacts
-    ./z distclean  # Deep clean (build artifacts + untracked files)
 
 Options:
     --with-nanvix PATH  Use local Nanvix binaries from PATH instead of
@@ -322,10 +321,6 @@ class CPythonBuild(ZScript):
         initrd = repo_root() / "python.img"
         if initrd.exists():
             initrd.unlink()
-
-    def distclean(self) -> None:
-        """Deep clean: remove all build artifacts, caches, and untracked files."""
-        build_mod.distclean(repo_root())
 
     def _install_missing_deps(self) -> None:
         """Download missing dependency libraries using fallback assets."""

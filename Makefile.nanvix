@@ -108,9 +108,7 @@ ifdef CONFIG_NANVIX
   endif
 else
   ifneq ($(MAKECMDGOALS),clean)
-    ifneq ($(MAKECMDGOALS),distclean)
-      $(error CONFIG_NANVIX must be set to 'y'. Usage: make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix)
-    endif
+    $(error CONFIG_NANVIX must be set to 'y'. Usage: make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix)
   endif
   EXE=.elf
 endif
@@ -250,15 +248,4 @@ clean:
 	rm -f $(CONFIGURED_MARKER)
 	rm -f python$(EXE)
 
-
-# Distclean target
-distclean: clean
-	-$(MAKE) distclean 2>/dev/null || true
-	git clean -fdx -e Makefile.nanvix -e NANVIX.md -e .github \
-		-e .nanvix/z.py -e .nanvix/_loader.py -e .nanvix/nanvix.toml -e .nanvix/.gitignore \
-		-e .nanvix/config.py -e .nanvix/build.py -e .nanvix/docker.py \
-		-e .nanvix/ramfs.py -e .nanvix/test.py -e .nanvix/package.py \
-		-e .nanvix/run-regrtest.py -e .nanvix/run-tests.py \
-		-e z -e z.sh -e z.ps1 2>/dev/null || true
-
-.PHONY: all configure build install clean distclean
+.PHONY: all configure build install clean
