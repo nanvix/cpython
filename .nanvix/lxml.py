@@ -5,6 +5,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from nanvix_zutil import paths
+
 import config
 
 _SETUP_LOCAL_TEMPLATE = """\
@@ -38,13 +40,13 @@ def clear_setup_local(repo_root: Path) -> None:
         print(f"[lxml] Removed {setup_local}")
 
 
-def stage_lxml_runtime(repo_root: Path, sysroot: Path) -> None:
+def stage_lxml_runtime(sysroot: Path) -> None:
     """Copy lxml Python files from buildroot into the test/package sysroot.
 
     Looks for lxml in ``.nanvix/buildroot/python-packages/lxml/``.
     Skips gracefully when the python-packages directory is not available.
     """
-    lxml_src = repo_root / ".nanvix" / "buildroot" / "python-packages" / "lxml"
+    lxml_src = paths.nanvix_root() / "buildroot" / "python-packages" / "lxml"
     if not lxml_src.is_dir():
         print(
             f"[lxml] Staged lxml package not found at {lxml_src}; "

@@ -26,6 +26,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from nanvix_zutil import paths
+
 import _test as test_mod
 import build as build_mod
 import config
@@ -46,7 +48,7 @@ from nanvix_zutil.buildroot import (
     extract_nanvix_version_base,
 )
 from nanvix_zutil.github import resolve_release_with_fallback
-from nanvix_zutil.paths import nanvix_root, repo_root
+from nanvix_zutil.paths import nanvix_root
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -135,7 +137,7 @@ class CPythonBuild(ZScript):
 
     # ---- Common helpers --------------------------------------------------
 
-    def _get_host_paths(self) -> tuple[str, str]:
+    def _get_host_paths(self) -> tuple[Path, Path]:
         """Return (sysroot, toolchain) raw host paths from config."""
         sysroot = self.config.get(CFG_SYSROOT, "")
         if not sysroot:
@@ -144,53 +146,23 @@ class CPythonBuild(ZScript):
                 code=EXIT_MISSING_DEP,
                 hint="Run `./z setup` first to download the sysroot.",
             )
-        toolchain = str(TOOLCHAIN_CONTAINER_PATH)
-        return sysroot, toolchain
+        toolchain = Path(TOOLCHAIN_CONTAINER_PATH)
+        return Path(sysroot), toolchain
 
-    def _build_kwargs(self, release: bool = False) -> dict[str, object]:
-        """Return common keyword arguments for build/test/package modules."""
-        return {
-            "platform": self.config.machine,
-            "process_mode": self.config.deployment_mode,
-            "memory_size": self.config.memory_size,
-            "install_prefix": _DEFAULT_INSTALL_PREFIX,
-            "release": release,
-        }
-
-    # ---- Make invocation (for build/install only) ------------------------
-
-    def _run_make(self, make_args: list[str]) -> None:
-        """Execute a make command directly (Linux/macOS only).
-
-        On Windows, callers should use ``build_mod.build()`` or
-        ``build_mod.install()`` which route through ``docker_mod``
-        automatically.
-        """
-        if sys.platform == "win32":
-            raise RuntimeError(
-                "_run_make() is not supported on Windows. "
-                "Use build_mod.build() / build_mod.install() instead."
-            )
-        run(*make_args, cwd=repo_root())
-
-    def _make_args(self, *targets: str) -> list[str]:
+    def _make_args(self, *targets: str, release: bool = False) -> build_mod.MakeArgs:
         """Build the make argument list for configure/build/install."""
         sysroot, toolchain = self._get_host_paths()
-        release = os.environ.get(_MAKE_VAR_RELEASE, "no")
-
-        return build_mod.make_args(
-            str(
-                self.docker.translate_path(Path(sysroot))
-                if self.docker
-                else Path(sysroot)
-            ),
-            toolchain,
-            *targets,
+        return build_mod.MakeArgs(
+            toolchain_path=toolchain,
+            sysroot=sysroot,
+            targets=list(targets),
             platform=self.config.machine,
             process_mode=self.config.deployment_mode,
             memory_size=self.config.memory_size,
             install_prefix=_DEFAULT_INSTALL_PREFIX,
-            release=(release == "yes"),
+            release=release,
+            docker=self.docker is not None,
+            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[assignment]
         )
 
     def setup(self) -> bool:
@@ -205,7 +177,6 @@ class CPythonBuild(ZScript):
         used_fallback = super().setup()
 
         self._install_missing_deps()
-
         self.config.save()
 
         buildroot = nanvix_root() / "buildroot"
@@ -236,18 +207,9 @@ class CPythonBuild(ZScript):
     def build(self) -> None:
         """Cross-compile python.elf and libpython.a for Nanvix."""
         self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
         release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
-        build_mod.build(
-            sysroot,
-            toolchain,
-            repo_root(),
-            **self._build_kwargs(
-                release=release
-            ),  # pyright: ignore[reportArgumentType]
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
-        )
+        args = self._make_args(release=release)
+        build_mod.build(args)
 
         # For standalone deployment mode, produce an initrd image
         # containing the system daemons and the application binary.
@@ -257,68 +219,37 @@ class CPythonBuild(ZScript):
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
         self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
-        kwargs = self._build_kwargs()
-
+        args = self._make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
 
         test_mod.run_all(
-            sysroot,
-            toolchain,
-            repo_root(),
-            **kwargs,  # pyright: ignore[reportArgumentType]
+            args,
             nanvixd_extra=nanvixd_extra,
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
         )
 
     def benchmark(self) -> None:
         """Run hello-world benchmark with a release-style ramfs."""
         self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
-        kwargs = self._build_kwargs()
-
         nanvixd_extra = ["-allow-host-networking"]
-
-        # run_benchmark does not use 'release' — always stages a
-        # non-release build and applies release trimming itself.
-        bench_kwargs = {k: v for k, v in kwargs.items() if k != "release"}
+        args = self._make_args(release=False)
         test_mod.run_benchmark(
-            sysroot,
-            toolchain,
-            repo_root(),
-            **bench_kwargs,  # pyright: ignore[reportArgumentType]
+            args,
             nanvixd_extra=nanvixd_extra,
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
         )
 
     def release(self) -> None:
         """Package the CPython release tarballs and verify them."""
         self._overlay_local_nanvix()
-        sysroot, toolchain = self._get_host_paths()
-        kwargs = self._build_kwargs(release=True)
+        args = self._make_args(release=True)
 
-        package_mod.package(
-            sysroot,
-            toolchain,
-            repo_root(),
-            **kwargs,  # pyright: ignore[reportArgumentType]
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[arg-type]
-            docker=self.docker is not None,
-        )
-        package_mod.verify(
-            repo_root(),
-            platform=kwargs["platform"],  # pyright: ignore[reportArgumentType]
-            process_mode=kwargs["process_mode"],  # pyright: ignore[reportArgumentType]
-            memory_size=kwargs["memory_size"],  # pyright: ignore[reportArgumentType]
-        )
+        package_mod.package(args)
+        package_mod.verify(args)
 
     def clean(self) -> None:
         """Remove build artifacts."""
-        build_mod.clean(repo_root())
+        build_mod.clean()
         # Remove initrd image generated for standalone mode.
-        initrd = repo_root() / "python.img"
+        initrd = paths.repo_root() / "python.img"
         if initrd.exists():
             initrd.unlink()
 

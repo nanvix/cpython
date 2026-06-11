@@ -14,6 +14,7 @@ import hashlib
 import os
 import subprocess
 from pathlib import Path
+import build as build_mod
 
 import config
 
@@ -31,7 +32,7 @@ def _volume_name(workspace: Path) -> str:
 
 def _docker_run_base(
     workspace: Path,
-    nanvix_home: Path,
+    args: build_mod.MakeArgs,
     image: str = config.DOCKER_IMAGE,
 ) -> list[str]:
     """Build the common ``docker run`` prefix."""
@@ -49,7 +50,7 @@ def _docker_run_base(
         "-v",
         f"{workspace}:/mnt/host-workspace",
         "-v",
-        f"{nanvix_home.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
+        f"{args.sysroot.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
         "-w",
         config.DOCKER_WORKSPACE_PATH,
         "-e",
@@ -93,13 +94,8 @@ def sync_sources(
 
 def docker_build(
     workspace: Path,
-    nanvix_home: Path,
+    args: build_mod.MakeArgs,
     *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
-    release: bool = False,
     install_destdir: Path | None = None,
 ) -> None:
     """Run cross-compilation inside Docker (Windows host mode).
@@ -111,17 +107,10 @@ def docker_build(
     the same container and copies the install tree to the host.  This
     avoids a second Docker invocation during testing.
     """
-    base = _docker_run_base(workspace, nanvix_home)
+    base = _docker_run_base(workspace, args)
     sync = sync_sources(workspace)
-    inner_make = _inner_make_cmd(
-        "build",
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=release,
-    )
-    copy_back = _copy_outputs_cmd(workspace)
+    args.targets = ["build"]
+    copy_back = _copy_outputs_cmd()
 
     # Explicit strip command — ensure binaries are fully stripped even if
     # the Makefile's strip step is skipped (e.g. toolchain detection fails
@@ -162,18 +151,14 @@ def docker_build(
         f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
         f"{sysroot_check} && "
         f"{_generate_setup_local_cmd()} && "
-        f"{inner_make} && {strip_build}"
+        f"{args.to_string()} && {strip_build}"
     )
 
     if install_destdir is not None:
-        install_make = _inner_make_cmd(
-            f"install DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
-            platform=platform,
-            process_mode=process_mode,
-            memory_size=memory_size,
-            install_prefix=install_prefix,
-            release=release,
-        )
+        args.targets = [
+            "install",
+            f"DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
+        ]
         try:
             rel_dest = install_destdir.relative_to(workspace).as_posix()
         except ValueError:
@@ -182,7 +167,7 @@ def docker_build(
         # Strip the installed binary too so the install cache is lean.
         install_bin = (
             f"{config.DOCKER_WORKSPACE_PATH}/_install_staging"
-            f"{install_prefix}/bin/{config.python_binary()}"
+            f"{args.install_prefix}/bin/{config.python_binary()}"
         )
         strip_install = (
             f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
@@ -197,7 +182,7 @@ def docker_build(
             f"/mnt/host-workspace/{rel_dest}/"
         )
         shell_cmd += (
-            f" && {install_make} && {strip_install}; rc=$?; "
+            f" && {args.to_string()} && {strip_install}; rc=$?; "
             f"{copy_back}; {install_copy}; exit $rc"
         )
     else:
@@ -211,26 +196,16 @@ def docker_build(
 
 def docker_install(
     workspace: Path,
-    nanvix_home: Path,
     destdir: Path,
-    *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
-    release: bool = False,
+    args: build_mod.MakeArgs,
 ) -> None:
     """Run make install inside Docker (Windows host mode)."""
-    base = _docker_run_base(workspace, nanvix_home)
+    base = _docker_run_base(workspace, args)
     sync = sync_sources(workspace)
-    inner_make = _inner_make_cmd(
-        f"install DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=release,
-    )
+    args.targets = [
+        "install",
+        f"DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
+    ]
 
     # Compute relative path so nested destdirs (e.g. .nanvix/_test_staging)
     # are preserved correctly on the host.
@@ -243,14 +218,14 @@ def docker_install(
     strip_bin = f"{config.DOCKER_TOOLCHAIN_PATH}/bin/{config.TOOLCHAIN_TRIPLET}-strip"
     install_bin = (
         f"{config.DOCKER_WORKSPACE_PATH}/_install_staging"
-        f"{install_prefix}/bin/{config.python_binary()}"
+        f"{args.install_prefix}/bin/{config.python_binary()}"
     )
     strip_cmd = (
         f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
         f'"{strip_bin}" --strip-all "{install_bin}" || true'
     )
     shell_cmd = (
-        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && {inner_make}; rc=$?; "
+        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && {args.to_string()}; rc=$?; "
         f"{strip_cmd}; "
         f"if [ -d {config.DOCKER_WORKSPACE_PATH}/_install_staging ]; then "
         f"mkdir -p /mnt/host-workspace/{rel_dest} && "
@@ -291,32 +266,7 @@ def _generate_setup_local_cmd() -> str:
     )
 
 
-def _inner_make_cmd(
-    targets: str,
-    *,
-    platform: str,
-    process_mode: str,
-    memory_size: str,
-    install_prefix: str,
-    release: bool,
-) -> str:
-    """Build the inner make command string for execution inside Docker."""
-    release_str = "yes" if release else "no"
-    return (
-        f"make -f Makefile.nanvix "
-        f"CONFIG_NANVIX=y "
-        f"NANVIX_HOME={config.DOCKER_SYSROOT_PATH} "
-        f"NANVIX_TOOLCHAIN={config.DOCKER_TOOLCHAIN_PATH} "
-        f"PLATFORM={platform} "
-        f"PROCESS_MODE={process_mode} "
-        f"MEMORY_SIZE={memory_size} "
-        f"INSTALL_PREFIX={install_prefix} "
-        f"NANVIX_RELEASE={release_str} "
-        f"{targets}"
-    )
-
-
-def _copy_outputs_cmd(workspace: Path) -> str:
+def _copy_outputs_cmd() -> str:
     """Build shell command to copy build outputs back to host workspace."""
     copies: list[str] = []
     for f in config.DOCKER_OUTPUT_FILES:

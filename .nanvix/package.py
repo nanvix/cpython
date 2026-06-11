@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import shutil
 import tarfile
-from pathlib import Path
-from typing import Any
 import build as build_mod
 import config
 import lxml as lxml_mod
@@ -20,43 +18,18 @@ import ramfs as ramfs_mod
 from nanvix_zutil import paths
 
 
-def _artifact_base(
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-) -> str:
-    """Return the base name for release tarballs."""
-    return f"cpython-{platform}-{process_mode}-{memory_size}"
-
-
 def package(
-    sysroot: str | Path,
-    toolchain: str | Path,
-    repo_root: Path,
-    *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
-    release: bool = True,
-    run_fn: Any = None,
-    nanvix_home: str | Path | None = None,
-    docker: bool = False,
+    args: build_mod.MakeArgs,
 ) -> None:
     """Package CPython release tarballs.
 
     Creates two tarballs in ``nanvix_zutil.paths.dist_dir()``:
     - ``cpython-<platform>-<mode>-<memory>.tar.gz`` — runtime sysroot + binary + ramfs
     - ``cpython-<platform>-<mode>-<memory>-buildroot.tar.gz`` — build dependencies
-
-    Args:
-        nanvix_home: Host-side path to the Nanvix sysroot for local
-            file operations (mkramfs, etc.).  Defaults to *sysroot*.
     """
-    nanvix_home = Path(nanvix_home) if nanvix_home else Path(sysroot)
-    release_staging = repo_root / ".nanvix" / "release"
+    release_staging = paths.nanvix_root() / "release"
     dist_dir = paths.dist_dir()
-    artifact = _artifact_base(platform, process_mode, memory_size)
+    artifact = args.asset_prefix()
 
     print("Packaging CPython release...")
 
@@ -65,40 +38,17 @@ def package(
         shutil.rmtree(release_staging)
 
     # Build.
-    build_mod.build(
-        sysroot,
-        toolchain,
-        repo_root,
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=True,
-        run_fn=run_fn,
-        docker=docker,
-    )
+    build_mod.build(args)
 
     # Install into staging.
-    build_mod.install(
-        sysroot,
-        toolchain,
-        repo_root,
-        release_staging,
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=True,
-        run_fn=run_fn,
-        docker=docker,
-    )
+    build_mod.install(release_staging, args)
 
     sysroot_installed = release_staging / "sysroot"
     if not sysroot_installed.is_dir():
         raise FileNotFoundError(f"Install did not produce {sysroot_installed}")
 
     # Stage lxml Python package into the installed sysroot.
-    lxml_mod.stage_lxml_runtime(repo_root, sysroot_installed)
+    lxml_mod.stage_lxml_runtime(sysroot_installed)
 
     # --- Buildroot: build dependencies ---
     buildroot_pkg = release_staging / "buildroot-pkg"
@@ -165,7 +115,7 @@ def package(
 
     # --- Include python.elf binary ---
     bin_dir = release_staging / "bin"
-    python_elf = repo_root / f"python{config.EXE}"
+    python_elf = paths.repo_root() / f"python{config.EXE}"
     if python_elf.is_file():
         bin_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(python_elf, bin_dir / "python.elf")
@@ -176,7 +126,7 @@ def package(
 
     # --- Build ramfs image ---
     ramfs_img = release_staging / "cpython-ramfs.img"
-    ramfs_mod.build_image(ramfs_staging, nanvix_home, ramfs_img)
+    ramfs_mod.build_image(ramfs_staging, args.sysroot, ramfs_img)
 
     # --- Create release tarballs ---
     dist_dir.mkdir(parents=True, exist_ok=True)
@@ -205,19 +155,13 @@ def package(
         print(f"  {f.name} ({size // 1024}K)")
 
 
-def verify(
-    repo_root: Path,
-    *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-) -> None:
+def verify(args: build_mod.MakeArgs) -> None:
     """Verify release tarballs.
 
     Checks that tarballs exist, are not corrupt, and contain the
     expected contents.
     """
-    artifact = _artifact_base(platform, process_mode, memory_size)
+    artifact = args.asset_prefix()
     dist_dir = paths.dist_dir()
 
     print("Verifying release tarballs...")

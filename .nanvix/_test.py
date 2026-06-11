@@ -22,7 +22,8 @@ import tarfile
 import time
 import urllib.request
 from pathlib import Path
-from typing import Any
+
+from nanvix_zutil import paths
 
 import build as build_mod
 import config
@@ -101,19 +102,14 @@ def _create_initrd(
 # ---------------------------------------------------------------------------
 
 
-def _download_release_as_cache(
-    repo_root: Path,
-    platform: str,
-    process_mode: str,
-    memory_size: str,
-) -> Path:
+def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
     """Download the latest cpython release tarball and extract it as _install_cache.
 
     This lets ``./z test`` work on Windows without a prior ``./z build``
     (which requires Docker). The release tarball contains the same
     sysroot tree that ``./z build`` would produce.
     """
-    cache_dir = repo_root / ".nanvix" / "_install_cache"
+    cache_dir = paths.nanvix_root() / "_install_cache"
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -133,14 +129,13 @@ def _download_release_as_cache(
     print(f"  Resolved cpython release: {tag}")
 
     # Find a standalone tarball asset (.tar.gz preferred, .tar.bz2 fallback).
-    asset_prefix = f"cpython-{platform}-{process_mode}-{memory_size}"
     asset_url = None
     asset_name = None
     for ext in (".tar.gz", ".tar.bz2"):
         for a in release.get("assets", []):
             name = a.get("name", "")
             if (
-                name.startswith(asset_prefix)
+                name.startswith(args.asset_prefix())
                 and name.endswith(ext)
                 and "buildroot" not in name
             ):
@@ -152,13 +147,13 @@ def _download_release_as_cache(
 
     if not asset_url:
         raise FileNotFoundError(
-            f"No cpython release asset matching '{asset_prefix}*.tar.gz' or '*.tar.bz2' "
+            f"No cpython release asset matching '{args.asset_prefix()}*.tar.gz' or '*.tar.bz2' "
             f"in release {tag}. Available assets: "
             + ", ".join(a["name"] for a in release.get("assets", []))
         )
 
     # Download.
-    dl_dir = repo_root / ".nanvix" / "cache"
+    dl_dir = paths.nanvix_root() / "cache"
     dl_dir.mkdir(parents=True, exist_ok=True)
     assert asset_name is not None
     tarball = dl_dir / asset_name
@@ -208,7 +203,7 @@ def _download_release_as_cache(
     # needs it. The source checkout has the full Lib/test/.
     pylib_dir = sysroot / "lib" / config.PYTHON_LIB_DIR
     test_dst = pylib_dir / "test"
-    test_src = repo_root / "Lib" / "test"
+    test_src = paths.repo_root() / "Lib" / "test"
     if test_src.is_dir() and not test_dst.is_dir():
         shutil.copytree(test_src, test_dst)
         test_count = sum(1 for _ in test_dst.rglob("*.py"))
@@ -224,9 +219,8 @@ def _download_release_as_cache(
 
 
 def _manual_install(
-    repo_root: Path,
     staging: Path,
-    install_prefix: str,
+    args: build_mod.MakeArgs,
 ) -> None:
     """Create a minimal install tree without invoking make.
 
@@ -235,7 +229,7 @@ def _manual_install(
     the source/build tree into the staging directory.
     """
     # install_prefix is e.g. "/sysroot" — strip leading slash for relative path.
-    prefix_rel = install_prefix.lstrip("/")
+    prefix_rel = args.install_prefix.lstrip("/")
     sysroot_dir = staging / prefix_rel
     bin_dir = sysroot_dir / "bin"
     lib_dir = sysroot_dir / "lib" / config.PYTHON_LIB_DIR
@@ -244,26 +238,26 @@ def _manual_install(
     lib_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy the built python binary.
-    python_bin = repo_root / f"python{config.EXE}"
+    python_bin = paths.repo_root() / f"python{config.EXE}"
     if python_bin.is_file():
         shutil.copy2(python_bin, bin_dir / config.python_binary())
 
     # Copy the standard library from Lib/.
-    lib_src = repo_root / "Lib"
+    lib_src = paths.repo_root() / "Lib"
     if lib_src.is_dir():
         shutil.copytree(lib_src, lib_dir, dirs_exist_ok=True)
 
     # Copy sysconfigdata from the build directory.
     scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
-    pybuilddir_file = repo_root / "pybuilddir.txt"
+    pybuilddir_file = paths.repo_root() / "pybuilddir.txt"
     if pybuilddir_file.is_file():
-        bdir = repo_root / pybuilddir_file.read_text().strip()
+        bdir = paths.repo_root() / pybuilddir_file.read_text().strip()
         scdata_src = bdir / scdata_name
         if scdata_src.is_file():
             shutil.copy2(scdata_src, lib_dir / scdata_name)
 
     # Copy libpython archive (needed by some install validation).
-    libpython = repo_root / f"libpython{config.PYTHON_VERSION}.a"
+    libpython = paths.repo_root() / f"libpython{config.PYTHON_VERSION}.a"
     lib_parent = sysroot_dir / "lib"
     if libpython.is_file():
         shutil.copy2(libpython, lib_parent / libpython.name)
@@ -272,23 +266,13 @@ def _manual_install(
 
 
 def stage(
-    sysroot: str | Path,
-    toolchain: str | Path,
-    repo_root: Path,
-    *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
-    release: bool = False,
-    run_fn: Any = None,
-    docker: bool = False,
+    args: build_mod.MakeArgs,
 ) -> Path:
     """Build, install, and stage CPython for testing.
 
     Returns the test staging directory.
     """
-    staging = repo_root / ".nanvix" / "_test_staging"
+    staging = paths.nanvix_root() / "_test_staging"
 
     print("Running CPython tests on Nanvix...")
     if staging.exists():
@@ -297,7 +281,7 @@ def stage(
     if config.IS_WINDOWS:
         # On Windows, use the cached install tree produced by ``./z build``
         # so that no Docker invocation is needed during testing.
-        install_cache = repo_root / ".nanvix" / "_install_cache"
+        install_cache = paths.nanvix_root() / "_install_cache"
         if install_cache.is_dir():
             shutil.copytree(install_cache, staging)
             print("  Using cached install from ./z build")
@@ -306,12 +290,7 @@ def stage(
             # install cache. This lets ``./z test`` work on Windows
             # without a prior ``./z build`` (which requires Docker).
             print("  Install cache not found — downloading release artifacts...")
-            install_cache = _download_release_as_cache(
-                repo_root,
-                platform,
-                process_mode,
-                memory_size,
-            )
+            install_cache = _download_release_as_cache(args)
             shutil.copytree(install_cache, staging)
             print("  Using downloaded release as install cache")
     else:
@@ -320,12 +299,12 @@ def stage(
         # the build tree is properly configured, and the host cannot use
         # BUILD_PYTHON (e.g. after a prior Docker build where that tool
         # is unavailable outside the container).
-        python_binary = repo_root / f"python{config.EXE}"
-        configured_marker = repo_root / ".nanvix-configured"
-        pybuilddir = repo_root / "pybuilddir.txt"
+        python_binary = paths.repo_root() / f"python{config.EXE}"
+        configured_marker = paths.repo_root() / ".nanvix-configured"
+        pybuilddir = paths.repo_root() / "pybuilddir.txt"
 
         # Determine whether BUILD_PYTHON is usable on the host.
-        build_python_path = Path(toolchain) / "bin" / "python3"
+        build_python_path = Path(args.toolchain_path) / "bin" / "python3"
         build_python_available = (
             build_python_path.is_file()
             or shutil.which(str(build_python_path)) is not None
@@ -335,8 +314,8 @@ def stage(
         # /mnt/sysroot baked into Makefile).  A native rebuild would
         # fail because those paths don't exist on the host.
         docker_configured = False
-        makefile = repo_root / "Makefile"
-        if makefile.is_file() and not docker:
+        makefile = paths.repo_root() / "Makefile"
+        if makefile.is_file() and not args.docker:
             try:
                 header = makefile.read_text(encoding="utf-8", errors="replace")[:8192]
                 docker_configured = config.DOCKER_SYSROOT_PATH in header
@@ -364,51 +343,18 @@ def stage(
                 # Cannot run make install natively when configure used
                 # Docker paths and the native toolchain would trigger a
                 # rebuild — do a manual install instead.
-                _manual_install(repo_root, staging, install_prefix)
+                _manual_install(staging, args)
             else:
                 # Install into staging, skipping the outer build prereq
                 # and stubbing PYTHON_FOR_BUILD for the inner make.
                 build_mod.install(
-                    sysroot,
-                    toolchain,
-                    repo_root,
                     staging,
-                    platform=platform,
-                    process_mode=process_mode,
-                    memory_size=memory_size,
-                    install_prefix=install_prefix,
-                    release=release,
-                    run_fn=run_fn,
+                    args,
                     extra_make_flags=["-o", "build", "PYTHON_FOR_BUILD=:"],
-                    docker=docker,
                 )
         else:
-            build_mod.build(
-                sysroot,
-                toolchain,
-                repo_root,
-                platform=platform,
-                process_mode=process_mode,
-                memory_size=memory_size,
-                install_prefix=install_prefix,
-                release=release,
-                run_fn=run_fn,
-                docker=docker,
-            )
-
-            build_mod.install(
-                sysroot,
-                toolchain,
-                repo_root,
-                staging,
-                platform=platform,
-                process_mode=process_mode,
-                memory_size=memory_size,
-                install_prefix=install_prefix,
-                release=release,
-                run_fn=run_fn,
-                docker=docker,
-            )
+            build_mod.build(args)
+            build_mod.install(staging, args)
 
     sysroot_dir = staging / "sysroot"
 
@@ -420,9 +366,9 @@ def stage(
     scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
     scdata_dst = sysroot_dir / "lib" / config.PYTHON_LIB_DIR / scdata_name
     if not scdata_dst.is_file():
-        pybuilddir = repo_root / "pybuilddir.txt"
+        pybuilddir = paths.repo_root() / "pybuilddir.txt"
         if pybuilddir.is_file():
-            bdir = repo_root / pybuilddir.read_text().strip()
+            bdir = paths.repo_root() / pybuilddir.read_text().strip()
             scdata_src = bdir / scdata_name
             if scdata_src.is_file():
                 shutil.copy2(scdata_src, scdata_dst)
@@ -441,7 +387,7 @@ def stage(
     # xmlInitParser() hangs in multi-process/single-process modes where
     # filesystem I/O goes through nanvixd's virtualized host-FS layer.
     hello_script = sysroot_dir / "test_hello.py"
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
     lxml_snippet = (
         "try:\n"
         "    import lxml.etree\n"
@@ -467,14 +413,13 @@ def stage(
     # stage_ramfs().  Standalone mode mounts the ramfs as /, so the
     # script must already be present at this point — copying it later
     # (e.g. from run_smoke_httpserver) is too late.
-    httpserver_src = repo_root / "httpserver.py"
+    httpserver_src = paths.repo_root() / "httpserver.py"
     if httpserver_src.is_file():
         shutil.copy2(httpserver_src, sysroot_dir / "httpserver.py")
 
     # Copy Nanvix runtime binaries.
     bin_dir = sysroot_dir / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
-    nanvix_home = Path(sysroot)
     for binary in [
         "nanvixd.elf",
         "kernel.elf",
@@ -490,12 +435,12 @@ def stage(
         "memd.elf",
         "vfsd.elf",
     ]:
-        src = nanvix_home / "bin" / binary
+        src = args.sysroot / "bin" / binary
         if src.is_file():
             shutil.copy2(src, bin_dir / binary)
 
     # Replace unstripped python binary with stripped python.elf.
-    stripped = repo_root / f"python{config.EXE}"
+    stripped = paths.repo_root() / f"python{config.EXE}"
     if stripped.is_file():
         target = bin_dir / config.python_binary()
         shutil.copy2(stripped, target)
@@ -503,15 +448,15 @@ def stage(
         print(f"  Installed stripped python.elf into staging ({size // 1024}K)")
 
     # Copy guest-side test runner.
-    regrtest_runner = repo_root / ".nanvix" / "run-regrtest.py"
+    regrtest_runner = paths.nanvix_root() / "run-regrtest.py"
     if regrtest_runner.is_file():
         shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
 
     # Invalidate stale ramfs image and cache from previous runs.
-    stale_ramfs = repo_root / ".nanvix" / "cpython-rootfs.img"
+    stale_ramfs = paths.nanvix_root() / "cpython-rootfs.img"
     if stale_ramfs.is_file():
         stale_ramfs.unlink()
-    stale_cache = repo_root / ".nanvix" / "_ramfs_cache"
+    stale_cache = paths.nanvix_root() / "_ramfs_cache"
     if stale_cache.is_dir():
         shutil.rmtree(stale_cache)
 
@@ -525,8 +470,7 @@ def stage(
 
 def stage_ramfs(
     staging: Path,
-    nanvix_home: Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     ramfs_img: Path | None = None,
 ) -> Path:
     """Build a ramfs image for standalone mode testing.
@@ -536,9 +480,9 @@ def stage_ramfs(
     Returns the path to the ramfs image.
     """
     if ramfs_img is None:
-        ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
+        ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
 
-    ramfs_cache = repo_root / ".nanvix" / "_ramfs_cache"
+    ramfs_cache = paths.nanvix_root() / "_ramfs_cache"
 
     if ramfs_img.is_file() and (ramfs_cache / "sysroot").is_dir():
         print(f"  Using cached ramfs: {ramfs_img}")
@@ -560,7 +504,7 @@ def stage_ramfs(
     # Trim and build ramfs image (keep tests for test pipeline).
     ramfs_mod.trim_and_build(
         ramfs_cache,
-        nanvix_home,
+        args.sysroot,
         ramfs_img,
         keep_tests=True,
     )
@@ -576,12 +520,10 @@ def stage_ramfs(
 def _run_nanvixd_script(
     staging: Path,
     script_name: str,
+    args: build_mod.MakeArgs,
     *,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    platform: str = config.DEFAULT_PLATFORM,
     nanvixd_extra: list[str] | None = None,
     ramfs_img: Path | None = None,
-    nanvix_home: Path | None = None,
     timeout: int = 120,
     label: str = "script",
 ) -> tuple[int, str, int]:
@@ -594,13 +536,13 @@ def _run_nanvixd_script(
     resolved_extra: list[str] = (
         nanvixd_extra
         if nanvixd_extra is not None
-        else config.PLATFORM_NANVIXD_ARGS.get(platform, [])
+        else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
     # On Windows, CreateProcess searches for the executable relative to the
     # *parent's* CWD, not the child's cwd. Use an absolute path to avoid this.
     nanvixd = str((sysroot / "bin" / config.nanvixd_binary()).resolve())
     python_bin = f"./bin/{config.python_binary()}"
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
 
     if standalone:
         if ramfs_img is None:
@@ -609,7 +551,7 @@ def _run_nanvixd_script(
         # Copy host tools and daemon ELFs into the staging sysroot.
         # mkramfs is needed for ramfs generation; mkimage and the daemons
         # (procd, memd, vfsd) are needed for initrd creation.
-        if nanvix_home:
+        if args.sysroot:
             # Daemons are *guest* binaries — always .elf, even on
             # Windows.  Only host tools use the platform extension.
             _staging_bins = [
@@ -620,7 +562,7 @@ def _run_nanvixd_script(
                 "vfsd.elf",
             ]
             for name in _staging_bins:
-                src = nanvix_home / "bin" / name
+                src = args.sysroot / "bin" / name
                 if src.is_file():
                     shutil.copy2(src, sysroot / "bin" / name)
 
@@ -683,12 +625,9 @@ def _run_nanvixd_script(
 
 def run_hello(
     staging: Path,
-    *,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    platform: str = config.DEFAULT_PLATFORM,
+    args: build_mod.MakeArgs,
     nanvixd_extra: list[str] | None = None,
     ramfs_img: Path | None = None,
-    nanvix_home: Path | None = None,
 ) -> None:
     """Run the hello-world test via nanvixd.
 
@@ -696,18 +635,16 @@ def run_hello(
     environment variable syntax.  Multi-process and single-process modes
     use direct host-filesystem access (no ramfs).
     """
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
 
-    print(f"Test: Hello world ({process_mode})...")
+    print(f"Test: Hello world ({args.process_mode})...")
 
     returncode, output, elapsed_ms = _run_nanvixd_script(
         staging,
         "test_hello.py",
-        process_mode=process_mode,
-        platform=platform,
+        args,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
-        nanvix_home=nanvix_home,
         label="Hello test",
     )
     print(f"  Execution time: {elapsed_ms} ms")
@@ -749,13 +686,10 @@ def run_hello(
 
 def run_smoke_httpserver(
     staging: Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     *,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    platform: str = config.DEFAULT_PLATFORM,
     nanvixd_extra: list[str] | None = None,
     ramfs_img: Path | None = None,
-    nanvix_home: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 9999,
     boot_timeout: float = 60.0,
@@ -779,10 +713,10 @@ def run_smoke_httpserver(
     import socket as _socket
     import tempfile
 
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
     if not standalone:
         print(
-            f"Test: HTTP server smoke ({process_mode})... "
+            f"Test: HTTP server smoke ({args.process_mode})... "
             "SKIP (networking only available in standalone mode)"
         )
         return
@@ -798,23 +732,23 @@ def run_smoke_httpserver(
     resolved_extra: list[str] = (
         nanvixd_extra
         if nanvixd_extra is not None
-        else config.PLATFORM_NANVIXD_ARGS.get(platform, [])
+        else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
     nanvixd = str((sysroot / "bin" / config.nanvixd_binary()).resolve())
 
     if ramfs_img is None:
         raise ValueError("ramfs_img is required for standalone mode")
-    if nanvix_home is not None:
-        for name in (
-            config.mkramfs_binary(),
-            config.mkimage_binary(),
-            "procd.elf",
-            "memd.elf",
-            "vfsd.elf",
-        ):
-            hp = nanvix_home / "bin" / name
-            if hp.is_file():
-                shutil.copy2(hp, sysroot / "bin" / name)
+
+    for name in (
+        config.mkramfs_binary(),
+        config.mkimage_binary(),
+        "procd.elf",
+        "memd.elf",
+        "vfsd.elf",
+    ):
+        hp = args.sysroot / "bin" / name
+        if hp.is_file():
+            shutil.copy2(hp, sysroot / "bin" / name)
 
     bin_dir = sysroot / "bin"
     app_path = sysroot / "bin" / config.python_binary()
@@ -835,7 +769,7 @@ def run_smoke_httpserver(
         str(initrd_img),
     ]
 
-    print(f"Test: HTTP server smoke ({process_mode}) on {host}:{port}...")
+    print(f"Test: HTTP server smoke ({args.process_mode}) on {host}:{port}...")
 
     # Capture stdout/stderr to a file so we can both poll for the
     # "listening" marker without risking PIPE deadlock and include the
@@ -935,18 +869,15 @@ def run_smoke_httpserver(
 
 def run_regrtest(
     staging: Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     *,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    platform: str = config.DEFAULT_PLATFORM,
     test_list: list[str] | None = None,
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
     nanvixd_extra: list[str] | None = None,
     ramfs_img: Path | None = None,
-    release: bool = False,
 ) -> None:
     """Run stdlib regression tests via run-tests.py."""
-    if release:
+    if args.release:
         print("Test: regrtest skipped (NANVIX_RELEASE=yes)")
         return
 
@@ -956,12 +887,12 @@ def run_regrtest(
     resolved_nanvixd_extra: list[str] = (
         nanvixd_extra
         if nanvixd_extra is not None
-        else config.PLATFORM_NANVIXD_ARGS.get(platform, [])
+        else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
 
     sysroot = staging / "sysroot"
-    run_tests_script = repo_root / ".nanvix" / "run-tests.py"
+    run_tests_script = paths.nanvix_root() / "run-tests.py"
 
     env = os.environ.copy()
     env["NANVIX_TEST_BATCH_SIZE"] = str(batch_size)
@@ -970,7 +901,7 @@ def run_regrtest(
     if standalone:
         # Standalone: ramfs + initrd-based invocation.
         if ramfs_img is None:
-            ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
+            ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
         bin_dir = sysroot / "bin"
         extra_str = f"-bin-dir {bin_dir} -ramfs {ramfs_img}"
         if resolved_nanvixd_extra:
@@ -992,7 +923,7 @@ def run_regrtest(
 
     cmd = [sys.executable, str(run_tests_script)] + test_list
 
-    print(f"Test: regrtest ({len(test_list)} modules, {process_mode})...")
+    print(f"Test: regrtest ({len(test_list)} modules, {args.process_mode})...")
     result = subprocess.run(cmd, cwd=sysroot, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"regrtest failed with exit code {result.returncode}")
@@ -1003,9 +934,9 @@ def run_regrtest(
 # ---------------------------------------------------------------------------
 
 
-def cleanup(repo_root: Path) -> None:
+def cleanup() -> None:
     """Clean up test artifacts."""
-    staging = repo_root / ".nanvix" / "_test_staging"
+    staging = paths.nanvix_root() / "_test_staging"
     if staging.is_dir():
         shutil.rmtree(staging)
     for name in [
@@ -1013,18 +944,18 @@ def cleanup(repo_root: Path) -> None:
         "cpython_regrtest.log",
         "cpython_regrtest_batch.log",
     ]:
-        p = repo_root / ".nanvix" / name
+        p = paths.nanvix_root() / name
         if p.is_file():
             p.unlink()
 
 
-def deep_cleanup(repo_root: Path) -> None:
+def deep_cleanup() -> None:
     """Deep clean: remove cached ramfs template."""
-    cleanup(repo_root)
-    ramfs_cache = repo_root / ".nanvix" / "_ramfs_cache"
+    cleanup()
+    ramfs_cache = paths.nanvix_root() / "_ramfs_cache"
     if ramfs_cache.is_dir():
         shutil.rmtree(ramfs_cache)
-    ramfs_img = repo_root / ".nanvix" / "cpython-rootfs.img"
+    ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
     if ramfs_img.is_file():
         ramfs_img.unlink()
 
@@ -1035,82 +966,55 @@ def deep_cleanup(repo_root: Path) -> None:
 
 
 def run_all(
-    sysroot: str | Path,
-    toolchain: str | Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
-    release: bool = False,
     test_list: list[str] | None = None,
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
     nanvixd_extra: list[str] | None = None,
-    run_fn: Any = None,
-    docker: bool = False,
 ) -> None:
     """Run the complete test pipeline: stage → hello → regrtest → cleanup."""
-    nanvix_home = Path(sysroot)
-    standalone = process_mode == "standalone"
+    standalone = args.process_mode == "standalone"
 
     # Stage.
     staging = stage(
-        sysroot,
-        toolchain,
-        repo_root,
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=release,
-        run_fn=run_fn,
-        docker=docker,
+        args,
     )
-    lxml_mod.stage_lxml_runtime(repo_root, staging / "sysroot")
+    lxml_mod.stage_lxml_runtime(staging / "sysroot")
 
     # Ramfs — only needed for standalone mode.  Multi-process and
     # single-process use host-filesystem access (no ramfs).
     ramfs_img = None
     if standalone:
-        ramfs_img = stage_ramfs(staging, nanvix_home, repo_root)
+        ramfs_img = stage_ramfs(staging, args)
 
     # Hello test.
     run_hello(
         staging,
-        process_mode=process_mode,
-        platform=platform,
+        args,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
-        nanvix_home=nanvix_home,
     )
 
     # HTTP server smoke test.
     run_smoke_httpserver(
         staging,
-        repo_root,
-        process_mode=process_mode,
-        platform=platform,
+        args,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
-        nanvix_home=nanvix_home,
     )
 
     # Regression tests.
     run_regrtest(
         staging,
-        repo_root,
-        process_mode=process_mode,
-        platform=platform,
+        args,
         test_list=test_list,
         batch_size=batch_size,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
-        release=release,
     )
 
     # Cleanup.
-    cleanup(repo_root)
+    cleanup()
 
     print("\t\t*** CPython tests PASSED ***")
 
@@ -1121,17 +1025,9 @@ def run_all(
 
 
 def run_benchmark(
-    sysroot: str | Path,
-    toolchain: str | Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     *,
-    platform: str = config.DEFAULT_PLATFORM,
-    process_mode: str = config.DEFAULT_PROCESS_MODE,
-    memory_size: str = config.DEFAULT_MEMORY_SIZE,
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX,
     nanvixd_extra: list[str] | None = None,
-    run_fn: Any = None,
-    docker: bool = False,
 ) -> None:
     """Run a hello-world benchmark.
 
@@ -1143,57 +1039,23 @@ def run_benchmark(
 
     No regression tests are executed.
     """
-    nanvix_home = Path(sysroot)
-    standalone = process_mode == "standalone"
-
     try:
         _run_benchmark_impl(
-            sysroot,
-            toolchain,
-            repo_root,
-            nanvix_home=nanvix_home,
-            standalone=standalone,
-            platform=platform,
-            process_mode=process_mode,
-            memory_size=memory_size,
-            install_prefix=install_prefix,
+            args,
             nanvixd_extra=nanvixd_extra,
-            run_fn=run_fn,
-            docker=docker,
         )
     finally:
-        cleanup(repo_root)
+        cleanup()
 
 
 def _run_benchmark_impl(
-    sysroot: str | Path,
-    toolchain: str | Path,
-    repo_root: Path,
+    args: build_mod.MakeArgs,
     *,
-    nanvix_home: Path,
-    standalone: bool,
-    platform: str,
-    process_mode: str,
-    memory_size: str,
-    install_prefix: str,
     nanvixd_extra: list[str] | None = None,
-    run_fn: Any = None,
-    docker: bool = False,
 ) -> None:
     """Inner implementation of :func:`run_benchmark`."""
     # Stage (reuses cached build).
-    staging = stage(
-        sysroot,
-        toolchain,
-        repo_root,
-        platform=platform,
-        process_mode=process_mode,
-        memory_size=memory_size,
-        install_prefix=install_prefix,
-        release=False,
-        run_fn=run_fn,
-        docker=docker,
-    )
+    staging = stage(args)
 
     # Write a minimal benchmark script.
     bench_script = "bench_hello.py"
@@ -1201,9 +1063,9 @@ def _run_benchmark_impl(
 
     # Build ramfs with release trimming (keep_tests=False).
     ramfs_img = None
-    if standalone:
-        ramfs_img = repo_root / ".nanvix" / "cpython-benchmark.img"
-        bench_cache = repo_root / ".nanvix" / "_benchmark_cache"
+    if args.process_mode == "standalone":
+        ramfs_img = paths.nanvix_root() / "cpython-benchmark.img"
+        bench_cache = paths.nanvix_root() / "_benchmark_cache"
 
         # Always rebuild to reflect the current sysroot.
         if bench_cache.exists():
@@ -1218,7 +1080,7 @@ def _run_benchmark_impl(
         # Release-style trim: no test/ dir, no dev artifacts.
         ramfs_mod.trim_and_build(
             bench_cache,
-            nanvix_home,
+            args.sysroot,
             ramfs_img,
             keep_tests=False,
         )
@@ -1227,16 +1089,14 @@ def _run_benchmark_impl(
         shutil.rmtree(bench_cache, ignore_errors=True)
 
     # Run benchmark.
-    print(f"Benchmark: Hello world ({process_mode})...")
+    print(f"Benchmark: Hello world ({args.process_mode})...")
 
     returncode, output, elapsed_ms = _run_nanvixd_script(
         staging,
         bench_script,
-        process_mode=process_mode,
-        platform=platform,
+        args,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
-        nanvix_home=nanvix_home,
         label="Benchmark",
     )
     print(f"  Execution time: {elapsed_ms} ms")
