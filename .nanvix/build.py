@@ -85,22 +85,18 @@ class MakeArgs:
         return f"cpython-{self.platform}-{self.process_mode}-{self.memory_size}"
 
 
-def build(
-    args: MakeArgs,
-) -> None:
-    """Cross-compile python.elf for Nanvix."""
+def build(args: MakeArgs, out: Path) -> None:
+    """
+    Cross-compile python.elf for Nanvix.
+    Always runs in Docker.
+    """
     _args = dataclasses.replace(args, targets=["build"])
     if config.IS_WINDOWS:
-        # Build and install in one Docker invocation so the install tree
-        # is cached for later use by ``./z test`` (no Docker during tests).
-        install_cache = paths.nanvix_root() / "_install_cache"
-        docker_mod.docker_build(paths.repo_root(), args, install_destdir=install_cache)
+        docker_mod.docker_build(paths.repo_root(), args, install_destdir=out)
         return
-    sysroot_for_setup = (
-        Path(config.DOCKER_SYSROOT_PATH) if _args.docker else args.sysroot
-    )
-    lxml_mod.generate_setup_local(paths.repo_root(), sysroot_for_setup)
+    lxml_mod.generate_setup_local(paths.repo_root(), Path(config.DOCKER_SYSROOT_PATH))
     _args.run(cwd=paths.repo_root())
+    install(out, args)
 
 
 def install(
@@ -109,19 +105,41 @@ def install(
     *,
     extra_make_flags: list[str] | None = None,
 ) -> None:
-    """Install CPython into a staging directory."""
-    if config.IS_WINDOWS:
-        docker_mod.docker_install(paths.repo_root(), destdir, args)
-        return
+    """Install CPython into a staging directory under ``paths.out_dir()``."""
+    # Safety: destdir is caller-supplied and we're about to rmtree it.
+    # Refuse anything outside the Nanvix work area.
+    resolved_destdir = destdir.resolve()
+    out_root = paths.out_dir().resolve()
+    try:
+        resolved_destdir.relative_to(out_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"install() refuses to wipe {destdir!s}: not under {out_root!s}"
+        ) from exc
     # When running inside Docker, repo_root maps to /mnt/workspace.
     # Use a relative DESTDIR so it resolves correctly inside the container.
+    if destdir.exists():
+        shutil.rmtree(destdir)
     try:
-        rel_destdir = destdir.resolve().relative_to(paths.repo_root())
+        rel_destdir = resolved_destdir.relative_to(paths.repo_root())
     except ValueError:
         rel_destdir = destdir
     targets = [*(extra_make_flags or []), "install", f"DESTDIR={rel_destdir}"]
     _args = dataclasses.replace(args, targets=targets)
     _args.run(cwd=paths.repo_root())
+
+    if not args.release:
+        sysroot = destdir / args.install_prefix.lstrip("/")
+        shutil.copytree(
+            paths.repo_root() / "Lib" / "test",
+            sysroot / "lib" / config.PYTHON_LIB_DIR / "test",
+            dirs_exist_ok=True,
+        )
+        stripped = paths.repo_root() / f"python{config.EXE}"
+        if stripped.is_file():
+            bin_dir = sysroot / "bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(stripped, bin_dir / config.python_binary())
 
 
 def clean() -> None:

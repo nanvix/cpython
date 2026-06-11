@@ -27,25 +27,31 @@ def package(
     - ``cpython-<platform>-<mode>-<memory>.tar.gz`` — runtime sysroot + binary + ramfs
     - ``cpython-<platform>-<mode>-<memory>-buildroot.tar.gz`` — build dependencies
     """
-    release_staging = paths.nanvix_root() / "release"
+    release_staging = paths.release_dir()
     dist_dir = paths.dist_dir()
     artifact = args.asset_prefix()
 
     print("Packaging CPython release...")
 
-    # Clean previous staging.
-    if release_staging.exists():
-        shutil.rmtree(release_staging)
-
-    # Build.
-    build_mod.build(args)
-
-    # Install into staging.
-    build_mod.install(release_staging, args)
-
     sysroot_installed = release_staging / "sysroot"
     if not sysroot_installed.is_dir():
-        raise FileNotFoundError(f"Install did not produce {sysroot_installed}")
+        raise FileNotFoundError(
+            f"Release install tree not found at {sysroot_installed}. "
+            "Run `./z build` first to populate it."
+        )
+
+    # Clean previous packaging scratch (but NEVER the installed sysroot,
+    # which is produced by `./z build` and is the input to this step).
+    for scratch in (
+        release_staging / "buildroot-pkg",
+        release_staging / "sysroot-pkg-wrap",
+        release_staging / "bin",
+        release_staging / "cpython-ramfs.img",
+    ):
+        if scratch.is_dir():
+            shutil.rmtree(scratch)
+        elif scratch.is_file():
+            scratch.unlink()
 
     # Stage lxml Python package into the installed sysroot.
     lxml_mod.stage_lxml_runtime(sysroot_installed)
@@ -145,9 +151,6 @@ def package(
     buildroot_tar = dist_dir / f"{artifact}-buildroot.tar.gz"
     with tarfile.open(str(buildroot_tar), "w:gz") as tf:
         tf.add(str(buildroot_pkg), arcname="sysroot")
-
-    # Cleanup staging.
-    shutil.rmtree(release_staging)
 
     print("Release tarballs created in dist/")
     for f in sorted(dist_dir.glob(f"{artifact}*.tar.gz")):

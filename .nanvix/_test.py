@@ -35,6 +35,14 @@ import ramfs as ramfs_mod
 # ---------------------------------------------------------------------------
 
 
+def install_cache() -> Path:
+    """
+    Cpython installation cache used on Windows.
+    Allows tests to run without building first.
+    """
+    return paths.nanvix_root() / "_install_cache"
+
+
 def _create_initrd(
     bin_dir: Path,
     app_path: Path,
@@ -109,7 +117,7 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
     (which requires Docker). The release tarball contains the same
     sysroot tree that ``./z build`` would produce.
     """
-    cache_dir = paths.nanvix_root() / "_install_cache"
+    cache_dir = paths.test_out()
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -218,146 +226,32 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _manual_install(
-    staging: Path,
-    args: build_mod.MakeArgs,
-) -> None:
-    """Create a minimal install tree without invoking make.
-
-    Used when the Makefile was configured inside Docker and cannot be
-    used natively.  Copies the Python binary and standard library from
-    the source/build tree into the staging directory.
-    """
-    # install_prefix is e.g. "/sysroot" — strip leading slash for relative path.
-    prefix_rel = args.install_prefix.lstrip("/")
-    sysroot_dir = staging / prefix_rel
-    bin_dir = sysroot_dir / "bin"
-    lib_dir = sysroot_dir / "lib" / config.PYTHON_LIB_DIR
-
-    bin_dir.mkdir(parents=True, exist_ok=True)
-    lib_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy the built python binary.
-    python_bin = paths.repo_root() / f"python{config.EXE}"
-    if python_bin.is_file():
-        shutil.copy2(python_bin, bin_dir / config.python_binary())
-
-    # Copy the standard library from Lib/.
-    lib_src = paths.repo_root() / "Lib"
-    if lib_src.is_dir():
-        shutil.copytree(lib_src, lib_dir, dirs_exist_ok=True)
-
-    # Copy sysconfigdata from the build directory.
-    scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
-    pybuilddir_file = paths.repo_root() / "pybuilddir.txt"
-    if pybuilddir_file.is_file():
-        bdir = paths.repo_root() / pybuilddir_file.read_text().strip()
-        scdata_src = bdir / scdata_name
-        if scdata_src.is_file():
-            shutil.copy2(scdata_src, lib_dir / scdata_name)
-
-    # Copy libpython archive (needed by some install validation).
-    libpython = paths.repo_root() / f"libpython{config.PYTHON_VERSION}.a"
-    lib_parent = sysroot_dir / "lib"
-    if libpython.is_file():
-        shutil.copy2(libpython, lib_parent / libpython.name)
-
-    print(f"  Manual install complete ({sysroot_dir})")
-
-
 def stage(
     args: build_mod.MakeArgs,
 ) -> Path:
-    """Build, install, and stage CPython for testing.
-
+    """Stage CPython for testing.
+    Assumes that build() has already run.
     Returns the test staging directory.
     """
-    staging = paths.nanvix_root() / "_test_staging"
+    staging = paths.test_out()
 
     print("Running CPython tests on Nanvix...")
-    if staging.exists():
-        shutil.rmtree(staging)
-
     if config.IS_WINDOWS:
-        # On Windows, use the cached install tree produced by ``./z build``
-        # so that no Docker invocation is needed during testing.
-        install_cache = paths.nanvix_root() / "_install_cache"
-        if install_cache.is_dir():
-            shutil.copytree(install_cache, staging)
-            print("  Using cached install from ./z build")
-        else:
-            # Fallback: download the release tarball and use it as the
-            # install cache. This lets ``./z test`` work on Windows
-            # without a prior ``./z build`` (which requires Docker).
-            print("  Install cache not found — downloading release artifacts...")
+        # Fallback: download the release tarball and use it as the
+        # install cache. This lets ``./z test`` work on Windows
+        # without a prior ``./z build`` (which requires Docker).
+        if not paths.test_out().is_dir():
+            print("  Install cache not found. Downloading release artifacts...")
             install_cache = _download_release_as_cache(args)
             shutil.copytree(install_cache, staging)
             print("  Using downloaded release as install cache")
-    else:
-        # Linux: build and install directly.
-        # Only skip the rebuild when the previously built binary exists,
-        # the build tree is properly configured, and the host cannot use
-        # BUILD_PYTHON (e.g. after a prior Docker build where that tool
-        # is unavailable outside the container).
-        python_binary = paths.repo_root() / f"python{config.EXE}"
-        configured_marker = paths.repo_root() / ".nanvix-configured"
-        pybuilddir = paths.repo_root() / "pybuilddir.txt"
-
-        # Determine whether BUILD_PYTHON is usable on the host.
-        build_python_path = Path(args.toolchain_path) / "bin" / "python3"
-        build_python_available = (
-            build_python_path.is_file()
-            or shutil.which(str(build_python_path)) is not None
-        )
-
-        # Detect if ./configure was run inside Docker (paths like
-        # /mnt/sysroot baked into Makefile).  A native rebuild would
-        # fail because those paths don't exist on the host.
-        docker_configured = False
-        makefile = paths.repo_root() / "Makefile"
-        if makefile.is_file() and not args.docker:
-            try:
-                header = makefile.read_text(encoding="utf-8", errors="replace")[:8192]
-                docker_configured = config.DOCKER_SYSROOT_PATH in header
-            except OSError:
-                pass
-
-        can_skip_rebuild = (
-            python_binary.is_file()
-            and configured_marker.is_file()
-            and pybuilddir.is_file()
-            and (not build_python_available or docker_configured)
-        )
-
-        if can_skip_rebuild:
-            skip_reason = (
-                "Docker-configured Makefile (native rebuild would fail)"
-                if docker_configured and build_python_available
-                else "BUILD_PYTHON is unavailable"
-            )
-            print(
-                f"  Skipping rebuild ({python_binary.name} already exists"
-                f" — {skip_reason})"
-            )
-            if docker_configured and build_python_available:
-                # Cannot run make install natively when configure used
-                # Docker paths and the native toolchain would trigger a
-                # rebuild — do a manual install instead.
-                _manual_install(staging, args)
-            else:
-                # Install into staging, skipping the outer build prereq
-                # and stubbing PYTHON_FOR_BUILD for the inner make.
-                build_mod.install(
-                    staging,
-                    args,
-                    extra_make_flags=["-o", "build", "PYTHON_FOR_BUILD=:"],
-                )
-        else:
-            build_mod.build(args)
-            build_mod.install(staging, args)
 
     sysroot_dir = staging / "sysroot"
-
+    if not sysroot_dir.is_dir():
+        raise FileNotFoundError(
+            f"Test install tree not found at {sysroot_dir}. "
+            "Run `./z build` first to populate it."
+        )
     # Ensure _sysconfigdata module is present in the installed sysroot.
     # make install should copy it from build/<pybuilddir>/ but this can
     # silently fail when PYTHON_FOR_BUILD is not available or when the
@@ -439,13 +333,21 @@ def stage(
         if src.is_file():
             shutil.copy2(src, bin_dir / binary)
 
-    # Replace unstripped python binary with stripped python.elf.
-    stripped = paths.repo_root() / f"python{config.EXE}"
-    if stripped.is_file():
-        target = bin_dir / config.python_binary()
-        shutil.copy2(stripped, target)
-        size = target.stat().st_size
-        print(f"  Installed stripped python.elf into staging ({size // 1024}K)")
+    # NOTE: do not copy from paths.repo_root()/python.elf here.  By the
+    # time `./z test` runs, the release build in z.py::build() has
+    # overwritten that file with a --without-doc-strings binary, which
+    # breaks any regrtest module that depends on docstrings.  The
+    # correct stripped test binary was already installed into
+    # test_out/sysroot/bin by z.py::build() immediately after the test
+    # install, while python.elf still reflected the test build.
+    target = bin_dir / config.python_binary()
+    if not target.is_file():
+        raise FileNotFoundError(
+            f"Staged python binary not found at {target}. "
+            "Run `./z build` first to populate the test install tree."
+        )
+    size = target.stat().st_size
+    print(f"  Using staged python binary ({size // 1024}K)")
 
     # Copy guest-side test runner.
     regrtest_runner = paths.nanvix_root() / "run-regrtest.py"

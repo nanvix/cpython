@@ -41,7 +41,7 @@ def _docker_mount_source(path: Path) -> str:
     Windows, ``Path`` renders drive-letter paths like ``C:\\Users\\foo``,
     whose colon is misread as a field separator -- producing errors such
     as ``invalid mode: /mnt/host-workspace``.  Translate drive-letter
-    paths to the ``//c/Users/foo`` form that Docker accepts and which
+    paths to the ``/c/Users/foo`` form that Docker accepts and which
     contains no colon.  POSIX paths are returned unchanged.
     """
     resolved = path.resolve()
@@ -50,7 +50,7 @@ def _docker_mount_source(path: Path) -> str:
     if len(drive) == 2 and drive[1] == ":":
         letter = drive[0].lower()
         rest = str(resolved)[len(drive) :].replace("\\", "/").lstrip("/")
-        return f"//{letter}/{rest}"
+        return f"/{letter}/{rest}"
     return str(resolved)
 
 
@@ -212,52 +212,6 @@ def docker_build(
         )
     else:
         shell_cmd += f"; rc=$?; {copy_back}; exit $rc"
-
-    subprocess.run(
-        [*base, "sh", "-c", shell_cmd],
-        check=True,
-    )
-
-
-def docker_install(
-    workspace: Path,
-    destdir: Path,
-    args: build_mod.MakeArgs,
-) -> None:
-    """Run make install inside Docker (Windows host mode)."""
-    targets = [
-        "install",
-        f"DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
-    ]
-    _args = dataclasses.replace(args, docker=True, targets=targets)
-    base = _docker_run_base(workspace, _args)
-    sync = sync_sources(workspace)
-
-    # Compute relative path so nested destdirs (e.g. .nanvix/_test_staging)
-    # are preserved correctly on the host.
-    try:
-        rel_dest = destdir.relative_to(workspace).as_posix()
-    except ValueError:
-        rel_dest = destdir.name
-
-    # Copy install staging back to host, stripping the binary first.
-    strip_bin = f"{config.DOCKER_TOOLCHAIN_PATH}/bin/{config.TOOLCHAIN_TRIPLET}-strip"
-    install_bin = (
-        f"{config.DOCKER_WORKSPACE_PATH}/_install_staging"
-        f"{_args.install_prefix}/bin/{config.python_binary()}"
-    )
-    strip_cmd = (
-        f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
-        f'"{strip_bin}" --strip-all "{install_bin}" || true'
-    )
-    shell_cmd = (
-        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && {_args.to_string()}; rc=$?; "
-        f"{strip_cmd}; "
-        f"if [ -d {config.DOCKER_WORKSPACE_PATH}/_install_staging ]; then "
-        f"mkdir -p /mnt/host-workspace/{rel_dest} && "
-        f"cp -a {config.DOCKER_WORKSPACE_PATH}/_install_staging/* /mnt/host-workspace/{rel_dest}/; fi; "
-        f"exit $rc"
-    )
 
     subprocess.run(
         [*base, "sh", "-c", shell_cmd],

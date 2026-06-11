@@ -62,7 +62,6 @@ _MAKE_VAR_PLATFORM = "PLATFORM"
 _MAKE_VAR_PROCESS_MODE = "PROCESS_MODE"
 _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
 _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
-_MAKE_VAR_RELEASE = "NANVIX_RELEASE"
 
 # CPython embeds --prefix into the binary (sys.prefix, sys.path).
 _DEFAULT_INSTALL_PREFIX = config.DEFAULT_INSTALL_PREFIX
@@ -205,16 +204,43 @@ class CPythonBuild(ZScript):
         return used_fallback
 
     def build(self) -> None:
-        """Cross-compile python.elf and libpython.a for Nanvix."""
-        self._overlay_local_nanvix()
-        release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
-        args = self._make_args(release=release)
-        build_mod.build(args)
+        """Cross-compile python.elf and libpython.a for Nanvix.
 
-        # For standalone deployment mode, produce an initrd image
-        # containing the system daemons and the application binary.
+        Runs entirely inside Docker so that build and install share a
+        consistent set of sysroot/toolchain paths.  Produces two install
+        trees up front:
+
+          * ``paths.test_out()``   — test build (with docstrings,
+            test modules, and ``Lib/test``); consumed by ``./z test``.
+          * ``paths.release_dir()`` — release build
+            (``--without-doc-strings``, ``--disable-test-modules``);
+            consumed by ``./z release``.
+        """
+        if self.docker is None:
+            raise RuntimeError(
+                "`./z build` requires Docker; rerun `./z setup --with-docker=<image>`"
+            )
+        self._overlay_local_nanvix()
+
+        # Ensure a clean configure state: a prior `./z build` may have
+        # left .nanvix-configured (and the Makefile) in release mode,
+        # which would silently carry --without-doc-strings and
+        # --disable-test-modules into the test build below and break
+        # regrtest (any module that introspects docstrings).
+        self._make_args("clean", release=False).run(cwd=paths.repo_root())
+
+        # build for tests
+        args = self._make_args(release=False)
+        build_mod.build(args, paths.test_out())
         if self.config.deployment_mode == "standalone":
-            make_initrd(self, f"python{config.EXE}", test=False)
+            make_initrd(self, f"python{config.EXE}", test=True)
+
+        # clean debug build artifacts
+        self._make_args("clean", release=False).run(cwd=paths.repo_root())
+
+        # build for release
+        args = self._make_args(release=True)
+        build_mod.build(args, paths.release_dir())
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
