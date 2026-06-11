@@ -87,6 +87,10 @@ ifdef CONFIG_NANVIX
     LIBC := $(DOCKER_TOOLCHAIN_PATH)/i686-nanvix/lib/libc.a
     LIBM := $(DOCKER_TOOLCHAIN_PATH)/i686-nanvix/lib/libm.a
     LIBPOSIX := $(DOCKER_SYSROOT_PATH)/lib/libposix.a
+    # Since Nanvix 0.16.19, _start lives in libnvx_crt0.a; link it first (see
+    # LIBS below) so its strong _start overrides the toolchain's weak no-op
+    # stub. Probe the host sysroot so this stays a no-op on older releases.
+    LIBNVX_CRT0 := $(if $(wildcard $(abspath $(NANVIX_HOME))/lib/libnvx_crt0.a),$(DOCKER_SYSROOT_PATH)/lib/libnvx_crt0.a)
     LIBZ := $(DOCKER_SYSROOT_PATH)/lib/libz.a
     LIBSQLITE3 := $(DOCKER_SYSROOT_PATH)/lib/libsqlite3.a
     LIBSSL := $(DOCKER_SYSROOT_PATH)/lib/libssl.a
@@ -98,6 +102,7 @@ ifdef CONFIG_NANVIX
     LIBC := $(NANVIX_TOOLCHAIN)/i686-nanvix/lib/libc.a
     LIBM := $(NANVIX_TOOLCHAIN)/i686-nanvix/lib/libm.a
     LIBPOSIX := $(abspath $(NANVIX_HOME))/lib/libposix.a
+    LIBNVX_CRT0 := $(wildcard $(abspath $(NANVIX_HOME))/lib/libnvx_crt0.a)
     LIBZ := $(abspath $(NANVIX_HOME))/lib/libz.a
     LIBSQLITE3 := $(abspath $(NANVIX_HOME))/lib/libsqlite3.a
     LIBSSL := $(abspath $(NANVIX_HOME))/lib/libssl.a
@@ -123,7 +128,7 @@ CONFIGURE_ENV = \
 	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--start-group $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
+	LIBS="-Wl,--start-group $(LIBNVX_CRT0) $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
 	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
 	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
