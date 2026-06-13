@@ -43,10 +43,14 @@ class MakeArgs:
 
     def to_list(self) -> list[str]:
         """Convert to a list suitable to pass to a process runner."""
+        # When targeting Docker, these are POSIX paths *inside* the Linux
+        # container and must stay as forward-slash strings.  Wrapping them in
+        # Path() on a Windows host would rewrite them with backslashes
+        # (e.g. "\opt\nanvix"), breaking the in-container make invocation.
         nanvix_toolchain = (
-            Path(config.DOCKER_TOOLCHAIN_PATH) if self.docker else self.toolchain_path
+            config.DOCKER_TOOLCHAIN_PATH if self.docker else self.toolchain_path
         )
-        nanvix_home = Path(config.DOCKER_SYSROOT_PATH) if self.docker else self.sysroot
+        nanvix_home = config.DOCKER_SYSROOT_PATH if self.docker else self.sysroot
         return [
             "make",
             "-f",
