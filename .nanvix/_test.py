@@ -35,14 +35,6 @@ import ramfs as ramfs_mod
 # ---------------------------------------------------------------------------
 
 
-def install_cache() -> Path:
-    """
-    Cpython installation cache used on Windows.
-    Allows tests to run without building first.
-    """
-    return paths.nanvix_root() / "_install_cache"
-
-
 def _create_initrd(
     bin_dir: Path,
     app_path: Path,
