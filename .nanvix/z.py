@@ -227,7 +227,10 @@ class CPythonBuild(ZScript):
         # which would silently carry --without-doc-strings and
         # --disable-test-modules into the test build below and break
         # regrtest (any module that introspects docstrings).
-        self._make_args("clean", release=False).run(cwd=paths.repo_root())
+        if config.IS_WINDOWS:
+            build_mod.docker_mod.clean_volume(paths.repo_root())
+        else:
+            self._make_args("clean", release=False).run(cwd=paths.repo_root())
 
         # build for tests
         args = self._make_args(release=False)
