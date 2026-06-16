@@ -34,6 +34,26 @@ def _volume_name(workspace: Path) -> str:
     return f"cpython-nanvix-build-{_workspace_id(workspace)}"
 
 
+def _docker_mount_source(path: Path) -> str:
+    """Render *path* as a Docker bind-mount source.
+
+    Docker's ``-v src:dst[:mode]`` syntax splits fields on ``:``.  On
+    Windows, ``Path`` renders drive-letter paths like ``C:\\Users\\foo``,
+    whose colon is misread as a field separator -- producing errors such
+    as ``invalid mode: /mnt/host-workspace``.  Translate drive-letter
+    paths to the ``//c/Users/foo`` form that Docker accepts and which
+    contains no colon.  POSIX paths are returned unchanged.
+    """
+    resolved = path.resolve()
+    drive = resolved.drive
+    # Drive-letter prefix, e.g. "C:" (UNC drives are longer and skipped).
+    if len(drive) == 2 and drive[1] == ":":
+        letter = drive[0].lower()
+        rest = str(resolved)[len(drive) :].replace("\\", "/").lstrip("/")
+        return f"//{letter}/{rest}"
+    return str(resolved)
+
+
 def _docker_run_base(
     workspace: Path,
     args: build_mod.MakeArgs,
@@ -52,9 +72,9 @@ def _docker_run_base(
         "-v",
         f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
         "-v",
-        f"{workspace}:/mnt/host-workspace",
+        f"{_docker_mount_source(workspace)}:/mnt/host-workspace",
         "-v",
-        f"{args.sysroot.resolve()}:{config.DOCKER_SYSROOT_PATH}:ro",
+        f"{_docker_mount_source(args.sysroot)}:{config.DOCKER_SYSROOT_PATH}:ro",
         "-w",
         config.DOCKER_WORKSPACE_PATH,
         "-e",
