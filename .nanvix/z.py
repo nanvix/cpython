@@ -239,7 +239,10 @@ class CPythonBuild(ZScript):
             make_initrd(self, f"python{config.EXE}", test=True)
 
         # clean debug build artifacts
-        self._make_args("clean", release=False).run(cwd=paths.repo_root())
+        if config.IS_WINDOWS:
+            build_mod.docker_mod.clean_volume(paths.repo_root())
+        else:
+            self._make_args("clean", release=False).run(cwd=paths.repo_root())
 
         # build for release
         args = self._make_args(release=True)

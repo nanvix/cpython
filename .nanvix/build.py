@@ -130,17 +130,15 @@ def install(
 
     if not args.release:
         sysroot = destdir / args.install_prefix.lstrip("/")
-        shutil.copytree(
-            paths.repo_root() / "Lib" / "test",
-            sysroot / "lib" / config.PYTHON_LIB_DIR / "test",
-            dirs_exist_ok=True,
-        )
+        test_src = paths.repo_root() / "Lib" / "test"
+        test_dst = sysroot / "lib" / config.PYTHON_LIB_DIR / "test"
+        if test_src.is_dir() and not test_dst.is_dir():
+            shutil.copytree(test_src, test_dst)
         stripped = paths.repo_root() / f"python{config.EXE}"
         if stripped.is_file():
             bin_dir = sysroot / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(stripped, bin_dir / config.python_binary())
-
 
 def clean() -> None:
     """Remove build artifacts."""
