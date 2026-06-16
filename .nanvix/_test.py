@@ -240,11 +240,10 @@ def stage(
         # Fallback: download the release tarball and use it as the
         # install cache. This lets ``./z test`` work on Windows
         # without a prior ``./z build`` (which requires Docker).
-        if not paths.test_out().is_dir():
+        if not staging.is_dir():
             print("  Install cache not found. Downloading release artifacts...")
-            install_cache = _download_release_as_cache(args)
-            shutil.copytree(install_cache, staging)
-            print("  Using downloaded release as install cache")
+            _download_release_as_cache(args)
+            print("  Using downloaded release as install tree")
 
     sysroot_dir = staging / "sysroot"
     if not sysroot_dir.is_dir():
