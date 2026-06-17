@@ -20,6 +20,7 @@ from typing import Any
 from nanvix_zutil import paths
 
 import _docker as docker_mod
+import _test as test_mod
 import config
 import lxml as lxml_mod
 
@@ -88,19 +89,28 @@ class MakeArgs:
 def build(
     args: MakeArgs,
 ) -> None:
-    """Cross-compile python.elf for Nanvix."""
+    """Cross-compile python for Nanvix and install into the appropriate output tree.
+
+    Installs into ``paths.release_dir()`` for release builds and
+    ``paths.test_out()`` for non-release builds; non-release builds also
+    stage test fixtures via ``_test.stage()``.
+    """
     _args = dataclasses.replace(args, targets=["build"])
+    dest_dir = paths.release_dir() if args.release else paths.test_out()
     if config.IS_WINDOWS:
-        # Build and install in one Docker invocation so the install tree
-        # is cached for later use by ``./z test`` (no Docker during tests).
-        install_cache = paths.nanvix_root() / "_install_cache"
-        docker_mod.docker_build(paths.repo_root(), args, install_destdir=install_cache)
-        return
-    sysroot_for_setup = (
-        Path(config.DOCKER_SYSROOT_PATH) if _args.docker else args.sysroot
-    )
-    lxml_mod.generate_setup_local(paths.repo_root(), sysroot_for_setup)
-    _args.run(cwd=paths.repo_root())
+        # Build and install in one Docker invocation, writing directly to
+        # release_dir/test_out so ``./z test`` needs no further Docker work.
+        docker_mod.docker_build(paths.repo_root(), args, install_destdir=dest_dir)
+    else:
+        sysroot_for_setup = (
+            Path(config.DOCKER_SYSROOT_PATH) if _args.docker else args.sysroot
+        )
+        lxml_mod.generate_setup_local(paths.repo_root(), sysroot_for_setup)
+        _args.run(cwd=paths.repo_root())
+        install(dest_dir, args)
+
+    if not args.release:
+        test_mod.stage(args)
 
 
 def install(
@@ -124,20 +134,25 @@ def install(
     _args.run(cwd=paths.repo_root())
 
 
-def clean() -> None:
+def clean(preserve_nanvix_root: bool = False, preserve_cache: bool = False) -> None:
     """Remove build artifacts."""
-    if config.IS_WINDOWS:
-        for name in (".nanvix-configured", "python.elf", "python.exe"):
-            p = paths.repo_root() / name
-            if p.is_file():
-                p.unlink()
-                print(f"Removed {name}")
-        for name in ("_test_staging", "staging", "_install_cache", "_ramfs_cache"):
+    for name in (".nanvix-configured", *config.DOCKER_OUTPUT_FILES):
+        p = paths.repo_root() / name
+        if p.is_file():
+            p.unlink()
+            print(f"Removed {name}")
+
+    if not preserve_nanvix_root:
+        cache_dir = paths.nanvix_root() / "cache"
+        if not preserve_cache and (cache_dir).is_dir():
+            shutil.rmtree(cache_dir)
+        for name in ("_benchmark_cache", "_ramfs_cache", "out"):
             p = paths.nanvix_root() / name
             if p.is_dir():
                 shutil.rmtree(p)
                 print(f"Removed .nanvix/{name}/")
-    else:
+
+    if not config.IS_WINDOWS:
         subprocess.run(
             ["make", "-f", "Makefile.nanvix", "clean"],
             cwd=paths.repo_root(),
