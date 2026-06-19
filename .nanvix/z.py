@@ -62,7 +62,6 @@ _MAKE_VAR_PLATFORM = "PLATFORM"
 _MAKE_VAR_PROCESS_MODE = "PROCESS_MODE"
 _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
 _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
-_MAKE_VAR_RELEASE = "NANVIX_RELEASE"
 
 # CPython embeds --prefix into the binary (sys.prefix, sys.path).
 _DEFAULT_INSTALL_PREFIX = config.DEFAULT_INSTALL_PREFIX
@@ -207,14 +206,21 @@ class CPythonBuild(ZScript):
     def build(self) -> None:
         """Cross-compile python.elf and libpython.a for Nanvix."""
         self._overlay_local_nanvix()
-        release = os.environ.get(_MAKE_VAR_RELEASE, "no") == "yes"
-        args = self._make_args(release=release)
+
+        # Two separate builds: first release -> out/release/, then test -> out/test/.
+        build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
+        args = self._make_args(release=True)
         build_mod.build(args)
 
         # For standalone deployment mode, produce an initrd image
         # containing the system daemons and the application binary.
         if self.config.deployment_mode == "standalone":
             make_initrd(self, f"python{config.EXE}", test=False)
+
+        # Build for test
+        build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
+        args = self._make_args(release=False)
+        build_mod.build(args)
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""

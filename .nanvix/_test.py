@@ -20,8 +20,8 @@ import subprocess
 import sys
 import tarfile
 import time
-import urllib.request
 from pathlib import Path
+import urllib.request
 
 from nanvix_zutil import paths
 
@@ -103,13 +103,13 @@ def _create_initrd(
 
 
 def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
-    """Download the latest cpython release tarball and extract it as _install_cache.
+    """Download the latest cpython release tarball and extract it into ``paths.test_out()``.
 
     This lets ``./z test`` work on Windows without a prior ``./z build``
     (which requires Docker). The release tarball contains the same
     sysroot tree that ``./z build`` would produce.
     """
-    cache_dir = paths.nanvix_root() / "_install_cache"
+    cache_dir = paths.test_out()
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -161,7 +161,7 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
         print(f"  Downloading {asset_name}...")
         urllib.request.urlretrieve(asset_url, str(tarball))
 
-    # Extract into _install_cache with path-traversal protection.
+    # Extract into cache_dir with path-traversal protection.
     print(f"  Extracting to {cache_dir}...")
     with tarfile.open(tarball, "r:*") as tf:
         base = cache_dir.resolve()
@@ -218,151 +218,20 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _manual_install(
-    staging: Path,
-    args: build_mod.MakeArgs,
-) -> None:
-    """Create a minimal install tree without invoking make.
+def stage(args: build_mod.MakeArgs) -> None:
+    """Populate the test install tree with fixtures, runtime binaries, and helpers.
 
-    Used when the Makefile was configured inside Docker and cannot be
-    used natively.  Copies the Python binary and standard library from
-    the source/build tree into the staging directory.
+    Invoked by ``build_mod.build`` after ``install()`` for non-release
+    builds so that ``./z test`` can consume ``paths.test_out()`` directly
+    with no further staging.
+
+    Also called by run_all on Windows CI.
     """
-    # install_prefix is e.g. "/sysroot" — strip leading slash for relative path.
-    prefix_rel = args.install_prefix.lstrip("/")
-    sysroot_dir = staging / prefix_rel
-    bin_dir = sysroot_dir / "bin"
-    lib_dir = sysroot_dir / "lib" / config.PYTHON_LIB_DIR
+    sysroot_dir = paths.test_out() / "sysroot"
 
-    bin_dir.mkdir(parents=True, exist_ok=True)
-    lib_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy the built python binary.
-    python_bin = paths.repo_root() / f"python{config.EXE}"
-    if python_bin.is_file():
-        shutil.copy2(python_bin, bin_dir / config.python_binary())
-
-    # Copy the standard library from Lib/.
-    lib_src = paths.repo_root() / "Lib"
-    if lib_src.is_dir():
-        shutil.copytree(lib_src, lib_dir, dirs_exist_ok=True)
-
-    # Copy sysconfigdata from the build directory.
-    scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
-    pybuilddir_file = paths.repo_root() / "pybuilddir.txt"
-    if pybuilddir_file.is_file():
-        bdir = paths.repo_root() / pybuilddir_file.read_text().strip()
-        scdata_src = bdir / scdata_name
-        if scdata_src.is_file():
-            shutil.copy2(scdata_src, lib_dir / scdata_name)
-
-    # Copy libpython archive (needed by some install validation).
-    libpython = paths.repo_root() / f"libpython{config.PYTHON_VERSION}.a"
-    lib_parent = sysroot_dir / "lib"
-    if libpython.is_file():
-        shutil.copy2(libpython, lib_parent / libpython.name)
-
-    print(f"  Manual install complete ({sysroot_dir})")
-
-
-def stage(
-    args: build_mod.MakeArgs,
-) -> Path:
-    """Build, install, and stage CPython for testing.
-
-    Returns the test staging directory.
-    """
-    staging = paths.nanvix_root() / "_test_staging"
-
-    print("Running CPython tests on Nanvix...")
-    if staging.exists():
-        shutil.rmtree(staging)
-
-    if config.IS_WINDOWS:
-        # On Windows, use the cached install tree produced by ``./z build``
-        # so that no Docker invocation is needed during testing.
-        install_cache = paths.nanvix_root() / "_install_cache"
-        if install_cache.is_dir():
-            shutil.copytree(install_cache, staging)
-            print("  Using cached install from ./z build")
-        else:
-            # Fallback: download the release tarball and use it as the
-            # install cache. This lets ``./z test`` work on Windows
-            # without a prior ``./z build`` (which requires Docker).
-            print("  Install cache not found — downloading release artifacts...")
-            install_cache = _download_release_as_cache(args)
-            shutil.copytree(install_cache, staging)
-            print("  Using downloaded release as install cache")
-    else:
-        # Linux: build and install directly.
-        # Only skip the rebuild when the previously built binary exists,
-        # the build tree is properly configured, and the host cannot use
-        # BUILD_PYTHON (e.g. after a prior Docker build where that tool
-        # is unavailable outside the container).
-        python_binary = paths.repo_root() / f"python{config.EXE}"
-        configured_marker = paths.repo_root() / ".nanvix-configured"
-        pybuilddir = paths.repo_root() / "pybuilddir.txt"
-
-        # Determine whether BUILD_PYTHON is usable on the host.
-        build_python_path = Path(args.toolchain_path) / "bin" / "python3"
-        build_python_available = (
-            build_python_path.is_file()
-            or shutil.which(str(build_python_path)) is not None
-        )
-
-        # Detect if ./configure was run inside Docker (paths like
-        # /mnt/sysroot baked into Makefile).  A native rebuild would
-        # fail because those paths don't exist on the host.
-        docker_configured = False
-        makefile = paths.repo_root() / "Makefile"
-        if makefile.is_file() and not args.docker:
-            try:
-                header = makefile.read_text(encoding="utf-8", errors="replace")[:8192]
-                docker_configured = config.DOCKER_SYSROOT_PATH in header
-            except OSError:
-                pass
-
-        can_skip_rebuild = (
-            python_binary.is_file()
-            and configured_marker.is_file()
-            and pybuilddir.is_file()
-            and (not build_python_available or docker_configured)
-        )
-
-        if can_skip_rebuild:
-            skip_reason = (
-                "Docker-configured Makefile (native rebuild would fail)"
-                if docker_configured and build_python_available
-                else "BUILD_PYTHON is unavailable"
-            )
-            print(
-                f"  Skipping rebuild ({python_binary.name} already exists"
-                f" — {skip_reason})"
-            )
-            if docker_configured and build_python_available:
-                # Cannot run make install natively when configure used
-                # Docker paths and the native toolchain would trigger a
-                # rebuild — do a manual install instead.
-                _manual_install(staging, args)
-            else:
-                # Install into staging, skipping the outer build prereq
-                # and stubbing PYTHON_FOR_BUILD for the inner make.
-                build_mod.install(
-                    staging,
-                    args,
-                    extra_make_flags=["-o", "build", "PYTHON_FOR_BUILD=:"],
-                )
-        else:
-            build_mod.build(args)
-            build_mod.install(staging, args)
-
-    sysroot_dir = staging / "sysroot"
-
-    # Ensure _sysconfigdata module is present in the installed sysroot.
-    # make install should copy it from build/<pybuilddir>/ but this can
-    # silently fail when PYTHON_FOR_BUILD is not available or when the
-    # install recipe is interrupted.  Fall back to copying from the build
-    # directory directly.
+    # Sysconfigdata fallback: ``make install`` should copy it from
+    # build/<pybuilddir>/, but can silently fail when PYTHON_FOR_BUILD
+    # is unavailable or the install recipe is interrupted.
     scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
     scdata_dst = sysroot_dir / "lib" / config.PYTHON_LIB_DIR / scdata_name
     if not scdata_dst.is_file():
@@ -373,20 +242,10 @@ def stage(
             if scdata_src.is_file():
                 shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
-            else:
-                print(f"  WARNING: {scdata_name} not found in build dir {bdir}")
-        else:
-            print(f"  WARNING: pybuilddir.txt not found; cannot locate {scdata_name}")
-    else:
-        print(
-            f"  Verified: {scdata_name} installed ({scdata_dst.stat().st_size} bytes)"
-        )
 
-    # Copy test script — a simple smoke test that validates the interpreter.
-    # The lxml import test is only included for standalone mode because
-    # xmlInitParser() hangs in multi-process/single-process modes where
-    # filesystem I/O goes through nanvixd's virtualized host-FS layer.
-    hello_script = sysroot_dir / "test_hello.py"
+    # Hello-world test script. lxml import is exercised only in standalone
+    # mode; xmlInitParser() hangs in hosted modes where filesystem I/O goes
+    # through nanvixd's virtualized host-FS layer.
     standalone = args.process_mode == "standalone"
     lxml_snippet = (
         "try:\n"
@@ -401,23 +260,20 @@ def stage(
         "    print(f'CPYTHON_TEST_LXML_FAIL: {e}')\n"
         "    sys.exit(1)\n"
     )
-    hello_script.write_text(
+    (sysroot_dir / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
         "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
-        + (lxml_snippet if standalone else ""),
+        + (lxml_snippet if standalone else "")
     )
 
-    # Copy the HTTP server smoke-test script from the repo root into the
-    # sysroot so it ends up in the ramfs image built downstream by
-    # stage_ramfs().  Standalone mode mounts the ramfs as /, so the
-    # script must already be present at this point — copying it later
-    # (e.g. from run_smoke_httpserver) is too late.
+    # HTTP server smoke-test script must be present in the sysroot before
+    # ramfs build (standalone mode mounts ramfs as /).
     httpserver_src = paths.repo_root() / "httpserver.py"
     if httpserver_src.is_file():
         shutil.copy2(httpserver_src, sysroot_dir / "httpserver.py")
 
-    # Copy Nanvix runtime binaries.
+    # Nanvix runtime binaries (host tools + guest daemons).
     bin_dir = sysroot_dir / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     for binary in [
@@ -427,10 +283,8 @@ def stage(
         "uservm.elf",
         "nanvixd.exe",
         "kernel.exe",
-        # Host tools for initrd creation (standalone mode).
         config.mkramfs_binary(),
         config.mkimage_binary(),
-        # Guest daemon binaries — always .elf, even on Windows.
         "procd.elf",
         "memd.elf",
         "vfsd.elf",
@@ -439,28 +293,39 @@ def stage(
         if src.is_file():
             shutil.copy2(src, bin_dir / binary)
 
-    # Replace unstripped python binary with stripped python.elf.
+    # Replace unstripped python with the stripped python.elf from the build dir.
     stripped = paths.repo_root() / f"python{config.EXE}"
     if stripped.is_file():
         target = bin_dir / config.python_binary()
         shutil.copy2(stripped, target)
-        size = target.stat().st_size
-        print(f"  Installed stripped python.elf into staging ({size // 1024}K)")
+        print(
+            f"  Installed stripped python.elf into test_out ({target.stat().st_size // 1024}K)"
+        )
 
-    # Copy guest-side test runner.
+    # Guest-side regrtest runner.
     regrtest_runner = paths.nanvix_root() / "run-regrtest.py"
     if regrtest_runner.is_file():
         shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
 
-    # Invalidate stale ramfs image and cache from previous runs.
-    stale_ramfs = paths.nanvix_root() / "cpython-rootfs.img"
-    if stale_ramfs.is_file():
-        stale_ramfs.unlink()
-    stale_cache = paths.nanvix_root() / "_ramfs_cache"
-    if stale_cache.is_dir():
-        shutil.rmtree(stale_cache)
+    # ``make install`` omits Lib/test/ from the install tree; regrtest needs it.
+    pylib_dir = sysroot_dir / "lib" / config.PYTHON_LIB_DIR
 
-    return staging
+    # Windows CI workaround: the synced artifact overlay only ships
+    # *.elf/*.so (see nanvix_scripts.test_windows.mirror_ci), so the
+    # installed stdlib at sysroot/lib/python3.12/ is absent. Seed it
+    # from the in-tree Lib/ so regrtest and lxml staging can proceed.
+    # No-op on Linux where ``make install`` has already populated it.
+    lib_src = paths.repo_root() / "Lib"
+    if lib_src.is_dir() and not pylib_dir.is_dir():
+        shutil.copytree(lib_src, pylib_dir)
+        print(f"  Seeded {pylib_dir} from source Lib/ (no make install on this host)")
+
+    test_dst = pylib_dir / "test"
+    test_src = lib_src / "test"
+    if test_src.is_dir() and not test_dst.is_dir():
+        shutil.copytree(test_src, test_dst)
+        test_count = sum(1 for _ in test_dst.rglob("*.py"))
+        print(f"  Copied test suite from source tree ({test_count} files)")
 
 
 # ---------------------------------------------------------------------------
@@ -934,10 +799,11 @@ def run_regrtest(
 
 
 def cleanup() -> None:
-    """Clean up test artifacts."""
-    staging = paths.nanvix_root() / "_test_staging"
-    if staging.is_dir():
-        shutil.rmtree(staging)
+    """Clean up transient test artifacts (log files).
+
+    The build output at ``paths.test_out()`` is *not* removed — that is
+    a build artifact owned by ``./z build`` / ``./z clean``.
+    """
     for name in [
         "cpython_test.log",
         "cpython_regrtest.log",
@@ -971,13 +837,28 @@ def run_all(
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
     nanvixd_extra: list[str] | None = None,
 ) -> None:
-    """Run the complete test pipeline: stage → hello → regrtest → cleanup."""
-    standalone = args.process_mode == "standalone"
+    """Run the complete test pipeline: hello → regrtest → cleanup.
 
-    # Stage.
-    staging = stage(
-        args,
-    )
+    Consumes the test install tree produced by ``./z build`` at
+    ``paths.test_out()``; see :func:`stage`.
+    """
+    standalone = args.process_mode == "standalone"
+    staging = paths.test_out()
+    print("Running CPython tests on Nanvix...")
+
+    if config.IS_WINDOWS and os.environ.get("CI") is not None:
+        print("Downloading release artifacts...")
+        _download_release_as_cache(args)
+        stage(args)
+
+    # Invalidate stale ramfs image and cache from previous runs.
+    stale_ramfs = paths.nanvix_root() / "cpython-rootfs.img"
+    if stale_ramfs.is_file():
+        stale_ramfs.unlink()
+    stale_cache = paths.nanvix_root() / "_ramfs_cache"
+    if stale_cache.is_dir():
+        shutil.rmtree(stale_cache)
+
     lxml_mod.stage_lxml_runtime(staging / "sysroot")
 
     # Ramfs — only needed for standalone mode.  Multi-process and
@@ -1053,8 +934,12 @@ def _run_benchmark_impl(
     nanvixd_extra: list[str] | None = None,
 ) -> None:
     """Inner implementation of :func:`run_benchmark`."""
-    # Stage (reuses cached build).
-    staging = stage(args)
+    # Consume the test install tree produced by ``./z build``.
+    staging = paths.test_out()
+    if not (staging / "sysroot").is_dir():
+        raise RuntimeError(
+            f"{staging}/sysroot not found; run `./z build` before `./z benchmark`"
+        )
 
     # Write a minimal benchmark script.
     bench_script = "bench_hello.py"
