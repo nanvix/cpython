@@ -221,6 +221,8 @@ class CPythonBuild(ZScript):
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
         args = self._make_args(release=False)
         build_mod.build(args)
+        if self.config.deployment_mode == "standalone":
+            test_mod.stage_ramfs(args)
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
@@ -228,10 +230,11 @@ class CPythonBuild(ZScript):
         args = self._make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
 
-        test_mod.run_all(
-            args,
-            nanvixd_extra=nanvixd_extra,
-        )
+        ramfs_img = None
+        if self.config.deployment_mode == "standalone":
+            ramfs_img = paths.test_out() / "cpython-rootfs.img"
+
+        test_mod.run_all(args, nanvixd_extra=nanvixd_extra, ramfs_img=ramfs_img)
 
     def benchmark(self) -> None:
         """Run hello-world benchmark with a release-style ramfs."""

@@ -334,24 +334,13 @@ def stage(args: build_mod.MakeArgs) -> None:
 
 
 def stage_ramfs(
-    staging: Path,
     args: build_mod.MakeArgs,
-    ramfs_img: Path | None = None,
 ) -> Path:
     """Build a ramfs image for standalone mode testing.
-
-    Uses a cached ramfs directory under .nanvix/_ramfs_cache/.
-
     Returns the path to the ramfs image.
     """
-    if ramfs_img is None:
-        ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
-
-    ramfs_cache = paths.nanvix_root() / "_ramfs_cache"
-
-    if ramfs_img.is_file() and (ramfs_cache / "sysroot").is_dir():
-        print(f"  Using cached ramfs: {ramfs_img}")
-        return ramfs_img
+    ramfs_img = paths.test_out() / "cpython-rootfs.img"
+    ramfs_cache = paths.test_out() / "_ramfs_cache"
 
     # Build fresh ramfs.
     if ramfs_cache.exists():
@@ -359,7 +348,7 @@ def stage_ramfs(
     ramfs_cache.mkdir(parents=True)
 
     # Copy sysroot from test staging.
-    sysroot_src = staging / "sysroot"
+    sysroot_src = paths.test_out() / "sysroot"
     sysroot_dst = ramfs_cache / "sysroot"
     shutil.copytree(sysroot_src, sysroot_dst)
 
@@ -397,7 +386,7 @@ def _run_nanvixd_script(
     This is the low-level execution primitive shared by the hello-world
     test and the benchmark.
     """
-    sysroot = staging / "sysroot"
+    test_sysroot = staging / "sysroot"
     resolved_extra: list[str] = (
         nanvixd_extra
         if nanvixd_extra is not None
@@ -405,7 +394,7 @@ def _run_nanvixd_script(
     )
     # On Windows, CreateProcess searches for the executable relative to the
     # *parent's* CWD, not the child's cwd. Use an absolute path to avoid this.
-    nanvixd = str((sysroot / "bin" / config.nanvixd_binary()).resolve())
+    nanvixd = str((args.sysroot / "bin" / config.nanvixd_binary()).resolve())
     python_bin = f"./bin/{config.python_binary()}"
     standalone = args.process_mode == "standalone"
 
@@ -428,15 +417,15 @@ def _run_nanvixd_script(
         for name in _staging_bins:
             src = args.sysroot / "bin" / name
             if src.is_file():
-                shutil.copy2(src, sysroot / "bin" / name)
+                shutil.copy2(src, test_sysroot / "bin" / name)
 
     initrd_img: Path | None = None
     if standalone:
         # Standalone: bundle python binary with system daemons into an
         # initrd image.  Env vars are passed via app_env so the kernel's
         # split_cmdline sees them after the bare ';' separator.
-        bin_dir = sysroot / "bin"
-        app_path = sysroot / "bin" / config.python_binary()
+        bin_dir = test_sysroot / "bin"
+        app_path = test_sysroot / "bin" / config.python_binary()
         app_args = ["-B", f"./{script_name}"]
         app_env = (
             f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
@@ -474,7 +463,7 @@ def _run_nanvixd_script(
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=sysroot,
+            cwd=test_sysroot,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"{label} timed out after {timeout}s")
@@ -814,17 +803,6 @@ def cleanup() -> None:
             p.unlink()
 
 
-def deep_cleanup() -> None:
-    """Deep clean: remove cached ramfs template."""
-    cleanup()
-    ramfs_cache = paths.nanvix_root() / "_ramfs_cache"
-    if ramfs_cache.is_dir():
-        shutil.rmtree(ramfs_cache)
-    ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
-    if ramfs_img.is_file():
-        ramfs_img.unlink()
-
-
 # ---------------------------------------------------------------------------
 # Aggregate test runner
 # ---------------------------------------------------------------------------
@@ -836,13 +814,13 @@ def run_all(
     test_list: list[str] | None = None,
     batch_size: int = config.DEFAULT_TEST_BATCH_SIZE,
     nanvixd_extra: list[str] | None = None,
+    ramfs_img: Path | None = None,
 ) -> None:
     """Run the complete test pipeline: hello → regrtest → cleanup.
 
     Consumes the test install tree produced by ``./z build`` at
     ``paths.test_out()``; see :func:`stage`.
     """
-    standalone = args.process_mode == "standalone"
     staging = paths.test_out()
     print("Running CPython tests on Nanvix...")
 
@@ -850,22 +828,10 @@ def run_all(
         print("Downloading release artifacts...")
         _download_release_as_cache(args)
         stage(args)
-
-    # Invalidate stale ramfs image and cache from previous runs.
-    stale_ramfs = paths.nanvix_root() / "cpython-rootfs.img"
-    if stale_ramfs.is_file():
-        stale_ramfs.unlink()
-    stale_cache = paths.nanvix_root() / "_ramfs_cache"
-    if stale_cache.is_dir():
-        shutil.rmtree(stale_cache)
+        if args.process_mode == "standalone":
+            stage_ramfs(args)
 
     lxml_mod.stage_lxml_runtime(staging / "sysroot")
-
-    # Ramfs — only needed for standalone mode.  Multi-process and
-    # single-process use host-filesystem access (no ramfs).
-    ramfs_img = None
-    if standalone:
-        ramfs_img = stage_ramfs(staging, args)
 
     # Hello test.
     run_hello(

@@ -38,7 +38,7 @@ class MakeArgs:
     process_mode: str = config.DEFAULT_PROCESS_MODE
     memory_size: str = config.DEFAULT_MEMORY_SIZE
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX
-    sysroot: Path = field(default_factory=lambda: paths.nanvix_root() / "sysroot")
+    sysroot: Path = field(default_factory=lambda: paths.sysroot())
     run_fn: Any = None
     docker: bool = False
 
@@ -143,14 +143,16 @@ def clean(preserve_nanvix_root: bool = False, preserve_cache: bool = False) -> N
             print(f"Removed {name}")
 
     if not preserve_nanvix_root:
-        cache_dir = paths.nanvix_root() / "cache"
-        if not preserve_cache and (cache_dir).is_dir():
-            shutil.rmtree(cache_dir)
-        for name in ("_benchmark_cache", "_ramfs_cache", "out"):
-            p = paths.nanvix_root() / name
-            if p.is_dir():
-                shutil.rmtree(p)
-                print(f"Removed .nanvix/{name}/")
+        if not preserve_cache:
+            for name in ("cache", "_benchmark_cache"):
+                p = paths.nanvix_root() / name
+                if p.is_dir():
+                    shutil.rmtree(p)
+                    print(f"Removed {name}")
+
+        if paths.out_dir().is_dir():
+            shutil.rmtree(paths.out_dir())
+            print(f"Removed {paths.out_dir().relative_to(paths.repo_root())}")
 
     if not config.IS_WINDOWS:
         subprocess.run(
