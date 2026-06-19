@@ -40,7 +40,6 @@ from nanvix_zutil import (
     TOOLCHAIN_CONTAINER_PATH,
     ZScript,
     log,
-    make_initrd,
     run,
     suffix_dep,
 )
@@ -221,11 +220,6 @@ class CPythonBuild(ZScript):
             package_mod.sysroot_pkg() / "cpython-ramfs.img",
         )
 
-        # For standalone deployment mode, produce an initrd image
-        # containing the system daemons and the application binary.
-        if self.config.deployment_mode == "standalone":
-            make_initrd(self, f"python{config.EXE}", test=False)
-
         # Build for test
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
         args = self._make_args(release=False)
@@ -266,10 +260,6 @@ class CPythonBuild(ZScript):
     def clean(self) -> None:
         """Remove build artifacts."""
         build_mod.clean()
-        # Remove initrd image generated for standalone mode.
-        initrd = paths.repo_root() / "python.img"
-        if initrd.exists():
-            initrd.unlink()
 
     def _install_missing_deps(self) -> None:
         """Download missing dependency libraries using fallback assets."""
