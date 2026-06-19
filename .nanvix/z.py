@@ -30,8 +30,10 @@ from nanvix_zutil import paths
 
 import _test as test_mod
 import build as build_mod
+import lxml as lxml_mod
 import config
 import package as package_mod
+import ramfs as ramfs_mod
 from nanvix_zutil import (
     CFG_SYSROOT,
     EXIT_MISSING_DEP,
@@ -211,6 +213,13 @@ class CPythonBuild(ZScript):
         build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
         args = self._make_args(release=True)
         build_mod.build(args)
+        lxml_mod.stage_lxml_runtime(package_mod.release_sysroot())
+        package_mod.stage()
+        ramfs_mod.build_image(
+            package_mod.sysroot_pkg(),
+            args.sysroot,
+            package_mod.sysroot_pkg() / "cpython-ramfs.img",
+        )
 
         # For standalone deployment mode, produce an initrd image
         # containing the system daemons and the application binary.

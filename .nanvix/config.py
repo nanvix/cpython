@@ -467,6 +467,7 @@ SYSROOT_TRIM_BIN_PATTERNS: list[str] = [
     "python3-config",
     f"python{PYTHON_VERSION}-config",
     "python3",
+    f"python{PYTHON_VERSION}",
 ]
 
 # ---------------------------------------------------------------------------
