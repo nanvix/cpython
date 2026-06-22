@@ -38,7 +38,7 @@ def stage() -> None:
     # --- Buildroot tarball staging (must come before trim_sysroot) ---
     if buildroot_pkg().is_dir():
         shutil.rmtree(buildroot_pkg())
-    br = buildroot_pkg() / "sysroot"  # arcname "sysroot/" in the tarball
+    br = buildroot_pkg()
     (br / "lib").mkdir(parents=True)
     (br / "bin").mkdir(parents=True)
 

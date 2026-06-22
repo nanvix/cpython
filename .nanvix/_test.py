@@ -338,6 +338,7 @@ def stage_ramfs(
     ramfs_cache = paths.out_dir() / "_ramfs_cache"
 
     # Build fresh ramfs.
+    paths.out_dir().mkdir(parents=True, exist_ok=True)
     if ramfs_cache.exists():
         shutil.rmtree(ramfs_cache)
 

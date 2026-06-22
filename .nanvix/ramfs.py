@@ -9,8 +9,10 @@ via mkramfs.elf.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from nanvix_zutil import paths
@@ -26,7 +28,9 @@ def trim_sysroot(
     """Strip dev-only artifacts from a staged sysroot for ramfs packaging.
 
     Args:
-        staging: Root directory containing a ``sysroot/`` subdirectory.
+        staging: Sysroot/install-tree root directory (i.e. the directory
+            containing ``bin/``, ``lib/``, ``include/``, …). Trimming is
+            performed in place.
         keep_tests: When True, retain ``lib/python3.12/test/`` (needed
             when building a ramfs for the test pipeline).
     """
@@ -87,8 +91,8 @@ def build_image(
     """Build a ramfs image from a trimmed sysroot.
 
     Args:
-        staging: Root directory containing a ``sysroot/`` subdirectory
-            (should be trimmed first via :func:`trim_sysroot`).
+        staging: Sysroot/install-tree root directory to package (should
+            be trimmed first via :func:`trim_sysroot`).
         nanvix_home: Path to the Nanvix sysroot (contains
             ``bin/mkramfs.elf`` or ``bin/mkramfs.exe``).
         output: Output path for the ramfs image.
@@ -109,6 +113,9 @@ def build_image(
             f"{mkramfs_name} not found at {mkramfs}. "
             "Run `./z setup` to download required binaries."
         )
+
+    # Ensure paths.out_dir()
+    paths.out_dir().mkdir(parents=True, exist_ok=True)
 
     # Create a temporary image, then move it into place. Prevents cycles.
     if not staging.is_dir():
