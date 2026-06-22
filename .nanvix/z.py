@@ -212,7 +212,7 @@ class CPythonBuild(ZScript):
         build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
         args = self._make_args(release=True)
         build_mod.build(args)
-        lxml_mod.stage_lxml_runtime(package_mod.release_sysroot())
+        lxml_mod.stage_lxml_runtime(package_mod.sysroot_pkg())
         package_mod.stage()
         ramfs_mod.build_image(
             package_mod.sysroot_pkg(),

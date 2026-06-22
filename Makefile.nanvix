@@ -27,7 +27,7 @@ PROCESS_MODE ?= standalone
 MEMORY_SIZE ?= 256mb
 
 # Install prefix baked into the python binary (sys.prefix, sys.path)
-INSTALL_PREFIX ?= /sysroot
+INSTALL_PREFIX ?= /
 
 # Set to 'yes' for release packaging
 NANVIX_RELEASE ?= no

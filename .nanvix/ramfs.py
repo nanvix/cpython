@@ -13,6 +13,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from nanvix_zutil import paths
+
 import config
 
 
@@ -28,15 +30,14 @@ def trim_sysroot(
         keep_tests: When True, retain ``lib/python3.12/test/`` (needed
             when building a ramfs for the test pipeline).
     """
-    sysroot = staging / "sysroot"
-    if not sysroot.is_dir():
-        raise FileNotFoundError(f"{sysroot} does not exist")
+    if not staging.is_dir():
+        raise FileNotFoundError(f"{staging} does not exist")
 
     print("Trimming sysroot for ramfs...")
 
     # Remove heavyweight stdlib packages not needed at runtime.
     for reldir in config.SYSROOT_TRIM_DIRS:
-        p = sysroot / reldir
+        p = staging / reldir
         if p.is_dir():
             shutil.rmtree(p)
         elif p.is_file():
@@ -44,17 +45,17 @@ def trim_sysroot(
 
     # Optionally remove tests.
     if not keep_tests:
-        test_dir = sysroot / "lib" / config.PYTHON_LIB_DIR / "test"
+        test_dir = staging / "lib" / config.PYTHON_LIB_DIR / "test"
         if test_dir.is_dir():
             shutil.rmtree(test_dir)
 
     # Remove static library.
-    lib_a = sysroot / "lib" / f"libpython{config.PYTHON_VERSION}.a"
+    lib_a = staging / "lib" / f"libpython{config.PYTHON_VERSION}.a"
     if lib_a.is_file():
         lib_a.unlink()
 
     # Remove dev/config binaries from bin/.
-    bin_dir = sysroot / "bin"
+    bin_dir = staging / "bin"
     if bin_dir.is_dir():
         for pattern in config.SYSROOT_TRIM_BIN_PATTERNS:
             for match in bin_dir.glob(pattern):
@@ -73,7 +74,7 @@ def trim_sysroot(
             pass
 
     # Remove __pycache__ directories.
-    for cache_dir in sysroot.rglob("__pycache__"):
+    for cache_dir in staging.rglob("__pycache__"):
         if cache_dir.is_dir():
             shutil.rmtree(cache_dir)
 
@@ -109,14 +110,15 @@ def build_image(
             "Run `./z setup` to download required binaries."
         )
 
-    sysroot = staging / "sysroot"
-    if not sysroot.is_dir():
-        raise FileNotFoundError(f"{sysroot} does not exist")
-
+    # Create a temporary image, then move it into place. Prevents cycles.
+    if not staging.is_dir():
+        raise FileNotFoundError(f"{staging} does not exist")
+    prog = [str(mkramfs), "-o", str(paths.out_dir() / "tmp.img"), str(staging)]
     subprocess.run(
-        [str(mkramfs), "-o", str(output), str(sysroot)],
+        prog,
         check=True,
     )
+    shutil.move(paths.out_dir() / "tmp.img", output)
 
     size = output.stat().st_size
     human = _human_size(size)

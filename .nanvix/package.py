@@ -28,16 +28,11 @@ def buildroot_pkg() -> Path:
     return paths.release_dir() / "buildroot-pkg"
 
 
-def release_sysroot() -> Path:
-    """The raw ``make install`` output, living inside :func:`sysroot_pkg`."""
-    return sysroot_pkg() / "sysroot"
-
-
 def stage() -> None:
     """Stage the two tarball trees under ``release_dir/``.
 
     Must run after ``build_mod.build(args)`` has populated
-    :func:`release_sysroot`. Buildroot is curated *before* the sysroot
+    :func:`sysroot_pkg`. Buildroot is curated *before* the sysroot
     install tree is trimmed in-place.
     """
     # --- Buildroot tarball staging (must come before trim_sysroot) ---
@@ -48,12 +43,12 @@ def stage() -> None:
     (br / "bin").mkdir(parents=True)
 
     # Copy include directory.
-    inc_src = release_sysroot() / "include"
+    inc_src = sysroot_pkg() / "include"
     if inc_src.is_dir():
         shutil.copytree(inc_src, br / "include")
 
     # Copy static libraries.
-    lib_src = release_sysroot() / "lib"
+    lib_src = sysroot_pkg() / "lib"
     if lib_src.is_dir():
         for lib_file in lib_src.glob("*.a"):
             shutil.copy2(lib_file, br / "lib" / lib_file.name)
@@ -81,12 +76,12 @@ def stage() -> None:
         "pydoc3",
         f"pydoc{config.PYTHON_VERSION}",
     ]:
-        src = release_sysroot() / "bin" / f
+        src = sysroot_pkg() / "bin" / f
         if src.is_file():
             shutil.copy2(src, br / "bin" / f)
 
     # Copy share directory.
-    share_src = release_sysroot() / "share"
+    share_src = sysroot_pkg() / "share"
     if share_src.is_dir():
         shutil.copytree(share_src, br / "share")
 
