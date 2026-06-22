@@ -175,18 +175,15 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
                 )
         tf.extractall(cache_dir)
 
+    # Flatten legacy tarballs that still wrap everything in a top-level
+    # ``sysroot/`` directory (releases predating the strip-sysroot change).
+    # Newer tarballs extract directly into ``cache_dir`` and this is a no-op.
+    extracted_wrapper = cache_dir / "sysroot"
+    if extracted_wrapper.is_dir():
+        for item in extracted_wrapper.iterdir():
+            shutil.move(str(item), str(cache_dir / item.name))
+        extracted_wrapper.rmdir()
     sysroot = cache_dir
-    if not sysroot.is_dir():
-        python_lib_dir = Path(config.PYTHON_LIB_DIR)
-        for candidate in cache_dir.rglob(str(python_lib_dir)):
-            parent = candidate
-            for _ in python_lib_dir.parts:
-                parent = parent.parent
-            if parent != cache_dir:
-                sysroot.mkdir(exist_ok=True)
-                for item in parent.iterdir():
-                    shutil.move(str(item), str(sysroot / item.name))
-                break
 
     # Copy the stripped python binary into sysroot/bin/ if present.
     bin_dir = sysroot / "bin"
