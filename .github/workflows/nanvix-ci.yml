@@ -123,7 +123,11 @@ jobs:
           echo "Included: python.elf ($(stat -c%s windows-zip/python.elf) bytes)"
 
           # --- Build ramfs from the stdlib in the tarball ---
-          SYSROOT=$(find extract -type d -name "sysroot" | head -1)
+          # Tarballs ship a flat sysroot layout (no top-level `sysroot/`
+          # wrapper); the extraction root *is* the sysroot. The kernel mounts
+          # the ramfs at /, and Python is built with PYTHONHOME=/, so the
+          # image must be packed at the sysroot root (not its parent).
+          SYSROOT=extract
           PYLIB="${SYSROOT}/lib/python3.12"
           if [[ -d "$PYLIB" ]]; then
             echo "Building ramfs from stdlib at: $PYLIB"
@@ -156,9 +160,7 @@ jobs:
 
             if [[ -n "$MKRAMFS" ]]; then
               chmod +x "$MKRAMFS"
-              # mkramfs expects the parent dir so FAT32 has sysroot/ prefix
-              STAGING_PARENT=$(dirname "$SYSROOT")
-              "$MKRAMFS" -o windows-zip/cpython-ramfs.img "$STAGING_PARENT"
+              "$MKRAMFS" -o windows-zip/cpython-ramfs.img "$SYSROOT"
               echo "Included: cpython-ramfs.img ($(stat -c%s windows-zip/cpython-ramfs.img) bytes)"
             else
               echo "::warning::mkramfs not found — zip will not contain ramfs"

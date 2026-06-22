@@ -9,10 +9,8 @@ via mkramfs.elf.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
 from nanvix_zutil import paths
@@ -113,9 +111,6 @@ def build_image(
             f"{mkramfs_name} not found at {mkramfs}. "
             "Run `./z setup` to download required binaries."
         )
-
-    # Ensure paths.out_dir()
-    paths.out_dir().mkdir(parents=True, exist_ok=True)
 
     # Create a temporary image, then move it into place. Prevents cycles.
     if not staging.is_dir():
