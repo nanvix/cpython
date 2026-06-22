@@ -96,7 +96,9 @@ def build(
     stage test fixtures via ``_test.stage()``.
     """
     _args = dataclasses.replace(args, targets=["build"])
-    dest_dir = paths.release_dir() if args.release else paths.test_out()
+    dest_dir = (
+        (paths.release_dir() / "sysroot-pkg") if args.release else paths.test_out()
+    )
     if config.IS_WINDOWS:
         # Build and install in one Docker invocation, writing directly to
         # release_dir/test_out so ``./z test`` needs no further Docker work.

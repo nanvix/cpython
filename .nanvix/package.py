@@ -9,75 +9,63 @@ tarball creation, ramfs image inclusion, and tarball verification.
 
 from __future__ import annotations
 
+from pathlib import Path
 import shutil
 import tarfile
 import build as build_mod
 import config
-import lxml as lxml_mod
 import ramfs as ramfs_mod
 from nanvix_zutil import paths
 
 
-def package(
-    args: build_mod.MakeArgs,
-) -> None:
-    """Package CPython release tarballs.
+def sysroot_pkg() -> Path:
+    """Staging tree for the runtime sysroot tarball (tarred verbatim)."""
+    return paths.release_dir() / "sysroot-pkg"
 
-    Creates two tarballs in ``nanvix_zutil.paths.dist_dir()``:
-    - ``cpython-<platform>-<mode>-<memory>.tar.gz`` — runtime sysroot + binary + ramfs
-    - ``cpython-<platform>-<mode>-<memory>-buildroot.tar.gz`` — build dependencies
+
+def buildroot_pkg() -> Path:
+    """Staging tree for the buildroot tarball (tarred verbatim)."""
+    return paths.release_dir() / "buildroot-pkg"
+
+
+def release_sysroot() -> Path:
+    """The raw ``make install`` output, living inside :func:`sysroot_pkg`."""
+    return sysroot_pkg() / "sysroot"
+
+
+def stage() -> None:
+    """Stage the two tarball trees under ``release_dir/``.
+
+    Must run after ``build_mod.build(args)`` has populated
+    :func:`release_sysroot`. Buildroot is curated *before* the sysroot
+    install tree is trimmed in-place.
     """
-    release_staging = paths.nanvix_root() / "release"
-    dist_dir = paths.dist_dir()
-    artifact = args.asset_prefix()
-
-    print("Packaging CPython release...")
-
-    # Clean previous staging.
-    if release_staging.exists():
-        shutil.rmtree(release_staging)
-
-    # Build.
-    build_mod.build(args)
-
-    # Install into staging.
-    build_mod.install(release_staging, args)
-
-    sysroot_installed = release_staging / "sysroot"
-    if not sysroot_installed.is_dir():
-        raise FileNotFoundError(f"Install did not produce {sysroot_installed}")
-
-    # Stage lxml Python package into the installed sysroot.
-    lxml_mod.stage_lxml_runtime(sysroot_installed)
-
-    # --- Buildroot: build dependencies ---
-    buildroot_pkg = release_staging / "buildroot-pkg"
-    buildroot_pkg.mkdir(parents=True)
-    (buildroot_pkg / "lib").mkdir()
-    (buildroot_pkg / "bin").mkdir()
+    # --- Buildroot tarball staging (must come before trim_sysroot) ---
+    if buildroot_pkg().is_dir():
+        shutil.rmtree(buildroot_pkg())
+    br = buildroot_pkg() / "sysroot"  # arcname "sysroot/" in the tarball
+    (br / "lib").mkdir(parents=True)
+    (br / "bin").mkdir(parents=True)
 
     # Copy include directory.
-    inc_src = sysroot_installed / "include"
+    inc_src = release_sysroot() / "include"
     if inc_src.is_dir():
-        shutil.copytree(inc_src, buildroot_pkg / "include")
+        shutil.copytree(inc_src, br / "include")
 
     # Copy static libraries.
-    lib_src = sysroot_installed / "lib"
+    lib_src = release_sysroot() / "lib"
     if lib_src.is_dir():
         for lib_file in lib_src.glob("*.a"):
-            shutil.copy2(lib_file, buildroot_pkg / "lib" / lib_file.name)
+            shutil.copy2(lib_file, br / "lib" / lib_file.name)
         # Copy pkgconfig.
         pkgconfig = lib_src / "pkgconfig"
         if pkgconfig.is_dir():
-            shutil.copytree(pkgconfig, buildroot_pkg / "lib" / "pkgconfig")
+            shutil.copytree(pkgconfig, br / "lib" / "pkgconfig")
         # Copy config-3.12.
         config_dir = lib_src / config.PYTHON_LIB_DIR / f"config-{config.PYTHON_VERSION}"
         if config_dir.is_dir():
             dest = (
-                buildroot_pkg
-                / "lib"
-                / config.PYTHON_LIB_DIR
-                / f"config-{config.PYTHON_VERSION}"
+                br / "lib" / config.PYTHON_LIB_DIR / f"config-{config.PYTHON_VERSION}"
             )
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(config_dir, dest)
@@ -93,61 +81,50 @@ def package(
         "pydoc3",
         f"pydoc{config.PYTHON_VERSION}",
     ]:
-        src = sysroot_installed / "bin" / f
+        src = release_sysroot() / "bin" / f
         if src.is_file():
-            shutil.copy2(src, buildroot_pkg / "bin" / f)
+            shutil.copy2(src, br / "bin" / f)
 
     # Copy share directory.
-    share_src = sysroot_installed / "share"
+    share_src = release_sysroot() / "share"
     if share_src.is_dir():
-        shutil.copytree(share_src, buildroot_pkg / "share")
+        shutil.copytree(share_src, br / "share")
 
-    # --- Sysroot: runtime stdlib (trimmed) ---
-    ramfs_staging = release_staging / "sysroot-pkg-wrap"
-    ramfs_sysroot = ramfs_staging / "sysroot" / "lib"
-    ramfs_sysroot.mkdir(parents=True)
-
-    py_lib = sysroot_installed / "lib" / config.PYTHON_LIB_DIR
-    if py_lib.is_dir():
-        shutil.copytree(py_lib, ramfs_sysroot / config.PYTHON_LIB_DIR)
-
-    ramfs_mod.trim_sysroot(ramfs_staging)
+    # --- Sysroot tarball staging: trim install tree in-place ---
+    ramfs_mod.trim_sysroot(sysroot_pkg())
 
     # --- Include python.elf binary ---
-    bin_dir = release_staging / "bin"
     python_elf = paths.repo_root() / f"python{config.EXE}"
     if python_elf.is_file():
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(python_elf, bin_dir / "python.elf")
-        size = (bin_dir / "python.elf").stat().st_size
+        bin_dst = sysroot_pkg() / "bin"
+        bin_dst.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(python_elf, bin_dst / "python.elf")
+        size = (bin_dst / "python.elf").stat().st_size
         print(f"Included bin/python.elf ({size // 1024}K)")
     else:
         print("Warning: python.elf not found — binary will not be included in release")
 
-    # --- Build ramfs image ---
-    ramfs_img = release_staging / "cpython-ramfs.img"
-    ramfs_mod.build_image(ramfs_staging, args.sysroot, ramfs_img)
 
-    # --- Create release tarballs ---
+def package(
+    args: build_mod.MakeArgs,
+) -> None:
+    """Tar the two pre-staged trees verbatim.
+
+    Creates two tarballs in ``nanvix_zutil.paths.dist_dir()``:
+    - ``cpython-<platform>-<mode>-<memory>.tar.gz`` — runtime sysroot + binary + ramfs
+    - ``cpython-<platform>-<mode>-<memory>-buildroot.tar.gz`` — build dependencies
+    """
+    dist_dir = paths.dist_dir()
+    artifact = args.asset_prefix()
     dist_dir.mkdir(parents=True, exist_ok=True)
 
-    # Sysroot tarball.
-    sysroot_tar = dist_dir / f"{artifact}.tar.gz"
-    sysroot_runtime = ramfs_staging / "sysroot"
-    with tarfile.open(str(sysroot_tar), "w:gz") as tf:
-        tf.add(str(sysroot_runtime), arcname="sysroot")
-        if bin_dir.is_dir():
-            tf.add(str(bin_dir), arcname="bin")
-        if ramfs_img.is_file():
-            tf.add(str(ramfs_img), arcname="cpython-ramfs.img")
-
-    # Buildroot tarball.
-    buildroot_tar = dist_dir / f"{artifact}-buildroot.tar.gz"
-    with tarfile.open(str(buildroot_tar), "w:gz") as tf:
-        tf.add(str(buildroot_pkg), arcname="sysroot")
-
-    # Cleanup staging.
-    shutil.rmtree(release_staging)
+    for staging, name in [
+        (sysroot_pkg(), f"{artifact}.tar.gz"),
+        (buildroot_pkg(), f"{artifact}-buildroot.tar.gz"),
+    ]:
+        with tarfile.open(str(dist_dir / name), "w:gz") as tf:
+            for child in sorted(staging.iterdir()):
+                tf.add(str(child), arcname=child.name)
 
     print("Release tarballs created in dist/")
     for f in sorted(dist_dir.glob(f"{artifact}*.tar.gz")):
