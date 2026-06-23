@@ -114,6 +114,18 @@ else
 endif
 
 # Configure environment variables
+#
+# Link only the cross-toolchain's newlib libc/libm (LIBC/LIBM above), never the
+# sysroot's nanvix_libc.  Since Nanvix 0.17.x the sysroot ships its own
+# libc.a/libc.so, and -L$(SYSROOT_PATH)/lib (needed for the bundled deps) makes
+# the gcc driver's implicit -lc/-lm bind there instead of newlib.  That pulls
+# nanvix_libc's sigaction(), which flips CPython's configure to
+# HAVE_SIGACTION=yes and compiles Modules/faulthandler.c's SA_RESTART path -- a
+# macro the newlib <signal.h> we build against does not define, so the build
+# fails with "'SA_RESTART' undeclared".  -nodefaultlibs drops the implicit
+# libc/libm/libgcc; LIBS then names newlib libc/libm explicitly and re-adds
+# -lgcc.  This restores the pre-0.17 link set (newlib libc + libposix), where
+# sigaction was absent and the SA_RESTART path stayed compiled out.
 CONFIGURE_ENV = \
 	CC="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-gcc" \
 	CXX="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-g++" \
@@ -122,8 +134,8 @@ CONFIGURE_ENV = \
 	RANLIB="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ranlib" \
 	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -I$(SYSROOT_PATH)/include" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
-	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker" \
-	LIBS="-Wl,--start-group $(LIBCRT0) $(LIBPOSIX) $(LIBC) $(LIBM) -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
+	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker -nodefaultlibs" \
+	LIBS="-Wl,--start-group $(LIBCRT0) $(LIBPOSIX) $(LIBC) $(LIBM) -lgcc -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
 	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
 	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
 	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
