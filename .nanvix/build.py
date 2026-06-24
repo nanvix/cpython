@@ -97,7 +97,7 @@ def build(
     """
     _args = dataclasses.replace(args, targets=["build"])
     dest_dir = (
-        (paths.release_dir() / "sysroot-pkg") if args.release else paths.test_out()
+        (paths.release_dir() / config.PKG_SYSROOT) if args.release else paths.test_out()
     )
     if config.IS_WINDOWS:
         # Build and install in one Docker invocation, writing directly to

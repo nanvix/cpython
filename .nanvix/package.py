@@ -1,18 +1,17 @@
 # Copyright(c) The Maintainers of Nanvix.
 # Licensed under the MIT License.
 
-"""Release packaging and verification for Nanvix CPython.
+"""Release staging for Nanvix CPython.
 
-Replaces package-common.mk and verify-package.mk. Handles sysroot/buildroot
-tarball creation, ramfs image inclusion, and tarball verification.
+Stages the sysroot and buildroot trees under ``release_dir()`` for the
+base zutils ``release`` flow to tar. Also inserts the built ``python.elf``
+and prepares the ramfs image inputs.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 import shutil
-import tarfile
-import build as build_mod
 import config
 import ramfs as ramfs_mod
 from nanvix_zutil import paths
@@ -20,12 +19,12 @@ from nanvix_zutil import paths
 
 def sysroot_pkg() -> Path:
     """Staging tree for the runtime sysroot tarball (tarred verbatim)."""
-    return paths.release_dir() / "sysroot-pkg"
+    return paths.release_dir() / config.PKG_SYSROOT
 
 
 def buildroot_pkg() -> Path:
     """Staging tree for the buildroot tarball (tarred verbatim)."""
-    return paths.release_dir() / "buildroot-pkg"
+    return paths.release_dir() / config.PKG_BUILDROOT
 
 
 def stage() -> None:
@@ -98,62 +97,3 @@ def stage() -> None:
         print(f"Included bin/python.elf ({size // 1024}K)")
     else:
         print("Warning: python.elf not found — binary will not be included in release")
-
-
-def package(
-    args: build_mod.MakeArgs,
-) -> None:
-    """Tar the two pre-staged trees verbatim.
-
-    Creates two tarballs in ``nanvix_zutil.paths.dist_dir()``:
-    - ``cpython-<platform>-<mode>-<memory>.tar.gz`` — runtime sysroot + binary + ramfs
-    - ``cpython-<platform>-<mode>-<memory>-buildroot.tar.gz`` — build dependencies
-    """
-    dist_dir = paths.dist_dir()
-    artifact = args.asset_prefix()
-    dist_dir.mkdir(parents=True, exist_ok=True)
-
-    for staging, name in [
-        (sysroot_pkg(), f"{artifact}.tar.gz"),
-        (buildroot_pkg(), f"{artifact}-buildroot.tar.gz"),
-    ]:
-        with tarfile.open(str(dist_dir / name), "w:gz") as tf:
-            for child in sorted(staging.iterdir()):
-                tf.add(str(child), arcname=child.name)
-
-    print("Release tarballs created in dist/")
-    for f in sorted(dist_dir.glob(f"{artifact}*.tar.gz")):
-        size = f.stat().st_size
-        print(f"  {f.name} ({size // 1024}K)")
-
-
-def verify(args: build_mod.MakeArgs) -> None:
-    """Verify release tarballs.
-
-    Checks that tarballs exist, are not corrupt, and contain the
-    expected contents.
-    """
-    artifact = args.asset_prefix()
-    dist_dir = paths.dist_dir()
-
-    print("Verifying release tarballs...")
-
-    sysroot_tar = dist_dir / f"{artifact}.tar.gz"
-    buildroot_tar = dist_dir / f"{artifact}-buildroot.tar.gz"
-
-    if not sysroot_tar.is_file():
-        raise FileNotFoundError(f"Sysroot tarball not found: {sysroot_tar}")
-    if not buildroot_tar.is_file():
-        raise FileNotFoundError(f"Buildroot tarball not found: {buildroot_tar}")
-
-    # Verify integrity.
-    with tarfile.open(str(sysroot_tar), "r:gz") as tf:
-        members = tf.getnames()
-    with tarfile.open(str(buildroot_tar), "r:gz") as tf:
-        _ = tf.getnames()
-
-    # Verify python.elf is present (exact path match).
-    if "bin/python.elf" not in members:
-        raise ValueError("Sysroot tarball missing bin/python.elf")
-
-    print("\t\t*** Package verification PASSED ***")
