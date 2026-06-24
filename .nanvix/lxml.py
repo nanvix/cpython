@@ -40,7 +40,7 @@ def clear_setup_local(repo_root: Path) -> None:
         print(f"[lxml] Removed {setup_local}")
 
 
-def stage_lxml_runtime(sysroot: Path) -> None:
+def stage_lxml_runtime(pkg_root: Path) -> None:
     """Copy lxml Python files from buildroot into the test/package sysroot.
 
     Looks for lxml in ``.nanvix/buildroot/python-packages/lxml/``.
@@ -54,7 +54,7 @@ def stage_lxml_runtime(sysroot: Path) -> None:
         )
         return
 
-    py_lib = sysroot / "lib" / config.PYTHON_LIB_DIR
+    py_lib = pkg_root / "lib" / config.PYTHON_LIB_DIR
     if not py_lib.is_dir():
         raise RuntimeError(f"Python runtime library directory is missing: {py_lib}")
 

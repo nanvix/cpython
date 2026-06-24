@@ -184,6 +184,12 @@ def docker_build(
             f"DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
         ]
         _args = dataclasses.replace(_args, targets=targets)
+        # The named Docker volume persists across builds; wipe the
+        # install staging dir so stale files (e.g. from a prior
+        # INSTALL_PREFIX) don't leak into the tarball.
+        clean_install_staging = (
+            f"rm -rf {config.DOCKER_WORKSPACE_PATH}/_install_staging"
+        )
         try:
             rel_dest = install_destdir.relative_to(workspace).as_posix()
         except ValueError:
@@ -207,7 +213,8 @@ def docker_build(
             f"/mnt/host-workspace/{rel_dest}/"
         )
         shell_cmd += (
-            f" && {_args.to_string()} && {strip_install}; rc=$?; "
+            f" && {clean_install_staging} && {_args.to_string()}"
+            f" && {strip_install}; rc=$?; "
             f"{copy_back}; {install_copy}; exit $rc"
         )
     else:
@@ -250,8 +257,13 @@ def docker_install(
         f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
         f'"{strip_bin}" --strip-all "{install_bin}" || true'
     )
+    # The named Docker volume persists across builds; wipe the install
+    # staging dir so stale files (e.g. from a prior INSTALL_PREFIX)
+    # don't leak into the tarball.
     shell_cmd = (
-        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && {_args.to_string()}; rc=$?; "
+        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
+        f"rm -rf {config.DOCKER_WORKSPACE_PATH}/_install_staging && "
+        f"{_args.to_string()}; rc=$?; "
         f"{strip_cmd}; "
         f"if [ -d {config.DOCKER_WORKSPACE_PATH}/_install_staging ]; then "
         f"mkdir -p /mnt/host-workspace/{rel_dest} && "

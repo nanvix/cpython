@@ -10,7 +10,6 @@ across defaults.mk, common.mk, and the various test-*.mk files.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Platform defaults
@@ -20,7 +19,7 @@ DOCKER_IMAGE = "ghcr.io/nanvix/toolchain-python:latest"
 DEFAULT_PLATFORM = "microvm"
 DEFAULT_PROCESS_MODE = "standalone"
 DEFAULT_MEMORY_SIZE = "256mb"
-DEFAULT_INSTALL_PREFIX = "/sysroot"
+DEFAULT_INSTALL_PREFIX = "/"
 
 # Python version string — centralized to avoid shotgun surgery if updated.
 PYTHON_VERSION = "3.12"
@@ -47,116 +46,6 @@ TOOLCHAIN_DEFAULT_PATH = "/opt/nanvix"
 DOCKER_TOOLCHAIN_PATH = "/opt/nanvix"
 DOCKER_SYSROOT_PATH = "/mnt/sysroot"
 DOCKER_WORKSPACE_PATH = "/mnt/workspace"
-
-
-def toolchain_paths(
-    toolchain: str | Path,
-    sysroot: str | Path,
-) -> dict[str, Path]:
-    """Return resolved paths to toolchain binaries and libraries."""
-    tc = Path(toolchain)
-    sr = Path(sysroot)
-    return {
-        "cc": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-gcc",
-        "cxx": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-g++",
-        "ld": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-ld",
-        "ar": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-ar",
-        "ranlib": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-ranlib",
-        "strip": tc / "bin" / f"{TOOLCHAIN_TRIPLET}-strip",
-        "build_python": tc / "bin" / "python3",
-        "libc": tc / f"{TOOLCHAIN_TRIPLET}" / "lib" / "libc.a",
-        "libm": tc / f"{TOOLCHAIN_TRIPLET}" / "lib" / "libm.a",
-        "libposix": sr / "lib" / "libposix.a",
-        "libcrt0": sr / "lib" / "libnvx_crt0.a",
-        "libz": sr / "lib" / "libz.a",
-        "libsqlite3": sr / "lib" / "libsqlite3.a",
-        "libssl": sr / "lib" / "libssl.a",
-        "libcrypto": sr / "lib" / "libcrypto.a",
-        "liblzma": sr / "lib" / "liblzma.a",
-    }
-
-
-def configure_env(toolchain: str | Path, sysroot: str | Path) -> dict[str, str]:
-    """Return the environment dict for ./configure."""
-    tp = toolchain_paths(toolchain, sysroot)
-    sr = Path(sysroot)
-    return {
-        "CC": str(tp["cc"]),
-        "CXX": str(tp["cxx"]),
-        "LD": str(tp["ld"]),
-        "AR": str(tp["ar"]),
-        "RANLIB": str(tp["ranlib"]),
-        "CFLAGS": (
-            f"-O3 -fomit-frame-pointer -fno-unwind-tables "
-            f"-fno-asynchronous-unwind-tables -I{sr}/include"
-        ),
-        "CFLAGS_NODIST": "-fno-semantic-interposition",
-        "LDFLAGS": (
-            f"-L{sr}/lib -T{sr}/lib/user.ld "
-            f"-Wl,--allow-multiple-definition -no-pie "
-            f"-Wl,--export-dynamic -Wl,--no-dynamic-linker"
-        ),
-        "LIBS": (
-            f"-Wl,--start-group {tp['libcrt0']} {tp['libposix']} {tp['libc']} {tp['libm']} "
-            f"-lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group"
-        ),
-        "LIBSQLITE3_LIBS": f"-L{sr}/lib -lsqlite3",
-        "LIBSQLITE3_CFLAGS": f"-I{sr}/include",
-        "ZLIB_LIBS": f"-L{sr}/lib -lz",
-        "ZLIB_CFLAGS": f"-I{sr}/include",
-        "BZIP2_LIBS": f"-L{sr}/lib -lbz2",
-        "BZIP2_CFLAGS": f"-I{sr}/include",
-        "LIBLZMA_LIBS": f"-L{sr}/lib -llzma",
-        "LIBLZMA_CFLAGS": f"-I{sr}/include",
-        "LIBFFI_LIBS": f"-L{sr}/lib -lffi",
-        "LIBFFI_CFLAGS": f"-I{sr}/include",
-    }
-
-
-def configure_opts(
-    build_python: str | Path,
-    libc: str | Path,
-    libm: str | Path,
-    sysroot: str | Path,
-    install_prefix: str = DEFAULT_INSTALL_PREFIX,
-    release: bool = False,
-) -> list[str]:
-    """Return the ./configure option list."""
-    opts = [
-        "--disable-shared",
-        "--build=x86_64-pc-linux-gnux32",
-        f"--host={TOOLCHAIN_TRIPLET}",
-        f"--with-build-python={build_python}",
-    ]
-    if release:
-        opts.append("--disable-test-modules")
-    opts.extend(
-        [
-            f"--with-libc={libc}",
-            f"--with-libm={libm}",
-            f"--prefix={install_prefix}",
-            f"--exec-prefix={install_prefix}",
-            "--with-ensurepip=no",
-            "--with-pkg-config=no",
-            f"--with-openssl={sysroot}",
-            "--disable-ipv6",
-        ]
-    )
-    if release:
-        opts.append("--without-doc-strings")
-    opts.extend(
-        [
-            "--with-computed-gotos",
-            "ac_cv_file__dev_ptmx=no",
-            "ac_cv_file__dev_ptc=no",
-            "ac_cv_pthread_is_default=yes",
-            "ac_cv_pthread=yes",
-            "ac_cv_kthread=no",
-            "ac_cv_func_dlopen=yes",
-            "ac_cv_header_dlfcn_h=yes",
-        ]
-    )
-    return opts
 
 
 # ---------------------------------------------------------------------------

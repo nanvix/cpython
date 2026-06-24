@@ -175,20 +175,15 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
                 )
         tf.extractall(cache_dir)
 
-    # The tarball contains {bin/, sysroot/, cpython-ramfs.img}.
-    # Restructure if needed so that sysroot/ is at cache_dir/sysroot/.
-    sysroot = cache_dir / "sysroot"
-    if not sysroot.is_dir():
-        python_lib_dir = Path(config.PYTHON_LIB_DIR)
-        for candidate in cache_dir.rglob(str(python_lib_dir)):
-            parent = candidate
-            for _ in python_lib_dir.parts:
-                parent = parent.parent
-            if parent != cache_dir:
-                sysroot.mkdir(exist_ok=True)
-                for item in parent.iterdir():
-                    shutil.move(str(item), str(sysroot / item.name))
-                break
+    # Flatten legacy tarballs that still wrap everything in a top-level
+    # ``sysroot/`` directory (releases predating the strip-sysroot change).
+    # Newer tarballs extract directly into ``cache_dir`` and this is a no-op.
+    extracted_wrapper = cache_dir / "sysroot"
+    if extracted_wrapper.is_dir():
+        for item in extracted_wrapper.iterdir():
+            shutil.move(str(item), str(cache_dir / item.name))
+        extracted_wrapper.rmdir()
+    sysroot = cache_dir
 
     # Copy the stripped python binary into sysroot/bin/ if present.
     bin_dir = sysroot / "bin"
@@ -227,13 +222,13 @@ def stage(args: build_mod.MakeArgs) -> None:
 
     Also called by run_all on Windows CI.
     """
-    sysroot_dir = paths.test_out() / "sysroot"
+    staging = paths.test_out()
 
     # Sysconfigdata fallback: ``make install`` should copy it from
     # build/<pybuilddir>/, but can silently fail when PYTHON_FOR_BUILD
     # is unavailable or the install recipe is interrupted.
     scdata_name = f"{config.SYSCONFIGDATA_NAME}.py"
-    scdata_dst = sysroot_dir / "lib" / config.PYTHON_LIB_DIR / scdata_name
+    scdata_dst = staging / "lib" / config.PYTHON_LIB_DIR / scdata_name
     if not scdata_dst.is_file():
         pybuilddir = paths.repo_root() / "pybuilddir.txt"
         if pybuilddir.is_file():
@@ -260,7 +255,7 @@ def stage(args: build_mod.MakeArgs) -> None:
         "    print(f'CPYTHON_TEST_LXML_FAIL: {e}')\n"
         "    sys.exit(1)\n"
     )
-    (sysroot_dir / "test_hello.py").write_text(
+    (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
         "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
@@ -271,10 +266,10 @@ def stage(args: build_mod.MakeArgs) -> None:
     # ramfs build (standalone mode mounts ramfs as /).
     httpserver_src = paths.repo_root() / "httpserver.py"
     if httpserver_src.is_file():
-        shutil.copy2(httpserver_src, sysroot_dir / "httpserver.py")
+        shutil.copy2(httpserver_src, staging / "httpserver.py")
 
     # Nanvix runtime binaries (host tools + guest daemons).
-    bin_dir = sysroot_dir / "bin"
+    bin_dir = staging / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     for binary in [
         "nanvixd.elf",
@@ -305,10 +300,10 @@ def stage(args: build_mod.MakeArgs) -> None:
     # Guest-side regrtest runner.
     regrtest_runner = paths.nanvix_root() / "run-regrtest.py"
     if regrtest_runner.is_file():
-        shutil.copy2(regrtest_runner, sysroot_dir / "run-regrtest.py")
+        shutil.copy2(regrtest_runner, staging / "run-regrtest.py")
 
     # ``make install`` omits Lib/test/ from the install tree; regrtest needs it.
-    pylib_dir = sysroot_dir / "lib" / config.PYTHON_LIB_DIR
+    pylib_dir = staging / "lib" / config.PYTHON_LIB_DIR
 
     # Windows CI workaround: the synced artifact overlay only ships
     # *.elf/*.so (see nanvix_scripts.test_windows.mirror_ci), so the
@@ -340,16 +335,16 @@ def stage_ramfs(
     Returns the path to the ramfs image.
     """
     ramfs_img = paths.test_out() / "cpython-rootfs.img"
-    ramfs_cache = paths.test_out() / "_ramfs_cache"
+    ramfs_cache = paths.out_dir() / "_ramfs_cache"
 
     # Build fresh ramfs.
+    paths.out_dir().mkdir(parents=True, exist_ok=True)
     if ramfs_cache.exists():
         shutil.rmtree(ramfs_cache)
-    ramfs_cache.mkdir(parents=True)
 
     # Copy sysroot from test staging.
-    sysroot_src = paths.test_out() / "sysroot"
-    sysroot_dst = ramfs_cache / "sysroot"
+    sysroot_src = paths.test_out()
+    sysroot_dst = ramfs_cache
     shutil.copytree(sysroot_src, sysroot_dst)
 
     # Create /tmp for tempfile.gettempdir().
@@ -386,7 +381,6 @@ def _run_nanvixd_script(
     This is the low-level execution primitive shared by the hello-world
     test and the benchmark.
     """
-    test_sysroot = staging / "sysroot"
     resolved_extra: list[str] = (
         nanvixd_extra
         if nanvixd_extra is not None
@@ -417,15 +411,15 @@ def _run_nanvixd_script(
         for name in _staging_bins:
             src = args.sysroot / "bin" / name
             if src.is_file():
-                shutil.copy2(src, test_sysroot / "bin" / name)
+                shutil.copy2(src, staging / "bin" / name)
 
     initrd_img: Path | None = None
     if standalone:
         # Standalone: bundle python binary with system daemons into an
         # initrd image.  Env vars are passed via app_env so the kernel's
         # split_cmdline sees them after the bare ';' separator.
-        bin_dir = test_sysroot / "bin"
-        app_path = test_sysroot / "bin" / config.python_binary()
+        bin_dir = staging / "bin"
+        app_path = staging / "bin" / config.python_binary()
         app_args = ["-B", f"./{script_name}"]
         app_env = (
             f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
@@ -463,7 +457,7 @@ def _run_nanvixd_script(
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=test_sysroot,
+            cwd=staging,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"{label} timed out after {timeout}s")
@@ -574,11 +568,10 @@ def run_smoke_httpserver(
         )
         return
 
-    sysroot = staging / "sysroot"
     script_name = "httpserver.py"
-    if not (sysroot / script_name).is_file():
+    if not (staging / script_name).is_file():
         raise RuntimeError(
-            f"{script_name} not found in staging sysroot ({sysroot}); "
+            f"{script_name} not found in staging ({staging}); "
             "stage() did not copy it"
         )
 
@@ -587,7 +580,7 @@ def run_smoke_httpserver(
         if nanvixd_extra is not None
         else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
-    nanvixd = str((sysroot / "bin" / config.nanvixd_binary()).resolve())
+    nanvixd = str((staging / "bin" / config.nanvixd_binary()).resolve())
 
     if ramfs_img is None:
         raise ValueError("ramfs_img is required for standalone mode")
@@ -601,10 +594,10 @@ def run_smoke_httpserver(
     ):
         hp = args.sysroot / "bin" / name
         if hp.is_file():
-            shutil.copy2(hp, sysroot / "bin" / name)
+            shutil.copy2(hp, staging / "bin" / name)
 
-    bin_dir = sysroot / "bin"
-    app_path = sysroot / "bin" / config.python_binary()
+    bin_dir = staging / "bin"
+    app_path = staging / "bin" / config.python_binary()
     app_args = ["-B", f"./{script_name}"]
     app_env = (
         f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
@@ -636,7 +629,7 @@ def run_smoke_httpserver(
         stdin=subprocess.DEVNULL,
         stdout=log_fh,
         stderr=subprocess.STDOUT,
-        cwd=sysroot,
+        cwd=staging,
     )
 
     def _read_log() -> str:
@@ -744,7 +737,6 @@ def run_regrtest(
     )
     standalone = args.process_mode == "standalone"
 
-    sysroot = staging / "sysroot"
     run_tests_script = paths.nanvix_root() / "run-tests.py"
 
     env = os.environ.copy()
@@ -755,7 +747,7 @@ def run_regrtest(
         # Standalone: ramfs + initrd-based invocation.
         if ramfs_img is None:
             ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
-        bin_dir = sysroot / "bin"
+        bin_dir = staging / "bin"
         extra_str = f"-bin-dir {bin_dir} -ramfs {ramfs_img}"
         if resolved_nanvixd_extra:
             extra_str += " " + " ".join(resolved_nanvixd_extra)
@@ -777,7 +769,7 @@ def run_regrtest(
     cmd = [sys.executable, str(run_tests_script)] + test_list
 
     print(f"Test: regrtest ({len(test_list)} modules, {args.process_mode})...")
-    result = subprocess.run(cmd, cwd=sysroot, env=env)
+    result = subprocess.run(cmd, cwd=staging, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"regrtest failed with exit code {result.returncode}")
 
@@ -831,7 +823,7 @@ def run_all(
         if args.process_mode == "standalone":
             stage_ramfs(args)
 
-    lxml_mod.stage_lxml_runtime(staging / "sysroot")
+    lxml_mod.stage_lxml_runtime(staging)
 
     # Hello test.
     run_hello(
@@ -902,14 +894,14 @@ def _run_benchmark_impl(
     """Inner implementation of :func:`run_benchmark`."""
     # Consume the test install tree produced by ``./z build``.
     staging = paths.test_out()
-    if not (staging / "sysroot").is_dir():
+    if not staging.is_dir():
         raise RuntimeError(
-            f"{staging}/sysroot not found; run `./z build` before `./z benchmark`"
+            f"{staging} not found; run `./z build` before `./z benchmark`"
         )
 
     # Write a minimal benchmark script.
     bench_script = "bench_hello.py"
-    (staging / "sysroot" / bench_script).write_text("print('hello world')\n")
+    (staging / bench_script).write_text("print('hello world')\n")
 
     # Build ramfs with release trimming (keep_tests=False).
     ramfs_img = None
@@ -922,8 +914,8 @@ def _run_benchmark_impl(
             shutil.rmtree(bench_cache)
         bench_cache.mkdir(parents=True)
 
-        sysroot_src = staging / "sysroot"
-        sysroot_dst = bench_cache / "sysroot"
+        sysroot_src = staging
+        sysroot_dst = bench_cache
         shutil.copytree(sysroot_src, sysroot_dst)
         (sysroot_dst / "tmp").mkdir(exist_ok=True)
 
