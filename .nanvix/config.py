@@ -35,6 +35,9 @@ EXE = ".elf"
 # at runtime in the guest kernel.
 SYSCONFIGDATA_NAME = "_sysconfigdata__nanvix_"
 
+PKG_SYSROOT = "sysroot-pkg"
+PKG_BUILDROOT = "buildroot-pkg"
+
 # ---------------------------------------------------------------------------
 # Toolchain
 # ---------------------------------------------------------------------------

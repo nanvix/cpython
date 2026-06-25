@@ -99,6 +99,18 @@ class CPythonBuild(ZScript):
 
         SYSROOT_MULTI_PROCESS_FILES: tuple[str, ...] = ()
 
+    def release_targets(self) -> dict[str, str]:
+        name = (
+            f"{self.manifest.name}"
+            f"-{self.config.machine}"
+            f"-{self.config.deployment_mode}"
+            f"-{self.config.memory_size}"
+        )
+        return {
+            config.PKG_SYSROOT: f"{name}",
+            config.PKG_BUILDROOT: f"{name}-buildroot",
+        }
+
     # ---- Local Nanvix overlay --------------------------------------------
 
     def _overlay_local_nanvix(self) -> None:
@@ -248,14 +260,6 @@ class CPythonBuild(ZScript):
             args,
             nanvixd_extra=nanvixd_extra,
         )
-
-    def release(self) -> None:
-        """Package the CPython release tarballs and verify them."""
-        self._overlay_local_nanvix()
-        args = self._make_args(release=True)
-
-        package_mod.package(args)
-        package_mod.verify(args)
 
     def clean(self) -> None:
         """Remove build artifacts."""
