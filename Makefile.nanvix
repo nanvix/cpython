@@ -240,13 +240,10 @@ else
 	fi
 endif
 
-# Install target
+# Install target (native only; Windows/Docker installs are staged inside
+# docker_build via _docker.py).
 install: build
-ifdef CONFIG_NANVIX_DOCKER
-	$(DOCKER_RUN) $(MAKE) install DESTDIR="$(patsubst $(CURDIR)%,$(DOCKER_WORKSPACE_PATH)%,$(abspath $(DESTDIR)))"
-else
 	$(MAKE) install DESTDIR="$(DESTDIR)"
-endif
 
 
 # Clean target

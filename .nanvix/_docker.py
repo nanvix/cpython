@@ -226,66 +226,6 @@ def docker_build(
     )
 
 
-def docker_install(
-    workspace: Path,
-    destdir: Path,
-    args: build_mod.MakeArgs,
-) -> None:
-    """Run make install inside Docker (Windows host mode)."""
-    targets = [
-        "install",
-        f"DESTDIR={config.DOCKER_WORKSPACE_PATH}/_install_staging",
-    ]
-    _args = dataclasses.replace(args, docker=True, targets=targets)
-    base = _docker_run_base(workspace, _args)
-    sync = sync_sources(workspace)
-
-    # Compute relative path so nested destdirs (e.g. .nanvix/_test_staging)
-    # are preserved correctly on the host.
-    try:
-        rel_dest = destdir.relative_to(workspace).as_posix()
-    except ValueError:
-        rel_dest = destdir.name
-
-    # Copy install staging back to host, stripping the binary first.
-    strip_bin = f"{config.DOCKER_TOOLCHAIN_PATH}/bin/{config.TOOLCHAIN_TRIPLET}-strip"
-    install_bin = (
-        f"{config.DOCKER_WORKSPACE_PATH}/_install_staging"
-        f"{_args.install_prefix}/bin/{config.python_binary()}"
-    )
-    strip_cmd = (
-        f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
-        f'"{strip_bin}" --strip-all "{install_bin}" || true'
-    )
-    # The named Docker volume persists across builds; wipe the install
-    # staging dir so stale files (e.g. from a prior INSTALL_PREFIX)
-    # don't leak into the tarball.
-    shell_cmd = (
-        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
-        f"rm -rf {config.DOCKER_WORKSPACE_PATH}/_install_staging && "
-        f"{_args.to_string()}; rc=$?; "
-        f"{strip_cmd}; "
-        f"if [ -d {config.DOCKER_WORKSPACE_PATH}/_install_staging ]; then "
-        f"mkdir -p /mnt/host-workspace/{rel_dest} && "
-        f"cp -a {config.DOCKER_WORKSPACE_PATH}/_install_staging/* /mnt/host-workspace/{rel_dest}/; fi; "
-        f"exit $rc"
-    )
-
-    subprocess.run(
-        [*base, "sh", "-c", shell_cmd],
-        check=True,
-    )
-
-
-def clean_volume(workspace: Path) -> None:
-    """Remove the persistent Docker build volume."""
-    volume = _volume_name(workspace)
-    subprocess.run(
-        ["docker", "volume", "rm", volume],
-        capture_output=True,
-    )
-
-
 def _generate_setup_local_cmd() -> str:
     """Shell command to generate Modules/Setup.local inside the container."""
     sysroot = config.DOCKER_SYSROOT_PATH
