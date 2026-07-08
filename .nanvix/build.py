@@ -121,12 +121,13 @@ def install(
     *,
     extra_make_flags: list[str] | None = None,
 ) -> None:
-    """Install CPython into a staging directory."""
-    if config.IS_WINDOWS:
-        docker_mod.docker_install(paths.repo_root(), destdir, args)
-        return
-    # When running inside Docker, repo_root maps to /mnt/workspace.
-    # Use a relative DESTDIR so it resolves correctly inside the container.
+    """Install CPython into a staging directory (native host only).
+
+    Windows/Docker installs happen inside :func:`_docker.docker_build`
+    via ``install_destdir=``; this helper is never reached there.
+    """
+    # Use a relative DESTDIR so it resolves the same way whether the
+    # caller runs make directly or under a wrapper.
     try:
         rel_destdir = destdir.resolve().relative_to(paths.repo_root())
     except ValueError:

@@ -161,9 +161,20 @@ class CPythonBuild(ZScript):
         toolchain = Path(TOOLCHAIN_CONTAINER_PATH)
         return Path(sysroot), toolchain
 
-    def _make_args(self, *targets: str, release: bool = False) -> build_mod.MakeArgs:
-        """Build the make argument list for configure/build/install."""
+    def _make_args(
+        self,
+        *targets: str,
+        release: bool = False,
+        with_docker: bool = False,
+    ) -> build_mod.MakeArgs:
+        """Build the make argument list for configure/build/install.
+
+        Docker is build-only (see zutils#224 / #666). Callers other than
+        ``build()`` MUST leave ``with_docker=False``; ``self.docker`` is
+        ignored for those steps.
+        """
         sysroot, toolchain = self._get_host_paths()
+        use_docker = with_docker and self.docker is not None
         return build_mod.MakeArgs(
             toolchain_path=toolchain,
             sysroot=sysroot,
@@ -173,8 +184,12 @@ class CPythonBuild(ZScript):
             memory_size=self.config.memory_size,
             install_prefix=_DEFAULT_INSTALL_PREFIX,
             release=release,
-            docker=self.docker is not None,
-            run_fn=lambda *args, **kw: run(*args, docker=self.docker, **kw),  # type: ignore[assignment]
+            docker=use_docker,
+            run_fn=(
+                (lambda *args, **kw: run(*args, docker=self.docker, **kw))  # type: ignore[assignment]
+                if use_docker
+                else None
+            ),
         )
 
     def setup(self) -> bool:
@@ -222,7 +237,7 @@ class CPythonBuild(ZScript):
 
         # Two separate builds: first release -> out/release/, then test -> out/test/.
         build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
-        args = self._make_args(release=True)
+        args = self._make_args(release=True, with_docker=True)
         build_mod.build(args)
         lxml_mod.stage_lxml_runtime(package_mod.sysroot_pkg())
         package_mod.stage()
@@ -234,7 +249,7 @@ class CPythonBuild(ZScript):
 
         # Build for test
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
-        args = self._make_args(release=False)
+        args = self._make_args(release=False, with_docker=True)
         build_mod.build(args)
         if self.config.deployment_mode == "standalone":
             test_mod.stage_ramfs(args)
