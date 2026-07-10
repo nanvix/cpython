@@ -120,10 +120,6 @@ You need the following components to build CPython for Nanvix:
 
 | Platform | Process Mode | Artifact Pattern |
 |----------|--------------|------------------|
-| hyperlight | multi-process | `hyperlight.*multi-process` |
-| hyperlight | single-process | `hyperlight.*single-process` |
-| microvm | single-process | `microvm.*single-process` |
-| microvm | multi-process | `microvm.*multi-process` |
 | microvm | standalone | `microvm.*standalone` |
 
 ---
@@ -270,16 +266,13 @@ cd .nanvix/_test_staging/sysroot && \
 ### Test Suite Status
 
 The `./z test` target runs **64 CPython stdlib test modules** on Nanvix
-(i686, microvm, 256 MB RAM). In standalone mode, tests are split into
-batches of 4 modules per VM invocation to stay within per-process memory
-limits. Multi-process and single-process modes run all modules in a
-single invocation.
+(i686, microvm, 256 MB RAM). Tests are split into batches of 4 modules
+per VM invocation to stay within per-process memory limits.
 
-All three deployment modes (**multi-process**, **single-process**, and
-**standalone**) run tests via CPython's regrtest runner (`python -m test`).
-In standalone mode, a `/tmp` directory is created on the ramfs so
+The **standalone** deployment mode runs tests via CPython's regrtest
+runner (`python -m test`). A `/tmp` directory is created on the ramfs so
 `tempfile.gettempdir()` works, and modules are batched by
-`run-tests.py`. Per-mode exclusions (e.g.
+`run-tests.py`. Mode exclusions (e.g.
 `test_filter_dealloc` on standalone to avoid OOM) are passed to regrtest
 via `--ignore`.
 
@@ -366,7 +359,6 @@ The following changes were made to support Nanvix.
 | `Makefile.nanvix` | Top-level Makefile (includes composable `.mk` files) |
 | `.nanvix/mk/*.mk` | Composable Make includes (common, test modes, packaging) |
 | `.nanvix/run-tests.py` | Host-side parallel batch runner (splits modules across VM invocations) |
-| `.nanvix/run-regrtest.py` | Guest-side regrtest wrapper (invoked inside nanvixd VM) |
 | `NANVIX.md` | This documentation file |
 | `.nanvix/z.py` | ZScript subclass (build orchestration logic) |
 | `.nanvix/nanvix.toml` | Package manifest with dependency declarations |
@@ -416,8 +408,6 @@ The CI runs across platform/process-mode/memory configurations:
 
 | Platform | Process Mode | Runner |
 |----------|--------------|--------|
-| microvm | multi-process | `ubuntu-latest` (container) |
-| microvm | single-process | `ubuntu-latest` (container) |
 | microvm | standalone | `ubuntu-latest` (container) |
 
 All configurations run in parallel with `fail-fast: false`.

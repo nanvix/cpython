@@ -3,12 +3,11 @@
 
 """Test orchestration for Nanvix CPython.
 
-Replaces test-common.mk, test-standalone.mk, test-multi-process.mk,
-test-single-process.mk, test-hyperlight.mk, test-microvm.mk, and
+Replaces test-common.mk, test-standalone.mk, test-microvm.mk, and
 test-run-host.py.
 
 Provides staging, hello-world validation, and regrtest dispatch for
-all deployment modes and platforms.
+the standalone deployment mode.
 """
 
 from __future__ import annotations
@@ -238,10 +237,8 @@ def stage(args: build_mod.MakeArgs) -> None:
                 shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
 
-    # Hello-world test script. lxml import is exercised only in standalone
-    # mode; xmlInitParser() hangs in hosted modes where filesystem I/O goes
-    # through nanvixd's virtualized host-FS layer.
-    standalone = args.process_mode == "standalone"
+    # Hello-world test script. lxml import is exercised in standalone mode;
+    # xmlInitParser() runs against the in-memory FAT ramfs VFS.
     lxml_snippet = (
         "try:\n"
         "    import lxml.etree\n"
@@ -258,8 +255,7 @@ def stage(args: build_mod.MakeArgs) -> None:
     (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
-        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
-        + (lxml_snippet if standalone else "")
+        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + lxml_snippet
     )
 
     # HTTP server smoke-test script must be present in the sysroot before
@@ -296,11 +292,6 @@ def stage(args: build_mod.MakeArgs) -> None:
         print(
             f"  Installed stripped python.elf into test_out ({target.stat().st_size // 1024}K)"
         )
-
-    # Guest-side regrtest runner.
-    regrtest_runner = paths.nanvix_root() / "run-regrtest.py"
-    if regrtest_runner.is_file():
-        shutil.copy2(regrtest_runner, staging / "run-regrtest.py")
 
     # ``make install`` omits Lib/test/ from the install tree; regrtest needs it.
     pylib_dir = staging / "lib" / config.PYTHON_LIB_DIR
@@ -389,65 +380,51 @@ def _run_nanvixd_script(
     # On Windows, CreateProcess searches for the executable relative to the
     # *parent's* CWD, not the child's cwd. Use an absolute path to avoid this.
     nanvixd = str((args.sysroot / "bin" / config.nanvixd_binary()).resolve())
-    python_bin = f"./bin/{config.python_binary()}"
-    standalone = args.process_mode == "standalone"
 
-    if standalone:
-        if ramfs_img is None:
-            raise ValueError("ramfs_img is required for standalone mode")
+    if ramfs_img is None:
+        raise ValueError("ramfs_img is required for standalone mode")
 
-        # Copy host tools and daemon ELFs into the staging sysroot.
-        # mkramfs is needed for ramfs generation; mkimage and the daemons
-        # (procd, memd, vfsd) are needed for initrd creation.
-        # Daemons are *guest* binaries — always .elf, even on
-        # Windows.  Only host tools use the platform extension.
-        _staging_bins = [
-            config.mkramfs_binary(),
-            config.mkimage_binary(),
-            "procd.elf",
-            "memd.elf",
-            "vfsd.elf",
-        ]
-        for name in _staging_bins:
-            src = args.sysroot / "bin" / name
-            if src.is_file():
-                shutil.copy2(src, staging / "bin" / name)
+    # Copy host tools and daemon ELFs into the staging sysroot.
+    # mkramfs is needed for ramfs generation; mkimage and the daemons
+    # (procd, memd, vfsd) are needed for initrd creation.
+    # Daemons are *guest* binaries — always .elf, even on
+    # Windows.  Only host tools use the platform extension.
+    _staging_bins = [
+        config.mkramfs_binary(),
+        config.mkimage_binary(),
+        "procd.elf",
+        "memd.elf",
+        "vfsd.elf",
+    ]
+    for name in _staging_bins:
+        src = args.sysroot / "bin" / name
+        if src.is_file():
+            shutil.copy2(src, staging / "bin" / name)
 
-    initrd_img: Path | None = None
-    if standalone:
-        # Standalone: bundle python binary with system daemons into an
-        # initrd image.  Env vars are passed via app_env so the kernel's
-        # split_cmdline sees them after the bare ';' separator.
-        bin_dir = staging / "bin"
-        app_path = staging / "bin" / config.python_binary()
-        app_args = ["-B", f"./{script_name}"]
-        app_env = (
-            f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
-            f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}"
-        )
-        initrd_img = _create_initrd(
-            bin_dir, app_path, app_args=app_args, app_env=app_env
-        )
+    # Standalone: bundle python binary with system daemons into an
+    # initrd image.  Env vars are passed via app_env so the kernel's
+    # split_cmdline sees them after the bare ';' separator.
+    bin_dir = staging / "bin"
+    app_path = staging / "bin" / config.python_binary()
+    app_args = ["-B", f"./{script_name}"]
+    app_env = (
+        f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
+        f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}"
+    )
+    initrd_img: Path | None = _create_initrd(
+        bin_dir, app_path, app_args=app_args, app_env=app_env
+    )
 
-        cmd = [
-            nanvixd,
-            "-bin-dir",
-            str(bin_dir),
-            "-ramfs",
-            str(ramfs_img),
-            *resolved_extra,
-            "--",
-            str(initrd_img),
-        ]
-    else:
-        # Direct mode: guest accesses host filesystem, no ramfs.
-        cmd = [
-            nanvixd,
-            *resolved_extra,
-            "--",
-            python_bin,
-            f"./{script_name}",
-        ]
+    cmd = [
+        nanvixd,
+        "-bin-dir",
+        str(bin_dir),
+        "-ramfs",
+        str(ramfs_img),
+        *resolved_extra,
+        "--",
+        str(initrd_img),
+    ]
 
     start = time.monotonic()
     try:
@@ -479,11 +456,8 @@ def run_hello(
     """Run the hello-world test via nanvixd.
 
     Standalone mode uses ramfs + ``-bin-dir`` + the semicolon-delimited
-    environment variable syntax.  Multi-process and single-process modes
-    use direct host-filesystem access (no ramfs).
+    environment variable syntax.
     """
-    standalone = args.process_mode == "standalone"
-
     print(f"Test: Hello world ({args.process_mode})...")
 
     returncode, output, elapsed_ms = _run_nanvixd_script(
@@ -518,7 +492,7 @@ def run_hello(
         print(output)
         raise RuntimeError("Hello test did not produce expected output")
 
-    if standalone and not found_lxml:
+    if not found_lxml:
         # lxml staging is best-effort — if the runtime package was not
         # available (e.g. release asset missing), the test is non-fatal.
         print("  WARNING: lxml import/parse test did not produce expected output")
@@ -551,22 +525,9 @@ def run_smoke_httpserver(
     server's "listening" log line on stdout, issues a single HTTP/1.0
     GET, and validates the response body.  The nanvixd process is
     always terminated before this function returns.
-
-    The smoke test only runs in *standalone* mode.  In multi-process
-    and single-process modes the standalone networking stack is not
-    exposed to the host (see ``HOSTED_EXCLUDE`` in ``.nanvix/config.py``),
-    so the test is skipped with a "SKIP" message.
     """
     import socket as _socket
     import tempfile
-
-    standalone = args.process_mode == "standalone"
-    if not standalone:
-        print(
-            f"Test: HTTP server smoke ({args.process_mode})... "
-            "SKIP (networking only available in standalone mode)"
-        )
-        return
 
     script_name = "httpserver.py"
     if not (staging / script_name).is_file():
@@ -735,7 +696,6 @@ def run_regrtest(
         if nanvixd_extra is not None
         else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
-    standalone = args.process_mode == "standalone"
 
     run_tests_script = paths.nanvix_root() / "run-tests.py"
 
@@ -743,28 +703,17 @@ def run_regrtest(
     env["NANVIX_TEST_BATCH_SIZE"] = str(batch_size)
     env["NANVIX_PYTHON_BIN"] = f"./bin/{config.python_binary()}"
 
-    if standalone:
-        # Standalone: ramfs + initrd-based invocation.
-        if ramfs_img is None:
-            ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
-        bin_dir = staging / "bin"
-        extra_str = f"-bin-dir {bin_dir} -ramfs {ramfs_img}"
-        if resolved_nanvixd_extra:
-            extra_str += " " + " ".join(resolved_nanvixd_extra)
-        env["NANVIXD_EXTRA_ARGS"] = extra_str
-        env["NANVIX_STANDALONE"] = "1"
-        env["NANVIX_BIN_DIR"] = str(bin_dir)
-        exclude_set = set(config.STANDALONE_EXCLUDE)
-        test_list = [m for m in test_list if m not in exclude_set]
-    else:
-        # Direct mode: host filesystem, no ramfs.
-        if resolved_nanvixd_extra:
-            env["NANVIXD_EXTRA_ARGS"] = " ".join(resolved_nanvixd_extra)
-        else:
-            env.pop("NANVIXD_EXTRA_ARGS", None)
-        env.pop("NANVIX_STANDALONE", None)
-        exclude_set = set(config.HOSTED_EXCLUDE)
-        test_list = [m for m in test_list if m not in exclude_set]
+    # Standalone: ramfs + initrd-based invocation.
+    if ramfs_img is None:
+        ramfs_img = paths.nanvix_root() / "cpython-rootfs.img"
+    bin_dir = staging / "bin"
+    extra_str = f"-bin-dir {bin_dir} -ramfs {ramfs_img}"
+    if resolved_nanvixd_extra:
+        extra_str += " " + " ".join(resolved_nanvixd_extra)
+    env["NANVIXD_EXTRA_ARGS"] = extra_str
+    env["NANVIX_BIN_DIR"] = str(bin_dir)
+    exclude_set = set(config.STANDALONE_EXCLUDE)
+    test_list = [m for m in test_list if m not in exclude_set]
 
     cmd = [sys.executable, str(run_tests_script)] + test_list
 
@@ -820,8 +769,7 @@ def run_all(
         print("Downloading release artifacts...")
         _download_release_as_cache(args)
         stage(args)
-        if args.process_mode == "standalone":
-            stage_ramfs(args)
+        stage_ramfs(args)
 
     lxml_mod.stage_lxml_runtime(staging)
 
@@ -869,11 +817,9 @@ def run_benchmark(
 ) -> None:
     """Run a hello-world benchmark.
 
-    In *standalone* mode the benchmark builds a ramfs with the same
-    trimming applied during ``./z release`` (no test/ directory, no dev
-    artifacts) so that the image size and boot time reflect a production
-    deployment.  Other process modes run without a ramfs and therefore
-    do not exercise the production image/boot path.
+    The benchmark builds a ramfs with the same trimming applied during
+    ``./z release`` (no test/ directory, no dev artifacts) so that the
+    image size and boot time reflect a production deployment.
 
     No regression tests are executed.
     """
@@ -904,31 +850,29 @@ def _run_benchmark_impl(
     (staging / bench_script).write_text("print('hello world')\n")
 
     # Build ramfs with release trimming (keep_tests=False).
-    ramfs_img = None
-    if args.process_mode == "standalone":
-        ramfs_img = paths.nanvix_root() / "cpython-benchmark.img"
-        bench_cache = paths.nanvix_root() / "_benchmark_cache"
+    ramfs_img = paths.nanvix_root() / "cpython-benchmark.img"
+    bench_cache = paths.nanvix_root() / "_benchmark_cache"
 
-        # Always rebuild to reflect the current sysroot.
-        if bench_cache.exists():
-            shutil.rmtree(bench_cache)
-        bench_cache.mkdir(parents=True)
+    # Always rebuild to reflect the current sysroot.
+    if bench_cache.exists():
+        shutil.rmtree(bench_cache)
+    bench_cache.mkdir(parents=True)
 
-        sysroot_src = staging
-        sysroot_dst = bench_cache
-        shutil.copytree(sysroot_src, sysroot_dst)
-        (sysroot_dst / "tmp").mkdir(exist_ok=True)
+    sysroot_src = staging
+    sysroot_dst = bench_cache
+    shutil.copytree(sysroot_src, sysroot_dst)
+    (sysroot_dst / "tmp").mkdir(exist_ok=True)
 
-        # Release-style trim: no test/ dir, no dev artifacts.
-        ramfs_mod.trim_and_build(
-            bench_cache,
-            args.sysroot,
-            ramfs_img,
-            keep_tests=False,
-        )
+    # Release-style trim: no test/ dir, no dev artifacts.
+    ramfs_mod.trim_and_build(
+        bench_cache,
+        args.sysroot,
+        ramfs_img,
+        keep_tests=False,
+    )
 
-        # Scratch directory is no longer needed.
-        shutil.rmtree(bench_cache, ignore_errors=True)
+    # Scratch directory is no longer needed.
+    shutil.rmtree(bench_cache, ignore_errors=True)
 
     # Run benchmark.
     print(f"Benchmark: Hello world ({args.process_mode})...")
