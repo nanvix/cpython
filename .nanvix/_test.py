@@ -237,8 +237,8 @@ def stage(args: build_mod.MakeArgs) -> None:
                 shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
 
-    # Hello-world test script. lxml import is exercised in standalone mode;
-    # xmlInitParser() runs against the in-memory FAT ramfs VFS.
+    # Hello-world test script.  The lxml import is exercised against the
+    # in-memory FAT ramfs VFS via xmlInitParser().
     lxml_snippet = (
         "try:\n"
         "    import lxml.etree\n"

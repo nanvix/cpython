@@ -274,7 +274,7 @@ STANDALONE_EXCLUDE: list[str] = [
     "test_socket",  # NSKIP019: standalone 32 MB heap too small for module
     "test_ssl",  # NSKIP019: standalone 32 MB heap too small for module
     # #327: standalone kernel getsockopt/setsockopt returns errno 134;
-    # these tests require full socket option support that is unavailable
+    # these tests require full socket option support, which is unavailable
     # until the standalone network stack is complete.
     "test_httplib",
     "test_urllib",
