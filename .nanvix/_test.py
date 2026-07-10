@@ -382,7 +382,7 @@ def _run_nanvixd_script(
     nanvixd = str((args.sysroot / "bin" / config.nanvixd_binary()).resolve())
 
     if ramfs_img is None:
-        raise ValueError("ramfs_img is required for standalone mode")
+        raise ValueError("ramfs_img is required")
 
     # Copy host tools and daemon ELFs into the staging sysroot.
     # mkramfs is needed for ramfs generation; mkimage and the daemons
