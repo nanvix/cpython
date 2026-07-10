@@ -272,9 +272,7 @@ per VM invocation to stay within per-process memory limits.
 The **standalone** deployment mode runs tests via CPython's regrtest
 runner (`python -m test`). A `/tmp` directory is created on the ramfs so
 `tempfile.gettempdir()` works, and modules are batched by
-`run-tests.py`. Test exclusions (e.g.
-`test_filter_dealloc` on standalone to avoid OOM) are passed to regrtest
-via `--ignore`.
+`run-tests.py`. Test exclusions (e.g. `test_queue` to avoid OOM) are applied by filtering the module list on the host before invoking regrtest.
 
 | Metric | Value |
 |--------|-------|
