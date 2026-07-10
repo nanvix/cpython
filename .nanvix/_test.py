@@ -411,7 +411,7 @@ def _run_nanvixd_script(
         f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
         f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}"
     )
-    initrd_img: Path | None = _create_initrd(
+    initrd_img = _create_initrd(
         bin_dir, app_path, app_args=app_args, app_env=app_env
     )
 
@@ -439,7 +439,7 @@ def _run_nanvixd_script(
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"{label} timed out after {timeout}s")
     finally:
-        if initrd_img is not None and initrd_img.exists():
+        if initrd_img.exists():
             initrd_img.unlink()
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
