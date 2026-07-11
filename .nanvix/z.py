@@ -97,8 +97,6 @@ class CPythonBuild(ZScript):
             "bin/mkramfs.exe",
         )
 
-        SYSROOT_MULTI_PROCESS_FILES: tuple[str, ...] = ()
-
     def release_targets(self) -> dict[str, str]:
         name = (
             f"{self.manifest.name}"
@@ -251,8 +249,7 @@ class CPythonBuild(ZScript):
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
         args = self._make_args(release=False, with_docker=True)
         build_mod.build(args)
-        if self.config.deployment_mode == "standalone":
-            test_mod.stage_ramfs(args)
+        test_mod.stage_ramfs(args)
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
@@ -260,9 +257,7 @@ class CPythonBuild(ZScript):
         args = self._make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
 
-        ramfs_img = None
-        if self.config.deployment_mode == "standalone":
-            ramfs_img = paths.test_out() / "cpython-rootfs.img"
+        ramfs_img = paths.test_out() / "cpython-rootfs.img"
 
         test_mod.run_all(args, nanvixd_extra=nanvixd_extra, ramfs_img=ramfs_img)
 

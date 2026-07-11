@@ -274,7 +274,7 @@ STANDALONE_EXCLUDE: list[str] = [
     "test_socket",  # NSKIP019: standalone 32 MB heap too small for module
     "test_ssl",  # NSKIP019: standalone 32 MB heap too small for module
     # #327: standalone kernel getsockopt/setsockopt returns errno 134;
-    # these tests require full socket option support and are hosted-only
+    # these tests require full socket option support, which is unavailable
     # until the standalone network stack is complete.
     "test_httplib",
     "test_urllib",
@@ -292,31 +292,6 @@ STANDALONE_EXCLUDE: list[str] = [
     "test_socketserver",
     # #327: asyncio event-loop not yet supported in standalone mode.
     "test_contextlib_async",
-]
-
-# Tests that require host networking (only available in standalone with
-# -allow-host-networking).  Excluded from multi-process / single-process.
-HOSTED_EXCLUDE: list[str] = [
-    "test_socket",
-    "test_ssl",
-    "test_timeout",
-    "test_httplib",
-    "test_http_cookiejar",
-    "test_http_cookies",
-    "test_urllib",
-    "test_urllib2",
-    "test_urlparse",
-    "test_urllib_response",
-    "test_ftplib",
-    "test_poplib",
-    "test_imaplib",
-    "test_nntplib",
-    "test_smtplib",
-    "test_xmlrpc",
-    "test_select",
-    "test_selectors",
-    "test_poll",
-    "test_socketserver",
 ]
 
 # Platform-specific nanvixd extra arguments.
