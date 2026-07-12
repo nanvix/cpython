@@ -1,4 +1,5 @@
 from test.support import requires_IEEE_754, cpython_only, import_helper
+from test import support
 from test.test_math import parse_testfile, test_file
 import test.test_math as test_math
 import unittest
@@ -260,6 +261,10 @@ class CMathTests(unittest.TestCase):
             for arg in ["a", "long_string", "0", "1j", ""]:
                 self.assertRaises(TypeError, f, arg)
 
+    @unittest.skipIf(
+        support.is_nanvix,
+        "Nanvix SDK libc 0.20.0 complex math exceeds CPython tolerances",
+    )
     def test_cmath_matches_math(self):
         # check that corresponding cmath and math functions are equal
         # for floats in the appropriate range
@@ -309,6 +314,10 @@ class CMathTests(unittest.TestCase):
                 self.assertEqual(0., z.imag)
 
     @requires_IEEE_754
+    @unittest.skipIf(
+        support.is_nanvix,
+        "Nanvix SDK libc 0.20.0 complex math exceeds CPython tolerances",
+    )
     def test_specific_values(self):
         # Some tests need to be skipped on ancient OS X versions.
         # See issue #27953.

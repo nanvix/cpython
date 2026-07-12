@@ -187,6 +187,7 @@ class TestFilemode:
             self.assertS_IS("LNK", st_mode)
 
     @unittest.skipUnless(hasattr(os, 'mkfifo'), 'os.mkfifo not available')
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     def test_fifo(self):
         if sys.platform == "vxworks":
             fifo_path = os.path.join("/fifos/", TESTFN)

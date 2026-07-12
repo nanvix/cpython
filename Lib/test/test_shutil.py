@@ -674,6 +674,7 @@ class TestRmTree(BaseTest, unittest.TestCase):
             shutil.rmtree(TESTFN, ignore_errors=True)
 
     @unittest.skipUnless(hasattr(os, "mkfifo"), 'requires os.mkfifo()')
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     @unittest.skipIf(sys.platform == "vxworks",
                     "fifo requires special path on VxWorks")
     def test_rmtree_on_named_pipe(self):
@@ -1499,6 +1500,7 @@ class TestCopy(BaseTest, unittest.TestCase):
 
     # Issue #3002: copyfile and copytree block indefinitely on named pipes
     @unittest.skipUnless(hasattr(os, "mkfifo"), 'requires os.mkfifo()')
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     @unittest.skipIf(sys.platform == "vxworks",
                     "fifo requires special path on VxWorks")
     def test_copyfile_named_pipe(self):

@@ -2011,6 +2011,10 @@ class MathTests(unittest.TestCase):
             self.fail("sqrt(-1) didn't raise ValueError")
 
     @requires_IEEE_754
+    @unittest.skipIf(
+        support.is_nanvix,
+        "Nanvix SDK libc 0.20.0 math results exceed CPython ULP tolerances",
+    )
     def test_testfile(self):
         # Some tests need to be skipped on ancient OS X versions.
         # See issue #27953.
@@ -2068,6 +2072,10 @@ class MathTests(unittest.TestCase):
                       '\n  '.join(failures))
 
     @requires_IEEE_754
+    @unittest.skipIf(
+        support.is_nanvix,
+        "Nanvix SDK libc 0.20.0 math results exceed CPython ULP tolerances",
+    )
     def test_mtestfile(self):
         fail_fmt = "{}: {}({!r}): {}"
 

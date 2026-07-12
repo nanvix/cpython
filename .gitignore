@@ -158,6 +158,10 @@ Python/frozen_modules/MANIFEST
 !/Python/
 
 # Nanvix build artifacts.
+.nanvix-configured
+.nanvix/nanvix.lock
+.nanvix/container-home/
+.nanvix/container-tmp/
 .nanvix/cpython-rootfs.img
 .nanvix/cpython-benchmark.img
 Python/python

@@ -411,9 +411,7 @@ def _run_nanvixd_script(
         f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
         f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}"
     )
-    initrd_img = _create_initrd(
-        bin_dir, app_path, app_args=app_args, app_env=app_env
-    )
+    initrd_img = _create_initrd(bin_dir, app_path, app_args=app_args, app_env=app_env)
 
     cmd = [
         nanvixd,

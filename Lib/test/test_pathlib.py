@@ -2610,6 +2610,7 @@ class _BasePathTest(object):
         self.assertIs((P / 'fileA\x00').is_fifo(), False)
 
     @unittest.skipUnless(hasattr(os, "mkfifo"), "os.mkfifo() required")
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     @unittest.skipIf(sys.platform == "vxworks",
                     "fifo requires special path on VxWorks")
     def test_is_fifo_true(self):
