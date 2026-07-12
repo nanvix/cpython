@@ -219,7 +219,7 @@ def stage(args: build_mod.MakeArgs) -> None:
     builds so that ``./z test`` can consume ``paths.test_out()`` directly
     with no further staging.
 
-    Also called by run_all on Windows CI.
+    The complete tree is uploaded for Windows CI after the Linux build.
     """
     staging = paths.test_out()
 
@@ -296,11 +296,8 @@ def stage(args: build_mod.MakeArgs) -> None:
     # ``make install`` omits Lib/test/ from the install tree; regrtest needs it.
     pylib_dir = staging / "lib" / config.PYTHON_LIB_DIR
 
-    # Windows CI workaround: the synced artifact overlay only ships
-    # *.elf/*.so (see nanvix_scripts.test_windows.mirror_ci), so the
-    # installed stdlib at sysroot/lib/python3.12/ is absent. Seed it
-    # from the in-tree Lib/ so regrtest and lxml staging can proceed.
-    # No-op on Linux where ``make install`` has already populated it.
+    # Seed from the source tree only when an install did not populate the
+    # standard library. Linux CI uploads the complete install tree to Windows.
     lib_src = paths.repo_root() / "Lib"
     if lib_src.is_dir() and not pylib_dir.is_dir():
         shutil.copytree(lib_src, pylib_dir)
@@ -763,11 +760,17 @@ def run_all(
     staging = paths.test_out()
     print("Running CPython tests on Nanvix...")
 
-    if config.IS_WINDOWS and os.environ.get("CI") is not None:
-        print("Downloading release artifacts...")
-        _download_release_as_cache(args)
-        stage(args)
-        stage_ramfs(args)
+    if config.IS_WINDOWS:
+        python = staging / "bin" / config.python_binary()
+        if os.environ.get("CI") is not None and not python.is_file():
+            raise FileNotFoundError(
+                f"Windows test artifact is missing the SDK-built interpreter: {python}"
+            )
+        if os.environ.get("CI") is None and not python.is_file():
+            print("Downloading release artifacts for local Windows testing...")
+            _download_release_as_cache(args)
+            stage(args)
+            stage_ramfs(args)
 
     lxml_mod.stage_lxml_runtime(staging)
 

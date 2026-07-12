@@ -37,6 +37,7 @@ jobs:
       skip-full-test-modes: '[]'
       caller-event-name: ${{ github.event_name }}
       windows-test: true
+      test-output-globs: '["**/*"]'
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
@@ -54,6 +55,7 @@ jobs:
       skip-full-test-modes: '[]'
       caller-event-name: 'schedule'
       windows-test: true
+      test-output-globs: '["**/*"]'
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
