@@ -766,6 +766,8 @@ def run_all(
             raise FileNotFoundError(
                 f"Windows test artifact is missing the SDK-built interpreter: {python}"
             )
+        if os.environ.get("CI") is not None:
+            stage(args)
         if os.environ.get("CI") is None and not python.is_file():
             print("Downloading release artifacts for local Windows testing...")
             _download_release_as_cache(args)
