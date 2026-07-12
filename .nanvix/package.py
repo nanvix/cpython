@@ -64,6 +64,12 @@ def stage() -> None:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(config_dir, dest)
 
+    # Cross ``make install`` does not reliably stage the static interpreter
+    # archive, so copy the just-built SDK archive directly.
+    python_archive = paths.repo_root() / f"libpython{config.PYTHON_VERSION}.a"
+    if python_archive.is_file():
+        shutil.copy2(python_archive, br / "lib" / python_archive.name)
+
     # Copy dev binaries.
     for f in [
         "python3-config",

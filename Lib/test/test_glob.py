@@ -354,6 +354,7 @@ class GlobTests(unittest.TestCase):
         eq(self.rglob('nonexistent', '**'), [])
 
     @unittest.skipUnless(hasattr(os, "mkfifo"), 'requires os.mkfifo()')
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     @unittest.skipIf(sys.platform == "vxworks",
                     "fifo requires special path on VxWorks")
     def test_glob_named_pipe(self):

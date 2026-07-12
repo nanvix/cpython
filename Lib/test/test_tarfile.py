@@ -3929,6 +3929,7 @@ class TestExtractionFilters(unittest.TestCase):
             self.expect_file('no_bits', mode='?rw-------')
             self.expect_file('dir/', mode=normal_dir_mode)
 
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     def test_pipe(self):
         # Test handling of a special file
         with ArchiveMaker() as arc:

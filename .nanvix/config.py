@@ -15,7 +15,10 @@ import sys
 # Platform defaults
 # ---------------------------------------------------------------------------
 
-DOCKER_IMAGE = "ghcr.io/nanvix/toolchain-python:latest"
+DOCKER_IMAGE = (
+    "ghcr.io/nanvix/nanvix-sdk-c-clang"
+    "@sha256:f61737cb0780e6a2058c6d0bdf8ae5562db18de437173b2bcbbe6973abd3689f"
+)
 DEFAULT_PLATFORM = "microvm"
 DEFAULT_PROCESS_MODE = "standalone"
 DEFAULT_MEMORY_SIZE = "256mb"
@@ -42,13 +45,15 @@ PKG_BUILDROOT = "buildroot-pkg"
 # Toolchain
 # ---------------------------------------------------------------------------
 
-TOOLCHAIN_TRIPLET = "i686-nanvix"
-TOOLCHAIN_DEFAULT_PATH = "/opt/nanvix"
+TARGET_TRIPLE = "i686-unknown-nanvix"
+SDK_VERSION = "v0.20.0-sdk.1"
+SDK_C_ABI = "i686-nanvix-sysv-1"
 
 # Docker-internal paths
-DOCKER_TOOLCHAIN_PATH = "/opt/nanvix"
+DOCKER_SDK_PATH = "/opt/nanvix"
 DOCKER_SYSROOT_PATH = "/mnt/sysroot"
 DOCKER_WORKSPACE_PATH = "/mnt/workspace"
+DOCKER_BUILDROOT_PATH = "/mnt/buildroot"
 
 
 # ---------------------------------------------------------------------------

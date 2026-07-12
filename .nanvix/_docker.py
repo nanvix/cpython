@@ -75,10 +75,14 @@ def _docker_run_base(
         f"{_docker_mount_source(workspace)}:/mnt/host-workspace",
         "-v",
         f"{_docker_mount_source(args.sysroot)}:{config.DOCKER_SYSROOT_PATH}:ro",
+        "-v",
+        f"{_docker_mount_source(args.buildroot)}:{config.DOCKER_BUILDROOT_PATH}:ro",
         "-w",
         config.DOCKER_WORKSPACE_PATH,
         "-e",
-        "HOME=/tmp",
+        f"HOME={config.DOCKER_WORKSPACE_PATH}/.nanvix/container-home",
+        "-e",
+        f"TMPDIR={config.DOCKER_WORKSPACE_PATH}/.nanvix/container-tmp",
         image,
     ]
 
@@ -139,7 +143,7 @@ def docker_build(
     # Explicit strip command — ensure binaries are fully stripped even if
     # the Makefile's strip step is skipped (e.g. toolchain detection fails
     # inside the container).
-    strip_bin = f"{config.DOCKER_TOOLCHAIN_PATH}/bin/{config.TOOLCHAIN_TRIPLET}-strip"
+    strip_bin = f"{config.DOCKER_SDK_PATH}/bin/llvm-strip"
     strip_build = (
         f'if [ -x "{strip_bin}" ]; then '
         f"for f in python python{config.EXE}; do "
@@ -148,32 +152,29 @@ def docker_build(
         f'echo "Stripped $f"; done; fi'
     )
 
-    # Detect sysroot changes and force a clean rebuild when needed.
+    # Detect SDK or dependency changes and force a clean rebuild when needed.
     # Without rsync (unavailable in the minimal Docker image), the tar-based
     # sync does not delete stale build artifacts from the named volume.
-    # If the sysroot changes (e.g. switching between downloaded and local
-    # Nanvix via --with-nanvix), stale object files and the old python
-    # binary remain.  Make sees no source changes and skips recompilation,
-    # producing a binary linked against the *old* sysroot libraries.
-    # Fix: fingerprint key sysroot files and force `make clean` when the
-    # fingerprint changes.
-    sysroot_check = (
-        f"_sr_hash=$(cat "
-        f"{config.DOCKER_SYSROOT_PATH}/lib/libposix.a "
-        f"{config.DOCKER_SYSROOT_PATH}/lib/user.ld "
-        f'2>/dev/null | md5sum | cut -d" " -f1); '
-        f"_stored=$(cat {config.DOCKER_WORKSPACE_PATH}/.sysroot-hash 2>/dev/null || true); "
-        f'if [ "$_sr_hash" != "$_stored" ]; then '
-        f'echo "Sysroot changed -- forcing clean rebuild"; '
+    # The runtime sysroot is intentionally excluded because it contributes no
+    # target headers or libraries.
+    build_inputs_check = (
+        f"_input_hash=$( (cat {config.DOCKER_SDK_PATH}/nanvix-sdk.json; "
+        f"find {config.DOCKER_BUILDROOT_PATH} -type f -print0 "
+        f"| sort -z | xargs -0 sha256sum) | sha256sum | cut -d' ' -f1); "
+        f"_stored=$(cat {config.DOCKER_WORKSPACE_PATH}/.build-inputs-hash "
+        f"2>/dev/null || true); "
+        f'if [ "$_input_hash" != "$_stored" ]; then '
+        f'echo "SDK or buildroot changed -- forcing clean rebuild"; '
         f"make -f Makefile.nanvix clean 2>/dev/null || true; "
         f"rm -f {config.DOCKER_WORKSPACE_PATH}/.nanvix-configured; "
         f"fi; "
-        f'echo "$_sr_hash" > {config.DOCKER_WORKSPACE_PATH}/.sysroot-hash'
+        f'echo "$_input_hash" > {config.DOCKER_WORKSPACE_PATH}/.build-inputs-hash'
     )
 
     shell_cmd = (
         f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
-        f"{sysroot_check} && "
+        f"mkdir -p .nanvix/container-home .nanvix/container-tmp && "
+        f"{build_inputs_check} && "
         f"{_generate_setup_local_cmd()} && "
         f"{_args.to_string()} && {strip_build}"
     )
@@ -228,7 +229,7 @@ def docker_build(
 
 def _generate_setup_local_cmd() -> str:
     """Shell command to generate Modules/Setup.local inside the container."""
-    sysroot = config.DOCKER_SYSROOT_PATH
+    buildroot = config.DOCKER_BUILDROOT_PATH
     ws = config.DOCKER_WORKSPACE_PATH
     return (
         f"printf '%s\\n' "
@@ -238,8 +239,8 @@ def _generate_setup_local_cmd() -> str:
         f"'# Nanvix OS interface module (snapshot, host-mount).' "
         f"'_nanvix _nanvixmodule.c' "
         f"'# lxml C extension modules (statically linked via pre-built archives).' "
-        f"'_lxml_etree lxml_etree_builtin.c -L{sysroot}/lib -llxml_etree -lxslt -lexslt -lxml2 -lz' "
-        f"'_lxml_elementpath lxml_elementpath_builtin.c -L{sysroot}/lib -llxml_elementpath -lxml2 -lz' "
+        f"'_lxml_etree lxml_etree_builtin.c -L{buildroot}/lib -llxml_etree -lxslt -lexslt -lxml2 -lz' "
+        f"'_lxml_elementpath lxml_elementpath_builtin.c -L{buildroot}/lib -llxml_elementpath -lxml2 -lz' "
         f"> {ws}/Modules/Setup.local"
     )
 

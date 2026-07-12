@@ -31,7 +31,6 @@ class MakeArgs:
     Common arguments passed to Makefile.nanvix.
     """
 
-    toolchain_path: Path
     release: bool
     targets: list[str]
     platform: str = config.DEFAULT_PLATFORM
@@ -39,26 +38,22 @@ class MakeArgs:
     memory_size: str = config.DEFAULT_MEMORY_SIZE
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX
     sysroot: Path = field(default_factory=lambda: paths.sysroot())
+    buildroot: Path = field(default_factory=lambda: paths.buildroot())
     run_fn: Any = None
     docker: bool = False
 
     def to_list(self) -> list[str]:
         """Convert to a list suitable to pass to a process runner."""
-        # When targeting Docker, these are POSIX paths *inside* the Linux
-        # container and must stay as forward-slash strings.  Wrapping them in
-        # Path() on a Windows host would rewrite them with backslashes
-        # (e.g. "\opt\nanvix"), breaking the in-container make invocation.
-        nanvix_toolchain = (
-            config.DOCKER_TOOLCHAIN_PATH if self.docker else self.toolchain_path
+        buildroot = (
+            config.DOCKER_BUILDROOT_PATH if self.docker else self.buildroot.resolve()
         )
-        nanvix_home = config.DOCKER_SYSROOT_PATH if self.docker else self.sysroot
         return [
             "make",
             "-f",
             "Makefile.nanvix",
             f"CONFIG_NANVIX=y",
-            f"NANVIX_HOME={nanvix_home}",
-            f"NANVIX_TOOLCHAIN={nanvix_toolchain}",
+            f"NANVIX_SDK_ROOT={config.DOCKER_SDK_PATH}",
+            f"NANVIX_BUILDROOT={buildroot}",
             f"PLATFORM={self.platform}",
             f"PROCESS_MODE={self.process_mode}",
             f"MEMORY_SIZE={self.memory_size}",
@@ -104,10 +99,10 @@ def build(
         # release_dir/test_out so ``./z test`` needs no further Docker work.
         docker_mod.docker_build(paths.repo_root(), args, install_destdir=dest_dir)
     else:
-        sysroot_for_setup = (
-            Path(config.DOCKER_SYSROOT_PATH) if _args.docker else args.sysroot
+        buildroot_for_setup = (
+            Path(config.DOCKER_BUILDROOT_PATH) if _args.docker else args.buildroot
         )
-        lxml_mod.generate_setup_local(paths.repo_root(), sysroot_for_setup)
+        lxml_mod.generate_setup_local(paths.repo_root(), buildroot_for_setup)
         _args.run(cwd=paths.repo_root())
         install(dest_dir, args)
 

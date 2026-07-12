@@ -3,164 +3,84 @@
 # Copyright(c) The Maintainers of Nanvix.
 # Licensed under the MIT License.
 #
-# Usage:
-#   make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix all
-#
-# Thin cross-compilation wrapper: configure, build, install, clean.
-# All other concerns (tests, ramfs, packaging) are handled by the Python
-# modules in .nanvix/ and invoked via ./z.
-#
-# Dependencies:
-#   - zlib (libz.a in NANVIX_HOME/lib)
-#   - SQLite (libsqlite3.a in NANVIX_HOME/lib)
-#   - OpenSSL (libssl.a, libcrypto.a in NANVIX_HOME/lib)
-#   - bzip2 (libbz2.a in NANVIX_HOME/lib)
-#   - libffi (libffi.a in NANVIX_HOME/lib)
-#   - liblzma (liblzma.a in NANVIX_HOME/lib)
+# The Nanvix SDK supplies the compiler, target C runtime, startup objects, and
+# linker script. Third-party dependencies are supplied separately by
+# nanvix-zutil in NANVIX_BUILDROOT.
 
-# Nanvix Docker image for cross-compilation
-NANVIX_DOCKER_IMAGE ?= ghcr.io/nanvix/toolchain-python:latest
-
-# Platform and deployment configuration
 PLATFORM ?= microvm
 PROCESS_MODE ?= standalone
 MEMORY_SIZE ?= 256mb
-
-# Install prefix baked into the python binary (sys.prefix, sys.path)
 INSTALL_PREFIX ?= /
-
-# Set to 'yes' for release packaging
 NANVIX_RELEASE ?= no
 
-# Nanvix cross-compilation configuration
-ifdef CONFIG_NANVIX
-  NANVIX_TOOLCHAIN ?= /opt/nanvix
-  NANVIX_HOME ?= $(HOME)/nanvix
+NANVIX_SDK_ROOT ?= /opt/nanvix
+NANVIX_BUILDROOT ?= /mnt/buildroot
+NANVIX_TARGET_TRIPLE ?= i686-unknown-nanvix
+BUILD_PYTHON ?= /usr/bin/python3
 
-  # Check if Docker is explicitly requested or native toolchain is not available
-  ifndef CONFIG_NANVIX_DOCKER
-    ifeq ($(wildcard $(NANVIX_TOOLCHAIN)/bin/i686-nanvix-gcc),)
-      # Native toolchain not found, check for Docker
-      DOCKER_AVAILABLE := $(shell command -v docker 2>/dev/null)
-      ifdef DOCKER_AVAILABLE
-        DOCKER_IMAGE_EXISTS := $(shell docker image inspect $(NANVIX_DOCKER_IMAGE) >/dev/null 2>&1 && echo yes)
-        ifdef DOCKER_IMAGE_EXISTS
-          CONFIG_NANVIX_DOCKER := y
-          $(info [INFO] Native toolchain not found at $(NANVIX_TOOLCHAIN), using Docker image $(NANVIX_DOCKER_IMAGE))
-        else
-          $(error Docker image $(NANVIX_DOCKER_IMAGE) not found. Run: docker pull $(NANVIX_DOCKER_IMAGE))
-        endif
-      else
-        $(error Nanvix toolchain not found at $(NANVIX_TOOLCHAIN) and Docker is not available)
-      endif
-    endif
-  else
-    # Docker explicitly requested via CONFIG_NANVIX_DOCKER=y
-    DOCKER_AVAILABLE := $(shell command -v docker 2>/dev/null)
-    ifndef DOCKER_AVAILABLE
-      $(error CONFIG_NANVIX_DOCKER=y but Docker is not installed)
-    endif
-    DOCKER_IMAGE_EXISTS := $(shell docker image inspect $(NANVIX_DOCKER_IMAGE) >/dev/null 2>&1 && echo yes)
-    ifndef DOCKER_IMAGE_EXISTS
-      $(error Docker image $(NANVIX_DOCKER_IMAGE) not found. Run: docker pull $(NANVIX_DOCKER_IMAGE))
-    endif
-    $(info [INFO] Using Docker image $(NANVIX_DOCKER_IMAGE) (explicitly requested))
+SDK_BIN := $(NANVIX_SDK_ROOT)/bin
+SDK_MANIFEST := $(NANVIX_SDK_ROOT)/nanvix-sdk.json
+EXE := .elf
+
+ifneq ($(MAKECMDGOALS),clean)
+  ifndef CONFIG_NANVIX
+    $(error CONFIG_NANVIX must be set to 'y')
   endif
-
-  EXE=.elf
-
-  ifdef CONFIG_NANVIX_DOCKER
-    DOCKER_TOOLCHAIN_PATH := /opt/nanvix
-    DOCKER_SYSROOT_PATH := /mnt/sysroot
-    DOCKER_WORKSPACE_PATH := /mnt/workspace
-    DOCKER_UID := $(shell id -u)
-    DOCKER_GID := $(shell id -g)
-    DOCKER_RUN := docker run --rm --user $(DOCKER_UID):$(DOCKER_GID) \
-      -v $(CURDIR):$(DOCKER_WORKSPACE_PATH) \
-      -v $(abspath $(NANVIX_HOME)):$(DOCKER_SYSROOT_PATH):ro \
-      -w $(DOCKER_WORKSPACE_PATH) \
-      -e HOME=/tmp \
-      $(NANVIX_DOCKER_IMAGE)
-
-    TOOLCHAIN_PREFIX := $(DOCKER_TOOLCHAIN_PATH)
-    SYSROOT_PATH := $(DOCKER_SYSROOT_PATH)
-    LIBC := $(DOCKER_TOOLCHAIN_PATH)/i686-nanvix/lib/libc.a
-    LIBM := $(DOCKER_TOOLCHAIN_PATH)/i686-nanvix/lib/libm.a
-    LIBPOSIX := $(DOCKER_SYSROOT_PATH)/lib/libposix.a
-    LIBCRT0 := $(DOCKER_SYSROOT_PATH)/lib/libnvx_crt0.a
-    LIBZ := $(DOCKER_SYSROOT_PATH)/lib/libz.a
-    LIBSQLITE3 := $(DOCKER_SYSROOT_PATH)/lib/libsqlite3.a
-    LIBSSL := $(DOCKER_SYSROOT_PATH)/lib/libssl.a
-    LIBCRYPTO := $(DOCKER_SYSROOT_PATH)/lib/libcrypto.a
-    BUILD_PYTHON := $(DOCKER_TOOLCHAIN_PATH)/bin/python3
-  else
-    TOOLCHAIN_PREFIX := $(NANVIX_TOOLCHAIN)
-    SYSROOT_PATH := $(abspath $(NANVIX_HOME))
-    LIBC := $(NANVIX_TOOLCHAIN)/i686-nanvix/lib/libc.a
-    LIBM := $(NANVIX_TOOLCHAIN)/i686-nanvix/lib/libm.a
-    LIBPOSIX := $(abspath $(NANVIX_HOME))/lib/libposix.a
-    LIBCRT0 := $(abspath $(NANVIX_HOME))/lib/libnvx_crt0.a
-    LIBZ := $(abspath $(NANVIX_HOME))/lib/libz.a
-    LIBSQLITE3 := $(abspath $(NANVIX_HOME))/lib/libsqlite3.a
-    LIBSSL := $(abspath $(NANVIX_HOME))/lib/libssl.a
-    LIBCRYPTO := $(abspath $(NANVIX_HOME))/lib/libcrypto.a
-    BUILD_PYTHON := $(NANVIX_TOOLCHAIN)/bin/python3
+  ifeq ($(wildcard $(SDK_MANIFEST)),)
+    $(error Nanvix SDK manifest not found at $(SDK_MANIFEST); run this build in the pinned SDK image)
   endif
-else
-  ifneq ($(MAKECMDGOALS),clean)
-    $(error CONFIG_NANVIX must be set to 'y'. Usage: make -f Makefile.nanvix CONFIG_NANVIX=y NANVIX_HOME=/path/to/nanvix)
+  ifeq ($(wildcard $(NANVIX_BUILDROOT)/lib),)
+    $(error Nanvix dependency buildroot not found at $(NANVIX_BUILDROOT); run './z setup' first)
   endif
-  EXE=.elf
 endif
 
-# Configure environment variables
-#
-# Link only the cross-toolchain's newlib libc/libm (LIBC/LIBM above), never the
-# sysroot's nanvix_libc.  Since Nanvix 0.17.x the sysroot ships its own
-# libc.a/libc.so, and -L$(SYSROOT_PATH)/lib (needed for the bundled deps) makes
-# the gcc driver's implicit -lc/-lm bind there instead of newlib.  That pulls
-# nanvix_libc's sigaction(), which flips CPython's configure to
-# HAVE_SIGACTION=yes and compiles Modules/faulthandler.c's SA_RESTART path -- a
-# macro the newlib <signal.h> we build against does not define, so the build
-# fails with "'SA_RESTART' undeclared".  -nodefaultlibs drops the implicit
-# libc/libm/libgcc; LIBS then names newlib libc/libm explicitly and re-adds
-# -lgcc.  This restores the pre-0.17 link set (newlib libc + libposix), where
-# sigaction was absent and the SA_RESTART path stayed compiled out.
-CONFIGURE_ENV = \
-	CC="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-gcc" \
-	CXX="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-g++" \
-	LD="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ld" \
-	AR="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ar" \
-	RANLIB="$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-ranlib" \
-	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -I$(SYSROOT_PATH)/include" \
-	CFLAGS_NODIST="-fno-semantic-interposition" \
-	LDFLAGS="-L$(SYSROOT_PATH)/lib -T$(SYSROOT_PATH)/lib/user.ld -Wl,--allow-multiple-definition -no-pie -Wl,--export-dynamic -Wl,--no-dynamic-linker -nodefaultlibs" \
-	LIBS="-Wl,--start-group $(LIBCRT0) $(LIBPOSIX) $(LIBC) $(LIBM) -lgcc -lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi -Wl,--end-group" \
-	LIBSQLITE3_LIBS="-L$(SYSROOT_PATH)/lib -lsqlite3" \
-	LIBSQLITE3_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	ZLIB_LIBS="-L$(SYSROOT_PATH)/lib -lz" \
-	ZLIB_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	BZIP2_LIBS="-L$(SYSROOT_PATH)/lib -lbz2" \
-	BZIP2_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	LIBLZMA_LIBS="-L$(SYSROOT_PATH)/lib -llzma" \
-	LIBLZMA_CFLAGS="-I$(SYSROOT_PATH)/include" \
-	LIBFFI_LIBS="-L$(SYSROOT_PATH)/lib -lffi" \
-	LIBFFI_CFLAGS="-I$(SYSROOT_PATH)/include"
+TARGET_CC := $(SDK_BIN)/clang --target=$(NANVIX_TARGET_TRIPLE)
+TARGET_CXX := $(SDK_BIN)/clang++ --target=$(NANVIX_TARGET_TRIPLE)
+TARGET_AR := $(SDK_BIN)/llvm-ar
+TARGET_RANLIB := $(SDK_BIN)/llvm-ranlib
+TARGET_STRIP := $(SDK_BIN)/llvm-strip
 
-# Configure options for Nanvix
+DEPENDENCY_CPPFLAGS := -I$(NANVIX_BUILDROOT)/include
+DEPENDENCY_LDFLAGS := -L$(NANVIX_BUILDROOT)/lib
+DEPENDENCY_LIBS := \
+	-Wl,--start-group \
+	-lsqlite3 -lssl -lcrypto -lz -lbz2 -llzma -lffi \
+	-Wl,--end-group
+
+CONFIGURE_ENV = \
+	CC="$(TARGET_CC)" \
+	CXX="$(TARGET_CXX)" \
+	LD="$(TARGET_CC)" \
+	AR="$(TARGET_AR)" \
+	RANLIB="$(TARGET_RANLIB)" \
+	STRIP="$(TARGET_STRIP)" \
+	CPPFLAGS="$(DEPENDENCY_CPPFLAGS)" \
+	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables" \
+	CFLAGS_NODIST="-fno-semantic-interposition" \
+	LDFLAGS="$(DEPENDENCY_LDFLAGS) -static -Wl,--export-dynamic" \
+	LIBS="$(DEPENDENCY_LIBS)" \
+	LIBSQLITE3_LIBS="$(DEPENDENCY_LDFLAGS) -lsqlite3" \
+	LIBSQLITE3_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
+	ZLIB_LIBS="$(DEPENDENCY_LDFLAGS) -lz" \
+	ZLIB_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
+	BZIP2_LIBS="$(DEPENDENCY_LDFLAGS) -lbz2" \
+	BZIP2_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
+	LIBLZMA_LIBS="$(DEPENDENCY_LDFLAGS) -llzma" \
+	LIBLZMA_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
+	LIBFFI_LIBS="$(DEPENDENCY_LDFLAGS) -lffi" \
+	LIBFFI_CFLAGS="$(DEPENDENCY_CPPFLAGS)"
+
 CONFIGURE_OPTS = \
 	--disable-shared \
-	--build=x86_64-pc-linux-gnux32 \
+	--build=x86_64-pc-linux-gnu \
 	--host=i686-nanvix \
 	--with-build-python="$(BUILD_PYTHON)" \
 	$(if $(filter yes,$(NANVIX_RELEASE)),--disable-test-modules,) \
-	--with-libc="$(LIBC)" \
-	--with-libm="$(LIBM)" \
 	--prefix="$(INSTALL_PREFIX)" \
 	--exec-prefix="$(INSTALL_PREFIX)" \
 	--with-ensurepip=no \
 	--with-pkg-config=no \
-	--with-openssl="$(SYSROOT_PATH)" \
+	--with-openssl="$(NANVIX_BUILDROOT)" \
 	--disable-ipv6 \
 	$(if $(filter yes,$(NANVIX_RELEASE)),--without-doc-strings,) \
 	--with-computed-gotos \
@@ -192,69 +112,42 @@ CONFIGURE_OPTS = \
 	ac_cv_func_fstatvfs=no \
 	ac_cv_func_fdopendir=no
 
-# Marker file to track if configure has been run
-CONFIGURED_MARKER = .nanvix-configured
+CONFIGURED_MARKER := .nanvix-configured
 
-# Default target
 all: build
 
-# Configure target
 configure: $(CONFIGURED_MARKER)
 
 $(CONFIGURED_MARKER):
-ifdef CONFIG_NANVIX_DOCKER
-	@echo "Running configure inside Docker..."
-	$(DOCKER_RUN) sh -c '$(CONFIGURE_ENV) ./configure $(CONFIGURE_OPTS)'
-else
+	@grep -Eq '"sdk_version"[[:space:]]*:[[:space:]]*"v0.20.0-sdk.1"' $(SDK_MANIFEST) || { \
+		echo "SDK version mismatch in $(SDK_MANIFEST)"; exit 1; \
+	}
+	@grep -Eq '"c_abi"[[:space:]]*:[[:space:]]*"i686-nanvix-sysv-1"' $(SDK_MANIFEST) || { \
+		echo "SDK C ABI mismatch in $(SDK_MANIFEST)"; exit 1; \
+	}
 	$(CONFIGURE_ENV) ./configure $(CONFIGURE_OPTS)
-endif
-	touch $(CONFIGURED_MARKER)
+	touch $@
 
-# Build target
 build: $(CONFIGURED_MARKER)
-ifdef CONFIG_NANVIX_DOCKER
-	@echo "Building inside Docker..."
-	$(DOCKER_RUN) $(MAKE) -j$$(nproc) all
-	@if [ -f python ]; then cp -f python python$(EXE); fi
-	$(DOCKER_RUN) sh -c '\
-		if [ ! -x "$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" ]; then \
-			echo "Warning: i686-nanvix-strip not found in Docker toolchain; skipping strip."; \
-		elif [ ! -f "$(DOCKER_WORKSPACE_PATH)/python$(EXE)" ]; then \
-			echo "Warning: $(DOCKER_WORKSPACE_PATH)/python$(EXE) not found; skipping strip."; \
-		else \
-			"$(DOCKER_TOOLCHAIN_PATH)/bin/i686-nanvix-strip" --strip-all "$(DOCKER_WORKSPACE_PATH)/python$(EXE)" || { \
-				echo "Error: failed to strip python$(EXE) inside Docker."; exit 1; }; \
-		fi'
-else
 	$(MAKE) -j$$(nproc) all
 	@if [ -f python ]; then cp -f python python$(EXE); fi
-	@if [ -x "$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip" ]; then \
-		if [ -f "python$(EXE)" ]; then \
-			"$(TOOLCHAIN_PREFIX)/bin/i686-nanvix-strip" --strip-all "python$(EXE)" || { \
-				echo "Error: failed to strip python$(EXE)."; exit 1; }; \
-		else \
-			echo "Warning: python$(EXE) not found; skipping strip."; \
-		fi; \
-	else \
-		echo "Warning: i686-nanvix-strip not found in $(TOOLCHAIN_PREFIX); skipping strip."; \
-	fi
-endif
+	@test -f python$(EXE)
+	$(TARGET_STRIP) --strip-all python$(EXE)
 
-# Install target (native only; Windows/Docker installs are staged inside
-# docker_build via _docker.py).
 install: build
 	$(MAKE) install DESTDIR="$(DESTDIR)"
 
-
-# Clean target
 clean:
-	set -e; \
-	TEMPDIR=$$(mktemp -d); \
-	mv .nanvix/ "$$TEMPDIR"; \
-	$(MAKE) clean 2>/dev/null || true; \
-	mv "$$TEMPDIR/.nanvix" ./; \
-	rm -rf "$$TEMPDIR"
-	rm -f $(CONFIGURED_MARKER)
-	rm -f python$(EXE)
+	find . -path './.nanvix' -prune -o -type d -name '__pycache__' \
+		-exec rm -rf {} +
+	find . -path './.nanvix' -prune -o -type f \
+		\( -name '*.py[co]' -o -name '*.[oa]' -o -name '*.s[ol]' \
+		-o -name '*.so.[0-9]*.[0-9]*' -o -name '*.lto' -o -name '*.wasm' \
+		-o -name '*.lst' \) -exec rm -f {} +
+	rm -rf build
+	rm -f pybuilddir.txt _bootstrap_python Programs/_testembed Programs/_freeze_module
+	rm -f Python/deepfreeze/*.[co] Python/frozen_modules/*.h
+	rm -f Python/frozen_modules/MANIFEST Include/pydtrace_probes.h
+	rm -f $(CONFIGURED_MARKER) python python$(EXE) libpython3.12.a
 
 .PHONY: all configure build install clean

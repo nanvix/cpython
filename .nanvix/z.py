@@ -22,8 +22,8 @@ Options:
 
 import os
 import shutil
-import sys
-import tempfile
+import tarfile
+import zipfile
 from pathlib import Path
 
 from nanvix_zutil import paths
@@ -36,19 +36,13 @@ import package as package_mod
 import ramfs as ramfs_mod
 from nanvix_zutil import (
     CFG_SYSROOT,
+    DockerConfig,
+    EXIT_INVALID_ARGS,
     EXIT_MISSING_DEP,
-    TOOLCHAIN_CONTAINER_PATH,
     ZScript,
     log,
     run,
-    suffix_dep,
 )
-from nanvix_zutil.buildroot import (
-    Buildroot,
-    Dependency,
-    extract_nanvix_version_base,
-)
-from nanvix_zutil.github import resolve_release_with_fallback
 from nanvix_zutil.paths import nanvix_root
 
 # ---------------------------------------------------------------------------
@@ -57,8 +51,6 @@ from nanvix_zutil.paths import nanvix_root
 
 # Makefile variable names (build-system-specific).
 _MAKE_VAR_CONFIG = "CONFIG_NANVIX"
-_MAKE_VAR_HOME = "NANVIX_HOME"
-_MAKE_VAR_TOOLCHAIN = "NANVIX_TOOLCHAIN"
 _MAKE_VAR_PLATFORM = "PLATFORM"
 _MAKE_VAR_PROCESS_MODE = "PROCESS_MODE"
 _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
@@ -71,31 +63,40 @@ _DEFAULT_INSTALL_PREFIX = config.DEFAULT_INSTALL_PREFIX
 _CFG_LOCAL_NANVIX = "local_nanvix_path"
 
 
-# Map dependency names to the library files they install into buildroot/lib.
-_DEP_EXPECTED_LIBS: dict[str, list[str]] = {
-    "bzip2": ["libbz2.a"],
-    "libffi": ["libffi.a"],
-    "zlib": ["libz.a"],
-    "sqlite": ["libsqlite3.a"],
-    "openssl": ["libssl.a", "libcrypto.a"],
-    "libxml2": ["libxml2.a"],
-    "libxslt": ["libxslt.a", "libexslt.a"],
-    "lxml": ["liblxml_etree.a", "liblxml_elementpath.a"],
-    "xz": ["liblzma.a"],
-}
-
-
 class CPythonBuild(ZScript):
     """Build script for nanvix/cpython."""
 
-    if sys.platform == "win32":
-        SYSROOT_REQUIRED_FILES: tuple[str, ...] = (
-            "lib/libposix.a",
-            "lib/user.ld",
-            "bin/nanvixd.exe",
-            "bin/kernel.elf",
-            "bin/mkramfs.exe",
+    SYSROOT_REQUIRED_FILES: tuple[str, ...] = (
+        "bin/nanvixd.elf",
+        "bin/kernel.elf",
+        "bin/mkramfs.elf",
+    )
+    SYSROOT_REQUIRED_FILES_WINDOWS: tuple[str, ...] = (
+        "bin/nanvixd.exe",
+        "bin/kernel.elf",
+        "bin/mkramfs.exe",
+    )
+
+    def docker_config(self, image: str) -> DockerConfig:
+        """Configure the immutable SDK container and repository-local temp paths."""
+        if image != config.DOCKER_IMAGE:
+            log.fatal(
+                f"Unsupported SDK image: {image}",
+                code=EXIT_INVALID_ARGS,
+                hint=f"Use the pinned SDK image: {config.DOCKER_IMAGE}",
+            )
+        container_home = paths.nanvix_root() / "container-home"
+        container_tmp = paths.nanvix_root() / "container-tmp"
+        container_home.mkdir(parents=True, exist_ok=True)
+        container_tmp.mkdir(parents=True, exist_ok=True)
+        docker = super().docker_config(image)
+        docker.extra_env.update(
+            {
+                "HOME": f"{config.DOCKER_WORKSPACE_PATH}/.nanvix/container-home",
+                "TMPDIR": f"{config.DOCKER_WORKSPACE_PATH}/.nanvix/container-tmp",
+            }
         )
+        return docker
 
     def release_targets(self) -> dict[str, str]:
         name = (
@@ -112,14 +113,15 @@ class CPythonBuild(ZScript):
     # ---- Local Nanvix overlay --------------------------------------------
 
     def _overlay_local_nanvix(self) -> None:
-        """Re-overlay local Nanvix binaries into the sysroot.
+        """Re-overlay local Nanvix runtime binaries into the runtime sysroot.
 
         Called before build/test/release so that local changes are
         picked up even after the initial ``setup()`` run.  Reads the
         ``WITH_NANVIX`` environment variable (set by ``z.sh``) or falls
         back to the path persisted in ``.nanvix/env.json``.
 
-        Delegates to ``Sysroot.overlay_local_nanvix()``.
+        Build-time headers and libraries intentionally remain owned by the SDK
+        and dependency buildroot.
         """
         nanvix_path = os.environ.get("WITH_NANVIX") or self.config.get(
             _CFG_LOCAL_NANVIX, ""
@@ -141,14 +143,24 @@ class CPythonBuild(ZScript):
         if not sysroot:
             return
 
-        from nanvix_zutil import Sysroot
+        source = Path(nanvix_path) / "bin"
+        if not source.is_dir():
+            log.warning(f"No bin/ runtime artifacts found in {nanvix_path}")
+            return
 
-        Sysroot(Path(sysroot)).overlay_local_nanvix(Path(nanvix_path))
+        destination = Path(sysroot) / "bin"
+        destination.mkdir(parents=True, exist_ok=True)
+        count = 0
+        for artifact in source.iterdir():
+            if artifact.is_file():
+                shutil.copy2(artifact, destination / artifact.name)
+                count += 1
+        log.info(f"Overlaid {count} local runtime artifact(s) from {nanvix_path}")
 
     # ---- Common helpers --------------------------------------------------
 
-    def _get_host_paths(self) -> tuple[Path, Path]:
-        """Return (sysroot, toolchain) raw host paths from config."""
+    def _get_host_sysroot(self) -> Path:
+        """Return the configured runtime sysroot host path."""
         sysroot = self.config.get(CFG_SYSROOT, "")
         if not sysroot:
             log.fatal(
@@ -156,8 +168,7 @@ class CPythonBuild(ZScript):
                 code=EXIT_MISSING_DEP,
                 hint="Run `./z setup` first to download the sysroot.",
             )
-        toolchain = Path(TOOLCHAIN_CONTAINER_PATH)
-        return Path(sysroot), toolchain
+        return Path(sysroot)
 
     def _make_args(
         self,
@@ -171,11 +182,11 @@ class CPythonBuild(ZScript):
         ``build()`` MUST leave ``with_docker=False``; ``self.docker`` is
         ignored for those steps.
         """
-        sysroot, toolchain = self._get_host_paths()
+        sysroot = self._get_host_sysroot()
         use_docker = with_docker and self.docker is not None
         return build_mod.MakeArgs(
-            toolchain_path=toolchain,
             sysroot=sysroot,
+            buildroot=paths.buildroot(),
             targets=list(targets),
             platform=self.config.machine,
             process_mode=self.config.deployment_mode,
@@ -193,40 +204,27 @@ class CPythonBuild(ZScript):
     def setup(self) -> bool:
         """Download the Nanvix sysroot and dependencies.
 
-        Delegates sysroot/dependency download, ``--with-nanvix`` overlay,
-        and verification to the base class.  Adds cpython-specific
-        post-processing: missing-dep fallback and buildroot→sysroot merge.
+        Downloads a runtime-only sysroot and installs build-time dependencies
+        into the separate buildroot.
         """
         # Base class handles: sysroot download, WITH_NANVIX overlay,
         # dependency installation, Windows binaries, and verification.
+        if self._with_nanvix_path:
+            local_nanvix = os.path.abspath(os.path.expanduser(self._with_nanvix_path))
+            self.config.set(_CFG_LOCAL_NANVIX, local_nanvix)
+
         used_fallback = super().setup()
-
-        self._install_missing_deps()
-        self.config.save()
-
-        buildroot = nanvix_root() / "buildroot"
         sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot or not buildroot.is_dir():
-            return used_fallback
+        if sysroot:
+            sysroot_path = Path(sysroot)
+            for build_dir in ("include", "lib"):
+                path = sysroot_path / build_dir
+                if path.is_dir():
+                    shutil.rmtree(path)
 
-        sysroot_path = Path(sysroot)
-        for subdir in ("lib", "include"):
-            src = buildroot / subdir
-            dst = sysroot_path / subdir
-            if not src.is_dir():
-                continue
-            dst.mkdir(parents=True, exist_ok=True)
-            for item in src.iterdir():
-                target = dst / item.name
-                if item.is_dir():
-                    shutil.copytree(item, target, dirs_exist_ok=True)
-                    log.info(f"Merged directory {subdir}/{item.name} into sysroot")
-                else:
-                    shutil.copy2(item, target)
-                    log.info(f"Merged {subdir}/{item.name} into sysroot")
-
-        # Overlay local Nanvix binaries last so they take precedence.
+        self._install_lxml_runtime_payload()
         self._overlay_local_nanvix()
+        self.config.save()
         return used_fallback
 
     def build(self) -> None:
@@ -249,6 +247,7 @@ class CPythonBuild(ZScript):
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
         args = self._make_args(release=False, with_docker=True)
         build_mod.build(args)
+        lxml_mod.stage_lxml_runtime(paths.test_out())
         test_mod.stage_ramfs(args)
 
     def test(self) -> None:
@@ -275,174 +274,68 @@ class CPythonBuild(ZScript):
         """Remove build artifacts."""
         build_mod.clean()
 
-    def _install_missing_deps(self) -> None:
-        """Download missing dependency libraries using fallback assets."""
-        buildroot = nanvix_root() / "buildroot"
-        buildroot.mkdir(parents=True, exist_ok=True)
-        lib_dir = buildroot / "lib"
-
-        sysroot_tag = self.manifest.sysroot_ref.value
-        nanvix_version = str(sysroot_tag).removeprefix("v") if sysroot_tag else ""
-
-        for dep in self.manifest.dependencies:
-            expected = _DEP_EXPECTED_LIBS.get(dep.name, [])
-            if not expected:
-                continue
-            libs_present = all((lib_dir / lib).exists() for lib in expected)
-            # For lxml, also require the python-packages payload.
-            if dep.name == "lxml":
-                pkg_present = (
-                    buildroot / "python-packages" / "lxml" / "__init__.py"
-                ).exists()
-                if libs_present and pkg_present:
-                    continue
-            elif libs_present:
-                continue
-            resolved = suffix_dep(dep, nanvix_version) if nanvix_version else dep
-            self._download_dep_fallback(resolved, buildroot)
-
-    def _download_dep_fallback(
-        self,
-        dep: Dependency,
-        buildroot: Path,
-    ) -> None:
-        """Download *dep* using a fallback asset variant.
-
-        Delegates download and extraction to ``Buildroot.install_dep``
-        (which handles ``.tar.gz``, ``.tar.bz2``, and ``.zip``
-        transparently).  Adds cpython-specific logic:
-
-        - Fuzzy release discovery (scan releases for ``prefix-nanvix-*``
-          when the exact tag is missing).
-        - Multiple deployment-mode candidates (standalone, single-process,
-          multi-process).
-        - Extraction of ``python-packages/`` payload (e.g. lxml).
-        """
-        dep_name = dep.name
-        repo = dep.repo
-        ref = str(dep.ref.value)
-        platform = self.config.machine
-        memory = self.config.memory_size
-        deployment = self.config.deployment_mode
-        gh_token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-
-        # --- Resolve release (with fuzzy fallback via zutils) ---
-        release: dict[str, object] | None = None
-        base_version = extract_nanvix_version_base(ref)
+    @staticmethod
+    def _python_package_path(member_name: str) -> Path | None:
+        """Return a safe path below an archive's ``python-packages`` directory."""
+        parts = Path(member_name).parts
         try:
-            if base_version is not None:
-                release, _ = resolve_release_with_fallback(
-                    repo=repo,
-                    version_specifier=ref,
-                    base_version=base_version,
-                    gh_token=gh_token,
-                )
-            else:
-                from nanvix_zutil.github import resolve_release
+            package_index = parts.index("python-packages")
+        except ValueError:
+            return None
+        relative = Path(*parts[package_index + 1 :])
+        if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+            return None
+        return relative
 
-                release = resolve_release(
-                    repo=repo,
-                    version_specifier=ref,
-                    gh_token=gh_token,
-                )
-        except SystemExit:
-            log.warning(f"No compatible release for {dep_name} ({ref})")
-            return
-
-        # --- Try deployment-mode candidates via Buildroot.install_dep ---
-        br = Buildroot.create()
-        modes = [deployment, "standalone", "single-process", "multi-process"]
-        seen: set[str] = set()
-        installed = False
-        for mode in modes:
-            if mode in seen:
-                continue
-            seen.add(mode)
-            fallback_dep = Dependency(
-                name=dep_name,
-                repo=repo,
-                ref=dep.ref,
+    def _install_lxml_runtime_payload(self) -> None:
+        """Install the exact lxml release's Python payload into the buildroot."""
+        cache_dir = nanvix_root() / "cache"
+        candidates = (
+            list(cache_dir.glob(f"lxml-{self.config.machine}-*"))
+            if cache_dir.is_dir()
+            else []
+        )
+        if not candidates:
+            raise FileNotFoundError(
+                "lxml release archive is missing from .nanvix/cache"
             )
-            try:
-                br.install_dep(
-                    fallback_dep,
-                    machine=platform,
-                    deployment_mode=mode,
-                    memory_size=memory,
-                    gh_token=gh_token,
-                    _release=release,
-                )
-                installed = True
-                break
-            except SystemExit:
-                continue
 
-        if not installed:
-            log.warning(f"No compatible fallback asset for {dep_name}")
-            return
+        archive = max(candidates, key=lambda path: path.stat().st_mtime_ns)
+        destination = nanvix_root() / "buildroot" / "python-packages"
+        if destination.is_dir():
+            shutil.rmtree(destination)
+        destination.mkdir(parents=True)
 
-        # --- CPython-specific: extract python-packages/ (e.g. lxml) ---
-        cache_dir = buildroot.parent / "cache"
-        asset_prefix = f"{dep_name}-{platform}-"
-        for cached in sorted(cache_dir.iterdir()) if cache_dir.is_dir() else []:
-            if not cached.name.startswith(asset_prefix):
-                continue
-            self._extract_python_packages(cached, buildroot)
-            break
+        installed = 0
+        if zipfile.is_zipfile(archive):
+            with zipfile.ZipFile(archive) as source:
+                for member in source.infolist():
+                    relative = self._python_package_path(member.filename)
+                    if relative is None or member.is_dir():
+                        continue
+                    output = destination / relative
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    with source.open(member) as src, output.open("wb") as dst:
+                        shutil.copyfileobj(src, dst)
+                    installed += 1
+        else:
+            with tarfile.open(archive, "r:*") as source:
+                for member in source.getmembers():
+                    relative = self._python_package_path(member.name)
+                    if relative is None or not member.isfile():
+                        continue
+                    extracted = source.extractfile(member)
+                    if extracted is None:
+                        continue
+                    output = destination / relative
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    with extracted, output.open("wb") as dst:
+                        shutil.copyfileobj(extracted, dst)
+                    installed += 1
 
-    def _extract_python_packages(self, asset_path: Path, buildroot: Path) -> None:
-        """Extract ``python-packages/`` from an archive into *buildroot*."""
-        import tarfile
-        import zipfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            extract_dir = Path(tmpdir) / "extracted"
-            extract_dir.mkdir()
-
-            if zipfile.is_zipfile(asset_path):
-                with zipfile.ZipFile(asset_path) as zf:
-                    for member in zf.namelist():
-                        if "python-packages" not in member:
-                            continue
-                        if os.path.isabs(member) or ".." in member.split("/"):
-                            continue
-                        dest = (extract_dir / member).resolve()
-                        if not dest.is_relative_to(extract_dir.resolve()):
-                            continue
-                        zf.extract(member, extract_dir)
-            else:
-                with tarfile.open(str(asset_path), "r:*") as tf:
-                    pkg_members = [
-                        m
-                        for m in tf.getmembers()
-                        if "python-packages" in m.name
-                        and not os.path.isabs(m.name)
-                        and ".." not in m.name.split("/")
-                    ]
-                    if not pkg_members:
-                        return
-                    try:
-                        tf.extractall(
-                            str(extract_dir), members=pkg_members, filter="data"
-                        )
-                    except TypeError:
-                        tf.extractall(str(extract_dir), members=pkg_members)
-
-            for pkg_src in extract_dir.rglob("python-packages"):
-                if not pkg_src.is_dir():
-                    continue
-                pkg_dst = buildroot / "python-packages"
-                pkg_dst.mkdir(parents=True, exist_ok=True)
-                for item in pkg_src.iterdir():
-                    target = pkg_dst / item.name
-                    if item.is_dir():
-                        if target.exists():
-                            shutil.rmtree(target)
-                        shutil.copytree(item, target)
-                    else:
-                        shutil.copy2(item, target)
-                log.info(f"Installed python packages from {asset_path.name}")
-                break
+        if installed == 0:
+            raise RuntimeError(f"{archive.name} contains no python-packages payload")
+        log.info(f"Installed {installed} lxml runtime file(s) from {archive.name}")
 
 
 if __name__ == "__main__":

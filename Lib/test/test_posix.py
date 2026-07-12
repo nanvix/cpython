@@ -99,6 +99,8 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'setresuid'),
                          'test needs posix.setresuid()')
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not implement getresuid()")
     def test_setresuid(self):
         current_user_ids = posix.getresuid()
         self.assertIsNone(posix.setresuid(*current_user_ids))
@@ -107,6 +109,8 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'setresuid'),
                          'test needs posix.setresuid()')
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not implement getresuid()")
     def test_setresuid_exception(self):
         # Don't do this test if someone is silly enough to run us as root.
         current_user_ids = posix.getresuid()
@@ -116,6 +120,8 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'setresgid'),
                          'test needs posix.setresgid()')
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not implement getresgid()")
     def test_setresgid(self):
         current_group_ids = posix.getresgid()
         self.assertIsNone(posix.setresgid(*current_group_ids))
@@ -124,6 +130,8 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'setresgid'),
                          'test needs posix.setresgid()')
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not implement getresgid()")
     def test_setresgid_exception(self):
         # Don't do this test if someone is silly enough to run us as root.
         current_group_ids = posix.getresgid()
@@ -680,6 +688,7 @@ class PosixTester(unittest.TestCase):
                 posix.stat, list(os.fsencode(os_helper.TESTFN)))
 
     @unittest.skipUnless(hasattr(posix, 'mkfifo'), "don't have mkfifo()")
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support FIFO nodes")
     def test_mkfifo(self):
         if sys.platform == "vxworks":
             fifo_path = os.path.join("/fifos/", os_helper.TESTFN)
@@ -695,6 +704,7 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'mknod') and hasattr(stat, 'S_IFIFO'),
                          "don't have mknod()/S_IFIFO")
+    @unittest.skipIf(support.is_nanvix, "Nanvix does not support device nodes")
     def test_mknod(self):
         # Test using mknod() to create a FIFO (the only use specified
         # by POSIX).
@@ -1747,6 +1757,8 @@ class PosixGroupsTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'initgroups'),
                          "test needs posix.initgroups()")
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not provide a passwd database")
     def test_initgroups(self):
         # find missing group
 
@@ -1757,6 +1769,8 @@ class PosixGroupsTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'setgroups'),
                          "test needs posix.setgroups()")
+    @unittest.skipIf(support.is_nanvix,
+                     "Nanvix does not implement supplementary groups")
     def test_setgroups(self):
         for groups in [[0], list(range(16))]:
             posix.setgroups(groups)

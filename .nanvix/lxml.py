@@ -21,13 +21,13 @@ _lxml_elementpath lxml_elementpath_builtin.c -L{sysroot}/lib -llxml_elementpath 
 """
 
 
-def generate_setup_local(repo_root: Path, sysroot: Path) -> None:
+def generate_setup_local(repo_root: Path, buildroot: Path) -> None:
     """Generate Modules/Setup.local with statically-linked module definitions.
 
     Includes both the _nanvix OS interface module and lxml C extensions.
     """
     setup_local = repo_root / "Modules" / "Setup.local"
-    content = _SETUP_LOCAL_TEMPLATE.format(sysroot=sysroot)
+    content = _SETUP_LOCAL_TEMPLATE.format(sysroot=buildroot)
     setup_local.write_text(content, encoding="utf-8")
     print(f"[lxml] Generated {setup_local}")
 
