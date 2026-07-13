@@ -3,8 +3,11 @@ venv
 cache
 sysroot
 buildroot
+out
 .yamllint.yml
 black.toml
 env.json
 pyrightconfig.json
-out
+.nanvix-zutil-update.lock
+.nanvix-zutil-update-journal.json
+.*.nanvix-zutil-*
