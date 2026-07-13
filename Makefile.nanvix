@@ -16,6 +16,8 @@ NANVIX_RELEASE ?= no
 NANVIX_SDK_ROOT ?= /opt/nanvix
 NANVIX_BUILDROOT ?= /mnt/buildroot
 NANVIX_TARGET_TRIPLE ?= i686-unknown-nanvix
+NANVIX_MANIFEST ?= .nanvix/nanvix.toml
+NANVIX_SDK_VERSION = $(shell sed -n 's/^sdk-version = "\(.*\)"/\1/p' $(NANVIX_MANIFEST))
 BUILD_PYTHON ?= /usr/bin/python3
 
 SDK_BIN := $(NANVIX_SDK_ROOT)/bin
@@ -119,7 +121,7 @@ all: build
 configure: $(CONFIGURED_MARKER)
 
 $(CONFIGURED_MARKER):
-	@grep -Eq '"sdk_version"[[:space:]]*:[[:space:]]*"v0.20.0-sdk.1"' $(SDK_MANIFEST) || { \
+	@grep -Eq '"sdk_version"[[:space:]]*:[[:space:]]*"$(NANVIX_SDK_VERSION)"' $(SDK_MANIFEST) || { \
 		echo "SDK version mismatch in $(SDK_MANIFEST)"; exit 1; \
 	}
 	@grep -Eq '"c_abi"[[:space:]]*:[[:space:]]*"i686-nanvix-sysv-1"' $(SDK_MANIFEST) || { \
