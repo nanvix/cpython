@@ -10,15 +10,31 @@ across defaults.mk, common.mk, and the various test-*.mk files.
 from __future__ import annotations
 
 import sys
+import tomllib
+from pathlib import Path
+from typing import cast
 
 # ---------------------------------------------------------------------------
 # Platform defaults
 # ---------------------------------------------------------------------------
 
-DOCKER_IMAGE = (
-    "ghcr.io/nanvix/nanvix-sdk-c-clang"
-    "@sha256:f61737cb0780e6a2058c6d0bdf8ae5562db18de437173b2bcbbe6973abd3689f"
-)
+
+def _manifest_sdk_image() -> str:
+    """Return the canonical immutable build image from nanvix.toml."""
+    with Path(__file__).with_name("nanvix.toml").open("rb") as manifest_file:
+        manifest: dict[str, object] = tomllib.load(manifest_file)
+    raw_toolchain = manifest.get("toolchain")
+    if not isinstance(raw_toolchain, dict):
+        raise RuntimeError("nanvix.toml has no canonical toolchain")
+    toolchain = cast(dict[str, object], raw_toolchain)
+    image = toolchain.get("build-image", toolchain.get("sdk-image"))
+    digest = toolchain.get("build-digest", toolchain.get("sdk-digest"))
+    if not isinstance(image, str) or not isinstance(digest, str):
+        raise RuntimeError("nanvix.toml has no immutable build image")
+    return f"{image}@{digest}"
+
+
+DOCKER_IMAGE = _manifest_sdk_image()
 DEFAULT_PLATFORM = "microvm"
 DEFAULT_PROCESS_MODE = "standalone"
 DEFAULT_MEMORY_SIZE = "256mb"
@@ -46,7 +62,6 @@ PKG_BUILDROOT = "buildroot-pkg"
 # ---------------------------------------------------------------------------
 
 TARGET_TRIPLE = "i686-unknown-nanvix"
-SDK_VERSION = "v0.20.0-sdk.1"
 SDK_C_ABI = "i686-nanvix-sysv-1"
 
 # Docker-internal paths
