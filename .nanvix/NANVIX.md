@@ -72,10 +72,8 @@ pip install nanvix-zutil
 ### SDK Build
 
 ```bash
-SDK=ghcr.io/nanvix/nanvix-sdk-c-clang@sha256:f61737cb0780e6a2058c6d0bdf8ae5562db18de437173b2bcbbe6973abd3689f
-
 # Download the Nanvix 0.20.0 runtime and exact dependency releases.
-./z setup --with-docker "$SDK"
+./z setup
 
 # Build, test, and package through the pinned SDK.
 ./z build
@@ -94,7 +92,7 @@ You need the following components to build CPython for Nanvix:
 | Component | Description | Default Location |
 |-----------|-------------|------------------|
 | **nanvix-zutil** | Build orchestration tool | `pip install nanvix-zutil` |
-| **Nanvix SDK** | Pinned Clang/LLVM SDK v0.20.0-sdk.1 | Docker |
+| **Nanvix SDK** | Canonical Clang/LLVM SDK | `.nanvix/nanvix.toml` |
 | **Nanvix Runtime** | Nanvix 0.20.0 host and guest runtime binaries | `.nanvix/sysroot` |
 | **Dependency Buildroot** | Exact SDK-built headers and static libraries | `.nanvix/buildroot` |
 | **zlib** | Compression library | Managed by nanvix-zutil |
@@ -136,8 +134,7 @@ All Nanvix target compilation, archives, stripping, and final links run in the
 content-addressed SDK:
 
 ```bash
-SDK=ghcr.io/nanvix/nanvix-sdk-c-clang@sha256:f61737cb0780e6a2058c6d0bdf8ae5562db18de437173b2bcbbe6973abd3689f
-./z setup --with-docker "$SDK"
+./z setup
 ./z build
 ```
 
@@ -153,8 +150,7 @@ On Windows, cross-compilation is performed entirely inside Docker:
 ```powershell
 # Prerequisites: Python 3, Make, and Docker Desktop must be installed and running.
 # Avoid GnuWin32 Make 3.81; prefer ezwinports Make 4.4.1 (winget install ezwinports.make).
-$sdk = "ghcr.io/nanvix/nanvix-sdk-c-clang@sha256:f61737cb0780e6a2058c6d0bdf8ae5562db18de437173b2bcbbe6973abd3689f"
-.\z.ps1 setup --with-docker $sdk
+.\z.ps1 setup
 .\z.ps1 build
 .\z.ps1 test
 .\z.ps1 release
