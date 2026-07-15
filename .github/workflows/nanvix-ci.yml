@@ -31,8 +31,8 @@ jobs:
       platforms: '["microvm"]'
       process-modes: '["standalone"]'
       memory-sizes: '["256mb"]'
-      windows-matrix-exclude: '[]'
-      skip-full-test-modes: '[]'
+      windows-matrix-exclude: "[]"
+      skip-full-test-modes: "[]"
       caller-event-name: ${{ github.event_name }}
       windows-test: true
       test-output-globs: '["**/*"]'
@@ -47,146 +47,11 @@ jobs:
       platforms: '["microvm"]'
       process-modes: '["standalone"]'
       memory-sizes: '["256mb"]'
-      windows-matrix-exclude: '[]'
-      skip-full-test-modes: '[]'
-      caller-event-name: 'schedule'
+      windows-matrix-exclude: "[]"
+      skip-full-test-modes: "[]"
+      caller-event-name: "schedule"
       windows-test: true
       test-output-globs: '["**/*"]'
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
       DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
-
-  # -------------------------------------------------------------------
-  # Create a Windows zip release asset for MXC consumption.
-  # The reusable workflow creates a GitHub release with .tar.gz assets.
-  # This job downloads the standalone tarball from that release, extracts
-  # python.elf + cpython-ramfs.img, packs them into a flat .zip, and
-  # uploads it to the same release.
-  # -------------------------------------------------------------------
-  windows-zip:
-    needs: [ci, ci-scheduled]
-    if: >-
-      !cancelled() &&
-      (needs.ci.result == 'success' || needs.ci-scheduled.result == 'success') &&
-      github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: >-
-        ${{ (needs.ci.outputs.package_version || needs.ci-scheduled.outputs.package_version)
-        }}-nanvix-${{
-        (needs.ci.outputs.nanvix_version || needs.ci-scheduled.outputs.nanvix_version) }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Download standalone tarball from release
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p release-download
-          echo "Release tag: $RELEASE_TAG"
-
-          # Wait briefly for the release to be fully created
-          sleep 5
-
-          # Download standalone tarballs (exclude buildroot variant)
-          gh release download "$RELEASE_TAG" --pattern "*standalone*.tar.gz" --dir release-download
-          ls -la release-download/
-
-      - name: Create Windows zip
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          # Find the main standalone tarball (not buildroot)
-          TARBALL=$(find release-download -name "*standalone*.tar.gz" ! -name "*buildroot*" | head -1)
-          if [[ -z "$TARBALL" ]]; then
-            echo "::error::No standalone tarball found (excluding buildroot)"
-            ls release-download/ 2>/dev/null || true
-            exit 1
-          fi
-          echo "Using tarball: $TARBALL"
-
-          mkdir -p extract windows-zip
-          tar -xzf "$TARBALL" -C extract
-
-          # Find the python binary — it's at bin/python.elf
-          PYTHON_ELF=$(find extract -name "python.elf" -type f | head -1)
-
-          if [[ -z "$PYTHON_ELF" ]]; then
-            echo "::error::Could not find python.elf binary in standalone tarball"
-            echo "Files in tarball:"
-            find extract -type f | head -20 || true
-            exit 1
-          fi
-
-          cp "$PYTHON_ELF" windows-zip/python.elf
-          echo "Included: python.elf ($(stat -c%s windows-zip/python.elf) bytes)"
-
-          # --- Build ramfs from the stdlib in the tarball ---
-          # Tarballs ship a flat sysroot layout (no top-level `sysroot/`
-          # wrapper); the extraction root *is* the sysroot. The kernel mounts
-          # the ramfs at /, and Python is built with PYTHONHOME=/, so the
-          # image must be packed at the sysroot root (not its parent).
-          SYSROOT=extract
-          PYLIB="${SYSROOT}/lib/python3.12"
-          if [[ -d "$PYLIB" ]]; then
-            echo "Building ramfs from stdlib at: $PYLIB"
-
-            # Trim stdlib (same as Makefile.nanvix ramfs target)
-            find "$SYSROOT" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-            find "$SYSROOT" -name "*.pyc" -delete 2>/dev/null || true
-            find "$SYSROOT" -name "*.a" -delete 2>/dev/null || true
-            find "$SYSROOT" -name "*.h" -delete 2>/dev/null || true
-            rm -rf "$SYSROOT/bin" "$SYSROOT/include" "$SYSROOT/share" "$SYSROOT/lib/pkgconfig"
-            for d in test tests idlelib tkinter ensurepip lib2to3 distutils unittest \
-                     turtledemo pydoc_data config-3.12*; do
-              rm -rf "$PYLIB/$d" 2>/dev/null || true
-            done
-            find "$SYSROOT" -type d -name "config-3.12*" -exec rm -rf {} + 2>/dev/null || true
-
-            echo "Trimmed stdlib: $(find "$SYSROOT" -type f | wc -l) files"
-
-            # Get mkramfs from the matching Nanvix 0.20.0 runtime.
-            echo "Downloading Nanvix 0.20.0 runtime for mkramfs..."
-            mkdir -p nanvix-dl
-            gh release download v0.20.0 \
-              --repo nanvix/nanvix \
-              --pattern "nanvix-x86-microvm-standalone-release-256mb-*.tar.bz2" \
-              --dir nanvix-dl
-            MKRAMFS=""
-            NVX_TAR=$(find nanvix-dl -name "nanvix*microvm-standalone*256mb*.tar.bz2" | head -1)
-            if [[ -n "$NVX_TAR" ]]; then
-              mkdir -p nanvix-extract
-              tar -xjf "$NVX_TAR" -C nanvix-extract
-              MKRAMFS=$(find nanvix-extract -name "mkramfs.elf" -type f | head -1)
-            fi
-
-            if [[ -n "$MKRAMFS" ]]; then
-              chmod +x "$MKRAMFS"
-              "$MKRAMFS" -o windows-zip/cpython-ramfs.img "$SYSROOT"
-              echo "Included: cpython-ramfs.img ($(stat -c%s windows-zip/cpython-ramfs.img) bytes)"
-            else
-              echo "::error::mkramfs not found in the Nanvix v0.20.0 runtime"
-              exit 1
-            fi
-          else
-            echo "::error::No stdlib found in CPython standalone tarball"
-            exit 1
-          fi
-
-          ZIP_NAME="cpython-windows-microvm-standalone-256mb-${GITHUB_SHA::7}.zip"
-          (cd windows-zip && zip "../${ZIP_NAME}" *)
-          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
-          echo "Created: $ZIP_NAME ($(stat -c%s "$ZIP_NAME") bytes)"
-          echo "Contents:"
-          unzip -l "$ZIP_NAME"
-
-      - name: Upload zip to release
-        if: ${{ env.zip_name != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$RELEASE_TAG" "${{ env.zip_name }}" --clobber
-          echo "Uploaded ${{ env.zip_name }} to release $RELEASE_TAG"
