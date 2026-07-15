@@ -237,8 +237,18 @@ def stage(args: build_mod.MakeArgs) -> None:
                 shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
 
-    # Hello-world test script.  The lxml import is exercised against the
-    # in-memory FAT ramfs VFS via xmlInitParser().
+    # Hello-world test script.  The array check proves that the first
+    # stdlib module migrated to a shared extension is loaded through dlopen.
+    array_snippet = (
+        "import array\n"
+        "assert 'array' not in sys.builtin_module_names, 'array still built-in!'\n"
+        "_array = array.array('i', [1, 2, 3])\n"
+        "assert _array.tolist() == [1, 2, 3]\n"
+        "print(f'CPYTHON_TEST_ARRAY_SO: array loaded via dlopen from {array.__file__}')\n"
+    )
+
+    # The lxml import is exercised against the in-memory FAT ramfs VFS via
+    # xmlInitParser().
     lxml_snippet = (
         "try:\n"
         "    import lxml.etree\n"
@@ -255,7 +265,7 @@ def stage(args: build_mod.MakeArgs) -> None:
     (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
-        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + lxml_snippet
+        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + array_snippet + lxml_snippet
     )
 
     # HTTP server smoke-test script must be present in the sysroot before
