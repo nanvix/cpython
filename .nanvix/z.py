@@ -98,18 +98,6 @@ class CPythonBuild(ZScript):
         )
         return docker
 
-    def release_targets(self) -> dict[str, str]:
-        name = (
-            f"{self.manifest.name}"
-            f"-{self.config.machine}"
-            f"-{self.config.deployment_mode}"
-            f"-{self.config.memory_size}"
-        )
-        return {
-            config.PKG_SYSROOT: f"{name}",
-            config.PKG_BUILDROOT: f"{name}-buildroot",
-        }
-
     # ---- Local Nanvix overlay --------------------------------------------
 
     def _overlay_local_nanvix(self) -> None:
@@ -290,11 +278,13 @@ class CPythonBuild(ZScript):
     def _install_lxml_runtime_payload(self) -> None:
         """Install the exact lxml release's Python payload into the buildroot."""
         cache_dir = nanvix_root() / "cache"
-        candidates = (
-            list(cache_dir.glob(f"lxml-{self.config.machine}-*"))
-            if cache_dir.is_dir()
-            else []
+        # Magic-path naming: lxml-{host}-{arch}-{machine}-{mode}-{mem}-dev.{ext}.
+        # Match any host/arch pair for the current machine + memory + mode.
+        pattern = (
+            f"lxml-*-{self.config.machine}-"
+            f"{self.config.deployment_mode}-{self.config.memory_size}-dev.*"
         )
+        candidates = list(cache_dir.glob(pattern)) if cache_dir.is_dir() else []
         if not candidates:
             raise FileNotFoundError(
                 "lxml release archive is missing from .nanvix/cache"

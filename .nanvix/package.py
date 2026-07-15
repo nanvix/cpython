@@ -3,9 +3,10 @@
 
 """Release staging for Nanvix CPython.
 
-Stages the sysroot and buildroot trees under ``release_dir()`` for the
-base zutils ``release`` flow to tar. Also inserts the built ``python.elf``
-and prepares the ramfs image inputs.
+Stages the runtime tree under ``regular_out()`` (packaged into the
+regular archive by ``nanvix-zutil release``) and the buildroot tree
+under ``dev_out()`` (packaged into the ``-dev`` archive). Also inserts
+the built ``python.elf`` and prepares the ramfs image inputs.
 """
 
 from __future__ import annotations
@@ -18,17 +19,17 @@ from nanvix_zutil import paths
 
 
 def sysroot_pkg() -> Path:
-    """Staging tree for the runtime sysroot tarball (tarred verbatim)."""
-    return paths.release_dir() / config.PKG_SYSROOT
+    """Staging tree for the runtime archive (packaged verbatim)."""
+    return paths.regular_out()
 
 
 def buildroot_pkg() -> Path:
-    """Staging tree for the buildroot tarball (tarred verbatim)."""
-    return paths.release_dir() / config.PKG_BUILDROOT
+    """Staging tree for the ``-dev`` (buildroot) archive (packaged verbatim)."""
+    return paths.dev_out()
 
 
 def stage() -> None:
-    """Stage the two tarball trees under ``release_dir/``.
+    """Stage the two archive trees under ``regular_out()`` and ``dev_out()``.
 
     Must run after ``build_mod.build(args)`` has populated
     :func:`sysroot_pkg`. Buildroot is curated *before* the sysroot
