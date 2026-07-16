@@ -30,6 +30,94 @@ import lxml as lxml_mod
 import ramfs as ramfs_mod
 
 # ---------------------------------------------------------------------------
+# Shared-extension smoke checks
+# ---------------------------------------------------------------------------
+
+_SO_MODULE_SANITY_CHECKS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "CPYTHON_TEST_DATA_PRIMITIVES",
+        (
+            ("_bisect", "m.bisect_left([1, 3, 5], 4) == 2"),
+            ("_heapq", "m.heappush([], 1) is None"),
+            ("_struct", "m.pack('i', 42) == b'\\x2a\\x00\\x00\\x00'"),
+            ("_random", "hasattr(m, 'Random')"),
+            ("_opcode", "hasattr(m, 'stack_effect')"),
+            ("_queue", "hasattr(m, 'SimpleQueue')"),
+            ("_csv", "hasattr(m, 'reader')"),
+            ("binascii", "m.hexlify(b'\\xab') == b'ab'"),
+            ("_json", "hasattr(m, 'encode_basestring_ascii')"),
+            ("_pickle", "hasattr(m, 'Pickler')"),
+            ("_zoneinfo", "hasattr(m, 'ZoneInfo')"),
+        ),
+    ),
+    (
+        "CPYTHON_TEST_MATH",
+        (
+            ("math", "abs(m.sqrt(4.0) - 2.0) < 1e-9"),
+            ("cmath", "abs(m.sqrt(complex(-1)) - complex(0, 1)) < 1e-9"),
+            ("_statistics", "hasattr(m, '_normal_dist_inv_cdf')"),
+            ("mmap", "hasattr(m, 'mmap')"),
+            ("_contextvars", "hasattr(m, 'ContextVar')"),
+        ),
+    ),
+    (
+        "CPYTHON_TEST_CODECS",
+        (
+            ("unicodedata", "m.lookup('LATIN SMALL LETTER A') == 'a'"),
+            ("_codecs_cn", "hasattr(m, 'getcodec')"),
+            ("_codecs_hk", "hasattr(m, 'getcodec')"),
+            ("_codecs_iso2022", "hasattr(m, 'getcodec')"),
+            ("_codecs_jp", "hasattr(m, 'getcodec')"),
+            ("_codecs_kr", "hasattr(m, 'getcodec')"),
+            ("_codecs_tw", "hasattr(m, 'getcodec')"),
+        ),
+    ),
+    (
+        "CPYTHON_TEST_BUNDLED_DEPS",
+        (
+            ("_asyncio", "hasattr(m, 'Future')"),
+            ("_decimal", "m.Decimal('1.1') + m.Decimal('2.2') == m.Decimal('3.3')"),
+            ("_elementtree", "hasattr(m, 'XMLParser')"),
+            ("_md5", "hasattr(m, 'md5')"),
+            ("_sha1", "hasattr(m, 'sha1')"),
+            ("_sha2", "hasattr(m, 'sha256')"),
+            ("_sha3", "hasattr(m, 'sha3_256')"),
+            ("_blake2", "hasattr(m, 'blake2b')"),
+            ("select", "hasattr(m, 'select')"),
+            ("_socket", "hasattr(m, 'socket')"),
+            ("_posixsubprocess", "hasattr(m, 'fork_exec')"),
+            ("fcntl", "hasattr(m, 'fcntl')"),
+            ("termios", "hasattr(m, 'tcgetattr')"),
+        ),
+    ),
+)
+
+
+def _render_so_sanity_snippets(
+    checks: tuple[
+        tuple[str, tuple[tuple[str, str], ...]], ...
+    ] = _SO_MODULE_SANITY_CHECKS,
+) -> str:
+    """Render imports that prove each migrated module loads through dlopen."""
+    snippets: list[str] = []
+    for log_tag, modules in checks:
+        items = ",\n".join(
+            f"    ({name!r}, lambda m: {check})" for name, check in modules
+        )
+        snippets.append(
+            f"_so_checks = [\n{items},\n]\n"
+            "for _name, _check in _so_checks:\n"
+            "    _mod = __import__(_name)\n"
+            "    assert _name not in sys.builtin_module_names, "
+            "f'{_name} still built-in!'\n"
+            "    assert _check(_mod), f'{_name} sanity check failed'\n"
+            f"    print(f'{log_tag}: "
+            "{_name} loaded via dlopen from {_mod.__file__}')\n"
+        )
+    return "".join(snippets)
+
+
+# ---------------------------------------------------------------------------
 # Initrd creation helper (standalone mode)
 # ---------------------------------------------------------------------------
 
@@ -246,6 +334,17 @@ def stage(args: build_mod.MakeArgs) -> None:
         "assert _array.tolist() == [1, 2, 3]\n"
         "print(f'CPYTHON_TEST_ARRAY_SO: array loaded via dlopen from {array.__file__}')\n"
     )
+    nested_import_snippet = (
+        "import xml.etree.ElementTree as _elementtree_api\n"
+        "assert _elementtree_api.fromstring('<root/>').tag == 'root'\n"
+        "assert '_elementtree' not in sys.builtin_module_names\n"
+        "assert 'pyexpat' in sys.builtin_module_names\n"
+        "import encodings.gb2312\n"
+        "assert '中文'.encode('gb2312') == b'\\xd6\\xd0\\xce\\xc4'\n"
+        "assert '_codecs_cn' not in sys.builtin_module_names\n"
+        "assert '_multibytecodec' in sys.builtin_module_names\n"
+        "print('CPYTHON_TEST_NESTED_IMPORTS: static C API anchors OK')\n"
+    )
 
     # The lxml import is exercised against the in-memory FAT ramfs VFS via
     # xmlInitParser().
@@ -265,7 +364,11 @@ def stage(args: build_mod.MakeArgs) -> None:
     (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
-        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + array_snippet + lxml_snippet
+        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n"
+        + array_snippet
+        + nested_import_snippet
+        + _render_so_sanity_snippets()
+        + lxml_snippet
     )
 
     # HTTP server smoke-test script must be present in the sysroot before
