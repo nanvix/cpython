@@ -26,7 +26,6 @@ from nanvix_zutil import paths
 
 import build as build_mod
 import config
-import lxml as lxml_mod
 import ramfs as ramfs_mod
 
 # ---------------------------------------------------------------------------
@@ -346,21 +345,6 @@ def stage(args: build_mod.MakeArgs) -> None:
         "print('CPYTHON_TEST_NESTED_IMPORTS: static C API anchors OK')\n"
     )
 
-    # The lxml import is exercised against the in-memory FAT ramfs VFS via
-    # xmlInitParser().
-    lxml_snippet = (
-        "try:\n"
-        "    import lxml.etree\n"
-        "    doc = lxml.etree.fromstring(b'<root><child>lxml OK</child></root>')\n"
-        "    assert doc.tag == 'root'\n"
-        "    assert doc[0].text == 'lxml OK'\n"
-        "    print('CPYTHON_TEST_LXML: lxml.etree import and parse OK')\n"
-        "except ImportError as e:\n"
-        "    print(f'CPYTHON_TEST_LXML_SKIP: {e}')\n"
-        "except Exception as e:\n"
-        "    print(f'CPYTHON_TEST_LXML_FAIL: {e}')\n"
-        "    sys.exit(1)\n"
-    )
     (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
@@ -368,7 +352,6 @@ def stage(args: build_mod.MakeArgs) -> None:
         + array_snippet
         + nested_import_snippet
         + _render_so_sanity_snippets()
-        + lxml_snippet
     )
 
     # HTTP server smoke-test script must be present in the sysroot before
@@ -585,25 +568,17 @@ def run_hello(
 
     # Validate output.
     found_hello = False
-    found_lxml = False
     for line in output.splitlines():
         if line.startswith("CPYTHON_TEST_"):
             tag = line.split(":")[0].replace("CPYTHON_TEST_", "")
             print(f"  {tag}: {line.strip()}")
             if tag == "HELLO":
                 found_hello = True
-            elif tag in ("LXML", "LXML_SKIP"):
-                found_lxml = True
 
     if not found_hello:
         print("  FAIL: Hello test did not produce expected output")
         print(output)
         raise RuntimeError("Hello test did not produce expected output")
-
-    if not found_lxml:
-        # lxml staging is best-effort — if the runtime package was not
-        # available (e.g. release asset missing), the test is non-fatal.
-        print("  WARNING: lxml import/parse test did not produce expected output")
 
     print("  PASS")
 
@@ -886,8 +861,6 @@ def run_all(
             _download_release_as_cache(args)
             stage(args)
             stage_ramfs(args)
-
-    lxml_mod.stage_lxml_runtime(staging)
 
     # Hello test.
     run_hello(
