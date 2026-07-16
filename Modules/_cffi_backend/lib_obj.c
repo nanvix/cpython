@@ -541,7 +541,7 @@ static PyObject *lib_getattr(LibObject *lib, PyObject *name)
         Py_INCREF(x);
         return x;
     }
-    /* this hack is for Python 3.5, and also to give a more 
+    /* this hack is for Python 3.5, and also to give a more
        module-like behavior */
     if (strcmp(p, "__name__") == 0) {
         PyErr_Clear();
