@@ -29,6 +29,8 @@ import config
 import lxml as lxml_mod
 import ramfs as ramfs_mod
 
+_DOWNLOADED_RELEASE_MARKER = ".downloaded-release"
+
 # ---------------------------------------------------------------------------
 # Initrd creation helper (standalone mode)
 # ---------------------------------------------------------------------------
@@ -130,23 +132,27 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
     # Find a standalone tarball asset (.tar.gz preferred, .tar.bz2 fallback).
     asset_url = None
     asset_name = None
+    asset_id = None
+    asset_stem = (
+        f"cpython-linux-x86-{args.platform}-{args.process_mode}-{args.memory_size}"
+    )
     for ext in (".tar.gz", ".tar.bz2"):
         for a in release.get("assets", []):
             name = a.get("name", "")
-            if (
-                name.startswith(args.asset_prefix())
-                and name.endswith(ext)
-                and "buildroot" not in name
+            if isinstance(name, str) and (
+                name == f"{args.asset_prefix()}{ext}" or name == f"{asset_stem}{ext}"
             ):
                 asset_url = a["browser_download_url"]
                 asset_name = name
+                asset_id = a["id"]
                 break
         if asset_url:
             break
 
     if not asset_url:
         raise FileNotFoundError(
-            f"No cpython release asset matching '{args.asset_prefix()}*.tar.gz' or '*.tar.bz2' "
+            f"No cpython runtime release asset named "
+            f"'{asset_stem}.tar.gz' or '{asset_stem}.tar.bz2' "
             f"in release {tag}. Available assets: "
             + ", ".join(a["name"] for a in release.get("assets", []))
         )
@@ -155,10 +161,17 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
     dl_dir = paths.nanvix_root() / "cache"
     dl_dir.mkdir(parents=True, exist_ok=True)
     assert asset_name is not None
-    tarball = dl_dir / asset_name
+    assert asset_id is not None
+    tarball = dl_dir / f"{asset_id}-{asset_name}"
     if not tarball.is_file():
         print(f"  Downloading {asset_name}...")
-        urllib.request.urlretrieve(asset_url, str(tarball))
+        partial = tarball.with_name(f".{tarball.name}.partial")
+        try:
+            urllib.request.urlretrieve(asset_url, str(partial))
+            partial.replace(tarball)
+        finally:
+            if partial.exists():
+                partial.unlink()
 
     # Extract into cache_dir with path-traversal protection.
     print(f"  Extracting to {cache_dir}...")
@@ -203,6 +216,7 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
         test_count = sum(1 for _ in test_dst.rglob("*.py"))
         print(f"  Copied test suite from source tree ({test_count} files)")
 
+    (cache_dir / _DOWNLOADED_RELEASE_MARKER).write_text(tag, encoding="utf-8")
     print(f"  Install cache ready at {cache_dir}")
     return cache_dir
 
@@ -212,7 +226,11 @@ def _download_release_as_cache(args: build_mod.MakeArgs) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def stage(args: build_mod.MakeArgs) -> None:
+def stage(
+    args: build_mod.MakeArgs,
+    *,
+    require_array_so: bool = True,
+) -> None:
     """Populate the test install tree with fixtures, runtime binaries, and helpers.
 
     Invoked by ``build_mod.build`` after ``install()`` for non-release
@@ -237,8 +255,22 @@ def stage(args: build_mod.MakeArgs) -> None:
                 shutil.copy2(scdata_src, scdata_dst)
                 print(f"  Copied {scdata_name} from build dir (make install missed it)")
 
-    # Hello-world test script.  The lxml import is exercised against the
-    # in-memory FAT ramfs VFS via xmlInitParser().
+    # Hello-world test script.  The array check proves that the first
+    # stdlib module migrated to a shared extension is loaded through dlopen.
+    array_snippet = (
+        "import array\n"
+        "_array = array.array('i', [1, 2, 3])\n"
+        "assert _array.tolist() == [1, 2, 3]\n"
+        "print('CPYTHON_TEST_ARRAY: array import and round-trip OK')\n"
+    )
+    if require_array_so:
+        array_snippet += (
+            "assert 'array' not in sys.builtin_module_names, 'array still built-in!'\n"
+            "print(f'CPYTHON_TEST_ARRAY_SO: array loaded via dlopen from {array.__file__}')\n"
+        )
+
+    # The lxml import is exercised against the in-memory FAT ramfs VFS via
+    # xmlInitParser().
     lxml_snippet = (
         "try:\n"
         "    import lxml.etree\n"
@@ -255,7 +287,7 @@ def stage(args: build_mod.MakeArgs) -> None:
     (staging / "test_hello.py").write_text(
         "import sys\n"
         "print('CPYTHON_TEST_HELLO: Hello from Python', sys.version_info[:2])\n"
-        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + lxml_snippet
+        "print('CPYTHON_TEST_PLATFORM:', sys.platform)\n" + array_snippet + lxml_snippet
     )
 
     # HTTP server smoke-test script must be present in the sysroot before
@@ -333,6 +365,8 @@ def stage_ramfs(
     # Copy sysroot from test staging.
     sysroot_src = paths.test_out()
     sysroot_dst = ramfs_cache
+    if ramfs_img.is_file():
+        ramfs_img.unlink()
     shutil.copytree(sysroot_src, sysroot_dst)
 
     # Create /tmp for tempfile.gettempdir().
@@ -447,6 +481,7 @@ def run_hello(
     args: build_mod.MakeArgs,
     nanvixd_extra: list[str] | None = None,
     ramfs_img: Path | None = None,
+    require_array_so: bool = True,
 ) -> None:
     """Run the hello-world test via nanvixd.
 
@@ -472,6 +507,8 @@ def run_hello(
 
     # Validate output.
     found_hello = False
+    found_array = False
+    found_array_so = False
     found_lxml = False
     for line in output.splitlines():
         if line.startswith("CPYTHON_TEST_"):
@@ -479,6 +516,10 @@ def run_hello(
             print(f"  {tag}: {line.strip()}")
             if tag == "HELLO":
                 found_hello = True
+            elif tag == "ARRAY":
+                found_array = True
+            elif tag == "ARRAY_SO":
+                found_array_so = True
             elif tag in ("LXML", "LXML_SKIP"):
                 found_lxml = True
 
@@ -486,6 +527,16 @@ def run_hello(
         print("  FAIL: Hello test did not produce expected output")
         print(output)
         raise RuntimeError("Hello test did not produce expected output")
+
+    if not found_array:
+        print("  FAIL: Hello test did not exercise array")
+        print(output)
+        raise RuntimeError("Hello test did not exercise array")
+
+    if require_array_so and not found_array_so:
+        print("  FAIL: Hello test did not load array as a shared module")
+        print(output)
+        raise RuntimeError("Hello test did not load array as a shared module")
 
     if not found_lxml:
         # lxml staging is best-effort — if the runtime package was not
@@ -759,19 +810,23 @@ def run_all(
     """
     staging = paths.test_out()
     print("Running CPython tests on Nanvix...")
+    require_array_so = True
 
     if config.IS_WINDOWS:
+        release_marker = staging / _DOWNLOADED_RELEASE_MARKER
+        downloaded_release = release_marker.is_file()
         python = staging / "bin" / config.python_binary()
         if os.environ.get("CI") is not None and not python.is_file():
             raise FileNotFoundError(
                 f"Windows test artifact is missing the SDK-built interpreter: {python}"
             )
-        if os.environ.get("CI") is not None:
-            stage(args)
         if os.environ.get("CI") is None and not python.is_file():
             print("Downloading release artifacts for local Windows testing...")
             _download_release_as_cache(args)
-            stage(args)
+            downloaded_release = True
+        require_array_so = not downloaded_release
+        stage(args, require_array_so=require_array_so)
+        if downloaded_release:
             stage_ramfs(args)
 
     lxml_mod.stage_lxml_runtime(staging)
@@ -782,6 +837,7 @@ def run_all(
         args,
         nanvixd_extra=nanvixd_extra,
         ramfs_img=ramfs_img,
+        require_array_so=require_array_so,
     )
 
     # HTTP server smoke test.
