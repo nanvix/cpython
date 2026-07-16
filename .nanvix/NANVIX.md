@@ -28,9 +28,6 @@ This document describes the port of [CPython](https://www.python.org/) interpret
 - OpenSSL 3.5.0
 - SQLite 3.49.0
 - libffi 3.4.6
-- libxml2 2.12.9
-- libxslt 1.1.42
-- lxml 5.3.0
 - xz 5.2.5
 
 ---
@@ -233,7 +230,7 @@ cd .nanvix/out/test && \
 
 ### Test Suite Status
 
-The `./z test` target runs **160 CPython stdlib test modules** on Nanvix
+The `./z test` target runs **159 CPython stdlib test modules** on Nanvix
 (i686, microvm, 256 MB RAM). Tests are split into batches of 4 modules
 per VM invocation to stay within per-process memory limits.
 
@@ -244,7 +241,7 @@ runner (`python -m test`). A `/tmp` directory is created on the ramfs so
 
 | Metric | Value |
 |--------|-------|
-| **Modules enabled** | 160 |
+| **Modules enabled** | 159 |
 | **Tests passed** | All supported tests |
 | **Tests skipped** | Unsupported Nanvix facilities use explicit skip reasons |
 | **Tests failed** | 0 |

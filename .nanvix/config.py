@@ -239,8 +239,6 @@ NANVIX_TEST_LIST: list[str] = [
     # #323 wave 8 — regex and plistlib
     "test_re",
     "test_plistlib",
-    # #600 — lxml built-in smoke test
-    "test_nanvix_lxml",
     # #526 — _lzma stdlib enablement
     "test_lzma",
     # #327 — network and protocol tests (IPv4 only; IPv6 disabled)
@@ -337,8 +335,8 @@ SYSROOT_TRIM_DIRS: list[str] = [
     "lib/pkgconfig",
 ]
 
-# site-packages is no longer trimmed because lxml runtime files may be
-# installed there by downstream packaging.  When the directory is empty
+# site-packages is not trimmed because downstream third-party packages may
+# install runtime files there. When the directory is empty
 # it remains harmlessly on disk (ramfs.trim_sysroot only removes empty
 # bin/).  To force-trim site-packages for minimal images, add the path
 # back into SYSROOT_TRIM_DIRS above.

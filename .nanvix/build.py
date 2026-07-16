@@ -22,7 +22,7 @@ from nanvix_zutil import paths
 import _docker as docker_mod
 import _test as test_mod
 import config
-import lxml as lxml_mod
+import setup_local as setup_local_mod
 
 
 @dataclass
@@ -100,7 +100,7 @@ def build(
         buildroot_for_setup = (
             Path(config.DOCKER_BUILDROOT_PATH) if _args.docker else args.buildroot
         )
-        lxml_mod.generate_setup_local(paths.repo_root(), buildroot_for_setup)
+        setup_local_mod.generate_setup_local(paths.repo_root(), buildroot_for_setup)
         _args.run(cwd=paths.repo_root())
         install(dest_dir, args)
 
