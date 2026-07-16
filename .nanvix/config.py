@@ -314,7 +314,6 @@ STANDALONE_EXCLUDE: list[str] = [
 # Platform-specific nanvixd extra arguments.
 PLATFORM_NANVIXD_ARGS: dict[str, list[str]] = {
     "microvm": [],
-    "hyperlight": [],
 }
 
 # ---------------------------------------------------------------------------
