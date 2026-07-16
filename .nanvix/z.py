@@ -20,7 +20,6 @@ Options:
                         it. Works on both Linux and Windows.
 """
 
-import os
 import shutil
 import tarfile
 import zipfile
@@ -59,9 +58,6 @@ _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
 # CPython embeds --prefix into the binary (sys.prefix, sys.path).
 _DEFAULT_INSTALL_PREFIX = config.DEFAULT_INSTALL_PREFIX
 
-# Config key for persisting the --with-nanvix path in env.json.
-_CFG_LOCAL_NANVIX = "local_nanvix_path"
-
 
 class CPythonBuild(ZScript):
     """Build script for nanvix/cpython."""
@@ -97,53 +93,6 @@ class CPythonBuild(ZScript):
             }
         )
         return docker
-
-    # ---- Local Nanvix overlay --------------------------------------------
-
-    def _overlay_local_nanvix(self) -> None:
-        """Re-overlay local Nanvix runtime binaries into the runtime sysroot.
-
-        Called before build/test/release so that local changes are
-        picked up even after the initial ``setup()`` run.  Reads the
-        ``WITH_NANVIX`` environment variable (set by ``z.sh``) or falls
-        back to the path persisted in ``.nanvix/env.json``.
-
-        Build-time headers and libraries intentionally remain owned by the SDK
-        and dependency buildroot.
-        """
-        nanvix_path = os.environ.get("WITH_NANVIX") or self.config.get(
-            _CFG_LOCAL_NANVIX, ""
-        )
-        if not nanvix_path:
-            return
-
-        nanvix_path = os.path.abspath(os.path.expanduser(nanvix_path))
-        if not os.path.isdir(nanvix_path):
-            log.warning(f"--with-nanvix path no longer exists: {nanvix_path}")
-            return
-
-        # Persist so subsequent commands reuse the same path.
-        if self.config.get(_CFG_LOCAL_NANVIX, "") != nanvix_path:
-            self.config.set(_CFG_LOCAL_NANVIX, nanvix_path)
-            self.config.save()
-
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot:
-            return
-
-        source = Path(nanvix_path) / "bin"
-        if not source.is_dir():
-            log.warning(f"No bin/ runtime artifacts found in {nanvix_path}")
-            return
-
-        destination = Path(sysroot) / "bin"
-        destination.mkdir(parents=True, exist_ok=True)
-        count = 0
-        for artifact in source.iterdir():
-            if artifact.is_file():
-                shutil.copy2(artifact, destination / artifact.name)
-                count += 1
-        log.info(f"Overlaid {count} local runtime artifact(s) from {nanvix_path}")
 
     # ---- Common helpers --------------------------------------------------
 
@@ -197,10 +146,6 @@ class CPythonBuild(ZScript):
         """
         # Base class handles: sysroot download, WITH_NANVIX overlay,
         # dependency installation, Windows binaries, and verification.
-        if self._with_nanvix_path:
-            local_nanvix = os.path.abspath(os.path.expanduser(self._with_nanvix_path))
-            self.config.set(_CFG_LOCAL_NANVIX, local_nanvix)
-
         used_fallback = super().setup()
         sysroot = self.config.get(CFG_SYSROOT, "")
         if sysroot:
@@ -211,14 +156,11 @@ class CPythonBuild(ZScript):
                     shutil.rmtree(path)
 
         self._install_lxml_runtime_payload()
-        self._overlay_local_nanvix()
         self.config.save()
         return used_fallback
 
     def build(self) -> None:
         """Cross-compile python.elf and libpython.a for Nanvix."""
-        self._overlay_local_nanvix()
-
         # Two separate builds: first release -> out/release/, then test -> out/test/.
         build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
         args = self._make_args(release=True, with_docker=True)
@@ -240,7 +182,6 @@ class CPythonBuild(ZScript):
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
-        self._overlay_local_nanvix()
         args = self._make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
 
@@ -250,7 +191,6 @@ class CPythonBuild(ZScript):
 
     def benchmark(self) -> None:
         """Run hello-world benchmark with a release-style ramfs."""
-        self._overlay_local_nanvix()
         nanvixd_extra = ["-allow-host-networking"]
         args = self._make_args(release=False)
         test_mod.run_benchmark(
