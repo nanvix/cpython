@@ -41,6 +41,7 @@ TARGET_CXX := $(SDK_BIN)/clang++ --target=$(NANVIX_TARGET_TRIPLE)
 TARGET_AR := $(SDK_BIN)/llvm-ar
 TARGET_RANLIB := $(SDK_BIN)/llvm-ranlib
 TARGET_STRIP := $(SDK_BIN)/llvm-strip
+COMPILER_RT_BUILTINS := $(shell $(TARGET_CC) --print-libgcc-file-name)
 
 DEPENDENCY_CPPFLAGS := -I$(NANVIX_BUILDROOT)/include
 DEPENDENCY_LDFLAGS := -L$(NANVIX_BUILDROOT)/lib
@@ -61,8 +62,8 @@ CONFIGURE_ENV = \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
 	LDFLAGS="$(DEPENDENCY_LDFLAGS) -Wl,--export-dynamic" \
 	LINKFORSHARED="-Wl,-pie,--export-dynamic,--no-dynamic-linker,-z,notext,-z,norelro,--hash-style=sysv" \
-	LDSHARED="$(TARGET_CC) -shared -Wl,--no-as-needed,-z,now,-rpath,/lib,-Bdynamic -L$(NANVIX_SDK_ROOT)/lib -l:libc.so -l:libm.so -Wl,-Bstatic" \
-	LDCXXSHARED="$(TARGET_CXX) -shared -Wl,--no-as-needed,-z,now,-rpath,/lib,-Bdynamic -L$(NANVIX_SDK_ROOT)/lib -l:libc.so -l:libm.so -Wl,-Bstatic" \
+	LDSHARED="$(TARGET_CC) -shared -nostdlib -Wl,-z,now,--no-dynamic-linker" \
+	LDCXXSHARED="$(TARGET_CXX) -shared -nostdlib -Wl,-z,now,--no-dynamic-linker" \
 	LIBS="$(DEPENDENCY_LIBS)" \
 	LIBSQLITE3_LIBS="$(DEPENDENCY_LDFLAGS) -lsqlite3" \
 	LIBSQLITE3_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
@@ -135,16 +136,15 @@ $(CONFIGURED_MARKER): Makefile.nanvix
 	touch $@
 
 build: $(CONFIGURED_MARKER)
-	$(MAKE) -j$$(nproc) all
+	$(MAKE) -j$$(nproc) COMPILER_RT_BUILTINS="$(COMPILER_RT_BUILTINS)" all
 	@if [ -f python ]; then cp -f python python$(EXE); fi
 	@test -f python$(EXE)
 	$(TARGET_STRIP) --strip-all python$(EXE)
 
 install: build
-	$(MAKE) install DESTDIR="$(DESTDIR)"
-	mkdir -p "$(DESTDIR)/lib"
-	cp -f "$(NANVIX_SDK_ROOT)/lib/libc.so" "$(DESTDIR)/lib/libc.so"
-	cp -f "$(NANVIX_SDK_ROOT)/lib/libm.so" "$(DESTDIR)/lib/libm.so"
+	$(MAKE) COMPILER_RT_BUILTINS="$(COMPILER_RT_BUILTINS)" install DESTDIR="$(DESTDIR)"
+	find "$(DESTDIR)$(INSTALL_PREFIX)/lib/python3.12/lib-dynload" \
+		-type f -name '*.so' -exec $(TARGET_STRIP) --strip-all {} +
 
 clean:
 	find . -path './.nanvix' -prune -o -type d -name '__pycache__' \
