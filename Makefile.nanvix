@@ -57,9 +57,12 @@ CONFIGURE_ENV = \
 	RANLIB="$(TARGET_RANLIB)" \
 	STRIP="$(TARGET_STRIP)" \
 	CPPFLAGS="$(DEPENDENCY_CPPFLAGS)" \
-	CFLAGS="-O3 -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables" \
+	CFLAGS="-O3 -fPIE -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables" \
 	CFLAGS_NODIST="-fno-semantic-interposition" \
-	LDFLAGS="$(DEPENDENCY_LDFLAGS) -static -Wl,--export-dynamic" \
+	LDFLAGS="$(DEPENDENCY_LDFLAGS) -Wl,--export-dynamic" \
+	LINKFORSHARED="-Wl,-pie,--export-dynamic,--no-dynamic-linker,-z,notext,-z,norelro,--hash-style=sysv" \
+	LDSHARED="$(TARGET_CC) -shared -Wl,--no-as-needed,-z,now,-rpath,/lib,-Bdynamic -L$(NANVIX_SDK_ROOT)/lib -l:libc.so -l:libm.so -Wl,-Bstatic" \
+	LDCXXSHARED="$(TARGET_CXX) -shared -Wl,--no-as-needed,-z,now,-rpath,/lib,-Bdynamic -L$(NANVIX_SDK_ROOT)/lib -l:libc.so -l:libm.so -Wl,-Bstatic" \
 	LIBS="$(DEPENDENCY_LIBS)" \
 	LIBSQLITE3_LIBS="$(DEPENDENCY_LDFLAGS) -lsqlite3" \
 	LIBSQLITE3_CFLAGS="$(DEPENDENCY_CPPFLAGS)" \
@@ -120,7 +123,8 @@ all: build
 
 configure: $(CONFIGURED_MARKER)
 
-$(CONFIGURED_MARKER):
+$(CONFIGURED_MARKER): Makefile.nanvix
+	$(MAKE) -f Makefile.nanvix clean
 	@grep -Eq '"sdk_version"[[:space:]]*:[[:space:]]*"$(NANVIX_SDK_VERSION)"' $(SDK_MANIFEST) || { \
 		echo "SDK version mismatch in $(SDK_MANIFEST)"; exit 1; \
 	}
@@ -138,6 +142,9 @@ build: $(CONFIGURED_MARKER)
 
 install: build
 	$(MAKE) install DESTDIR="$(DESTDIR)"
+	mkdir -p "$(DESTDIR)/lib"
+	cp -f "$(NANVIX_SDK_ROOT)/lib/libc.so" "$(DESTDIR)/lib/libc.so"
+	cp -f "$(NANVIX_SDK_ROOT)/lib/libm.so" "$(DESTDIR)/lib/libm.so"
 
 clean:
 	find . -path './.nanvix' -prune -o -type d -name '__pycache__' \
