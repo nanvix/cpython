@@ -140,16 +140,13 @@ SETUP_LOCAL_ENTRIES: tuple[SetupEntry, ...] = (
     # import their C APIs while a shared object initializes, which Nanvix cannot
     # nest safely yet.
     SetupEntry(
-        name="_asyncio",
+        name="_decimal",
         linkage=Linkage.SHARED,
-        tokens=("_asynciomodule.c",),
+        tokens=("_decimal/_decimal.c",),
         section_header=(
             "Modules with bundled CPython dependencies. Each extension keeps "
             "its vendored archive, matching the upstream build."
         ),
-    ),
-    SetupEntry(
-        name="_decimal", linkage=Linkage.SHARED, tokens=("_decimal/_decimal.c",)
     ),
     SetupEntry(name="_elementtree", linkage=Linkage.SHARED, tokens=("_elementtree.c",)),
     SetupEntry(
@@ -203,6 +200,12 @@ SETUP_LOCAL_ENTRIES: tuple[SetupEntry, ...] = (
             "_blake2/blake2b_impl.c",
             "_blake2/blake2s_impl.c",
         ),
+    ),
+    SetupEntry(
+        name="_asyncio",
+        linkage=Linkage.SHARED,
+        tokens=("_asynciomodule.c",),
+        section_header="POSIX wrappers and concurrency primitives.",
     ),
     SetupEntry(name="select", linkage=Linkage.SHARED, tokens=("selectmodule.c",)),
     SetupEntry(name="_socket", linkage=Linkage.SHARED, tokens=("socketmodule.c",)),
