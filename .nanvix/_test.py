@@ -340,7 +340,7 @@ def stage(args: build_mod.MakeArgs) -> None:
         "assert '_elementtree' not in sys.builtin_module_names\n"
         "assert 'pyexpat' in sys.builtin_module_names\n"
         "import encodings.gb2312\n"
-        "assert '中文'.encode('gb2312') == b'\\xd6\\xd0\\xce\\xc4'\n"
+        "assert '\\u4e2d\\u6587'.encode('gb2312') == b'\\xd6\\xd0\\xce\\xc4'\n"
         "assert '_codecs_cn' not in sys.builtin_module_names\n"
         "assert '_multibytecodec' in sys.builtin_module_names\n"
         "print('CPYTHON_TEST_NESTED_IMPORTS: static C API anchors OK')\n"
