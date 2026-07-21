@@ -10,75 +10,18 @@ build/install/clean targets from common.mk. Constructs and executes
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import dataclasses
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from nanvix_zutil import paths
 
-import _docker as docker_mod
-import _test as test_mod
-import config
-import lxml as lxml_mod
-
-
-@dataclass
-class MakeArgs:
-    """
-    Common arguments passed to Makefile.nanvix.
-    """
-
-    release: bool
-    targets: list[str]
-    platform: str = config.DEFAULT_PLATFORM
-    process_mode: str = config.DEFAULT_PROCESS_MODE
-    memory_size: str = config.DEFAULT_MEMORY_SIZE
-    install_prefix: str = config.DEFAULT_INSTALL_PREFIX
-    sysroot: Path = field(default_factory=lambda: paths.sysroot())
-    buildroot: Path = field(default_factory=lambda: paths.sysroot())
-    run_fn: Any = None
-    docker: bool = False
-
-    def to_list(self) -> list[str]:
-        """Convert to a list suitable to pass to a process runner."""
-        buildroot = (
-            config.DOCKER_SYSROOT_PATH if self.docker else self.buildroot.resolve()
-        )
-        return [
-            "make",
-            "-f",
-            "Makefile.nanvix",
-            f"CONFIG_NANVIX=y",
-            f"NANVIX_SDK_ROOT={config.DOCKER_SDK_PATH}",
-            f"NANVIX_BUILDROOT={buildroot}",
-            f"PLATFORM={self.platform}",
-            f"PROCESS_MODE={self.process_mode}",
-            f"MEMORY_SIZE={self.memory_size}",
-            f"INSTALL_PREFIX={self.install_prefix}",
-            f"NANVIX_RELEASE={'yes' if self.release else 'no'}",
-            *self.targets,
-        ]
-
-    def to_string(self) -> str:
-        import shlex
-
-        return shlex.join(self.to_list())
-
-    def run(self, *, cwd: Path | None = None):
-        """Execute a make command.
-        Args:
-            cwd: Working directory.
-        """
-        if self.run_fn:
-            self.run_fn(*self.to_list(), cwd=cwd)
-        else:
-            subprocess.run(self.to_list(), cwd=cwd, check=True)
-
-    def asset_prefix(self) -> str:
-        return f"cpython-{self.platform}-{self.process_mode}-{self.memory_size}"
+import src._docker as docker_mod
+import src.test as test_mod
+import src.config as config
+import src.lxml as lxml_mod
+from src.lib import MakeArgs
 
 
 def build(

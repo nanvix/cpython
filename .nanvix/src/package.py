@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
-import config
-import ramfs as ramfs_mod
+import src.config as config
+import src.ramfs as ramfs_mod
 from nanvix_zutil import paths
 
 

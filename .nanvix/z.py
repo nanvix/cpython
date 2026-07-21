@@ -28,22 +28,20 @@ from pathlib import Path
 
 from nanvix_zutil import paths
 
-import _test as test_mod
-import build as build_mod
-import lxml as lxml_mod
-import config
-import package as package_mod
-import ramfs as ramfs_mod
+import src.test as test_mod
+import src.build as build_mod
+import src.lxml as lxml_mod
+import src.config as config
+import src.package as package_mod
+import src.ramfs as ramfs_mod
 from nanvix_zutil import (
-    CFG_SYSROOT,
     DockerConfig,
     EXIT_INVALID_ARGS,
-    EXIT_MISSING_DEP,
-    ZScript,
     log,
-    run,
 )
 from nanvix_zutil.paths import nanvix_root
+
+from src.lib import CFG_LOCAL_NANVIX, LibMixin
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -56,26 +54,9 @@ _MAKE_VAR_PROCESS_MODE = "PROCESS_MODE"
 _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
 _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
 
-# CPython embeds --prefix into the binary (sys.prefix, sys.path).
-_DEFAULT_INSTALL_PREFIX = config.DEFAULT_INSTALL_PREFIX
 
-# Config key for persisting the --with-nanvix path in env.json.
-_CFG_LOCAL_NANVIX = "local_nanvix_path"
-
-
-class CPythonBuild(ZScript):
+class CPythonBuild(LibMixin):
     """Build script for nanvix/cpython."""
-
-    SYSROOT_REQUIRED_FILES: tuple[str, ...] = (
-        "bin/nanvixd.elf",
-        "bin/kernel.elf",
-        "bin/mkramfs.elf",
-    )
-    SYSROOT_REQUIRED_FILES_WINDOWS: tuple[str, ...] = (
-        "bin/nanvixd.exe",
-        "bin/kernel.elf",
-        "bin/mkramfs.exe",
-    )
 
     def docker_config(self, image: str) -> DockerConfig:
         """Configure the immutable SDK container and repository-local temp paths."""
@@ -98,104 +79,13 @@ class CPythonBuild(ZScript):
         )
         return docker
 
-    # ---- Local Nanvix overlay --------------------------------------------
-
-    def _overlay_local_nanvix(self) -> None:
-        """Re-overlay local Nanvix runtime binaries into the runtime sysroot.
-
-        Called before build/test/release so that local changes are
-        picked up even after the initial ``setup()`` run.  Reads the
-        ``WITH_NANVIX`` environment variable (set by ``z.sh``) or falls
-        back to the path persisted in ``.nanvix/env.json``.
-
-        Build-time headers and libraries intentionally remain owned by the SDK
-        and the sysroot.
-        """
-        nanvix_path = os.environ.get("WITH_NANVIX") or self.config.get(
-            _CFG_LOCAL_NANVIX, ""
-        )
-        if not nanvix_path:
-            return
-
-        nanvix_path = os.path.abspath(os.path.expanduser(nanvix_path))
-        if not os.path.isdir(nanvix_path):
-            log.warning(f"--with-nanvix path no longer exists: {nanvix_path}")
-            return
-
-        # Persist so subsequent commands reuse the same path.
-        if self.config.get(_CFG_LOCAL_NANVIX, "") != nanvix_path:
-            self.config.set(_CFG_LOCAL_NANVIX, nanvix_path)
-            self.config.save()
-
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot:
-            return
-
-        source = Path(nanvix_path) / "bin"
-        if not source.is_dir():
-            log.warning(f"No bin/ runtime artifacts found in {nanvix_path}")
-            return
-
-        destination = Path(sysroot) / "bin"
-        destination.mkdir(parents=True, exist_ok=True)
-        count = 0
-        for artifact in source.iterdir():
-            if artifact.is_file():
-                shutil.copy2(artifact, destination / artifact.name)
-                count += 1
-        log.info(f"Overlaid {count} local runtime artifact(s) from {nanvix_path}")
-
-    # ---- Common helpers --------------------------------------------------
-
-    def _get_host_sysroot(self) -> Path:
-        """Return the configured runtime sysroot host path."""
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot:
-            log.fatal(
-                f"{CFG_SYSROOT} is not set.",
-                code=EXIT_MISSING_DEP,
-                hint="Run `./z setup` first to download the sysroot.",
-            )
-        return Path(sysroot)
-
-    def _make_args(
-        self,
-        *targets: str,
-        release: bool = False,
-        with_docker: bool = False,
-    ) -> build_mod.MakeArgs:
-        """Build the make argument list for configure/build/install.
-
-        Docker is build-only (see zutils#224 / #666). Callers other than
-        ``build()`` MUST leave ``with_docker=False``; ``self.docker`` is
-        ignored for those steps.
-        """
-        sysroot = self._get_host_sysroot()
-        use_docker = with_docker and self.docker is not None
-        return build_mod.MakeArgs(
-            sysroot=sysroot,
-            buildroot=paths.sysroot(),
-            targets=list(targets),
-            platform=self.config.machine,
-            process_mode=self.config.deployment_mode,
-            memory_size=self.config.memory_size,
-            install_prefix=_DEFAULT_INSTALL_PREFIX,
-            release=release,
-            docker=use_docker,
-            run_fn=(
-                (lambda *args, **kw: run(*args, docker=self.docker, **kw))  # type: ignore[assignment]
-                if use_docker
-                else None
-            ),
-        )
-
     def setup(self) -> bool:
         """Download the Nanvix sysroot and dependencies."""
         # Base class handles: sysroot download, WITH_NANVIX overlay,
         # dependency installation, Windows binaries, and verification.
         if self._with_nanvix_path:
             local_nanvix = os.path.abspath(os.path.expanduser(self._with_nanvix_path))
-            self.config.set(_CFG_LOCAL_NANVIX, local_nanvix)
+            self.config.set(CFG_LOCAL_NANVIX, local_nanvix)
 
         used_fallback = super().setup()
         self._install_lxml_runtime_payload()
@@ -209,7 +99,7 @@ class CPythonBuild(ZScript):
 
         # Two separate builds: first release -> out/release/, then test -> out/test/.
         build_mod.clean(preserve_nanvix_root=False, preserve_cache=True)
-        args = self._make_args(release=True, with_docker=True)
+        args = self.make_args(release=True, with_docker=True)
         build_mod.build(args)
         lxml_mod.stage_lxml_runtime(package_mod.sysroot_pkg())
         package_mod.stage()
@@ -221,7 +111,7 @@ class CPythonBuild(ZScript):
 
         # Build for test
         build_mod.clean(preserve_nanvix_root=True, preserve_cache=True)
-        args = self._make_args(release=False, with_docker=True)
+        args = self.make_args(release=False, with_docker=True)
         build_mod.build(args)
         lxml_mod.stage_lxml_runtime(paths.test_out())
         test_mod.stage_ramfs(args)
@@ -229,7 +119,7 @@ class CPythonBuild(ZScript):
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
         self._overlay_local_nanvix()
-        args = self._make_args(release=False)
+        args = self.make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
 
         ramfs_img = paths.test_out() / "cpython-rootfs.img"
@@ -240,7 +130,7 @@ class CPythonBuild(ZScript):
         """Run hello-world benchmark with a release-style ramfs."""
         self._overlay_local_nanvix()
         nanvixd_extra = ["-allow-host-networking"]
-        args = self._make_args(release=False)
+        args = self.make_args(release=False)
         test_mod.run_benchmark(
             args,
             nanvixd_extra=nanvixd_extra,
