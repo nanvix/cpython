@@ -20,12 +20,11 @@ Options:
                         it. Works on both Linux and Windows.
 """
 
-from nanvix_zutil import paths
-
-import src.test as test_mod
+import src.benchmark as benchmark_mod
 
 from src.setup import SetupMixin
 from src.build import BuildMixin
+from src.test import TestMixin
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -39,25 +38,15 @@ _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
 _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
 
 
-class CPythonBuild(SetupMixin, BuildMixin):
+class CPythonBuild(SetupMixin, BuildMixin, TestMixin):
     """Build script for nanvix/cpython."""
-
-    def test(self) -> None:
-        """Run the CPython test suite (hello + regrtest)."""
-        self._overlay_local_nanvix()
-        args = self.make_args(release=False)
-        nanvixd_extra = ["-allow-host-networking"]
-
-        ramfs_img = paths.test_out() / "cpython-rootfs.img"
-
-        test_mod.run_all(args, nanvixd_extra=nanvixd_extra, ramfs_img=ramfs_img)
 
     def benchmark(self) -> None:
         """Run hello-world benchmark with a release-style ramfs."""
         self._overlay_local_nanvix()
         nanvixd_extra = ["-allow-host-networking"]
         args = self.make_args(release=False)
-        test_mod.run_benchmark(
+        benchmark_mod.run_benchmark(
             args,
             nanvixd_extra=nanvixd_extra,
         )
