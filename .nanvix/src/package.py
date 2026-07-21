@@ -31,7 +31,7 @@ def buildroot_pkg() -> Path:
 def stage() -> None:
     """Stage the two archive trees under ``regular_out()`` and ``dev_out()``.
 
-    Must run after ``build_mod.build(args)`` has populated
+    Must run after ``build_mod.run_build(args)`` has populated
     :func:`sysroot_pkg`. Buildroot is curated *before* the sysroot
     install tree is trimmed in-place.
     """
