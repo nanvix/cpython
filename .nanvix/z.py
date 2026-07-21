@@ -35,6 +35,7 @@ from nanvix_zutil import (
 )
 
 from src.setup import SetupMixin
+from src.clean import CleanMixin
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -48,7 +49,7 @@ _MAKE_VAR_MEMORY_SIZE = "MEMORY_SIZE"
 _MAKE_VAR_INSTALL_PREFIX = "INSTALL_PREFIX"
 
 
-class CPythonBuild(SetupMixin):
+class CPythonBuild(SetupMixin, CleanMixin):
     """Build script for nanvix/cpython."""
 
     def docker_config(self, image: str) -> DockerConfig:
@@ -114,10 +115,6 @@ class CPythonBuild(SetupMixin):
             args,
             nanvixd_extra=nanvixd_extra,
         )
-
-    def clean(self) -> None:
-        """Remove build artifacts."""
-        build_mod.clean()
 
 
 if __name__ == "__main__":
