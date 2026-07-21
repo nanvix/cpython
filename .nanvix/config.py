@@ -413,6 +413,16 @@ DOCKER_OUTPUT_FILES: list[str] = [
 IS_WINDOWS = sys.platform == "win32"
 
 
+def requires_isolated_workspace(workspace: Path) -> bool:
+    """Return whether build outputs would collide with case-folded source paths."""
+    if IS_WINDOWS:
+        return True
+    try:
+        return (workspace / "Python").samefile(workspace / "python")
+    except OSError:
+        return False
+
+
 def nanvixd_binary() -> str:
     """Return the nanvixd binary name for the current platform."""
     if IS_WINDOWS:

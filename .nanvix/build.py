@@ -92,9 +92,10 @@ def build(
     """
     _args = dataclasses.replace(args, targets=["build"])
     dest_dir = paths.regular_out() if args.release else paths.test_out()
-    if config.IS_WINDOWS:
-        # Build and install in one Docker invocation, writing directly to
-        # regular_out()/test_out so ``./z test`` needs no further Docker work.
+    if config.requires_isolated_workspace(paths.repo_root()):
+        # Build and install in one Docker invocation on a case-sensitive volume.
+        # This is required on Windows and Windows-mounted WSL worktrees, where
+        # the `python` output collides with CPython's `Python/` source directory.
         docker_mod.docker_build(paths.repo_root(), args, install_destdir=dest_dir)
     else:
         buildroot_for_setup = (
@@ -150,9 +151,11 @@ def clean(preserve_nanvix_root: bool = False, preserve_cache: bool = False) -> N
             shutil.rmtree(paths.out_dir())
             print(f"Removed {paths.out_dir().relative_to(paths.repo_root())}")
 
-    if not config.IS_WINDOWS:
+    if not config.requires_isolated_workspace(paths.repo_root()):
         subprocess.run(
             ["make", "-f", "Makefile.nanvix", "clean"],
             cwd=paths.repo_root(),
             check=False,
         )
+    else:
+        docker_mod.remove_build_volume(paths.repo_root())
