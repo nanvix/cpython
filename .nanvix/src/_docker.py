@@ -18,6 +18,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
+from .lib import MakeArgs
 
 if TYPE_CHECKING:
     import src.build as build_mod
@@ -183,7 +184,7 @@ def sync_sources(
 
 def docker_build(
     workspace: Path,
-    args: build_mod.MakeArgs,
+    args: MakeArgs,
     *,
     install_destdir: Path | None = None,
 ) -> None:
