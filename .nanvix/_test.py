@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 from pathlib import Path
 import urllib.request
@@ -355,30 +356,30 @@ def stage_ramfs(
     Returns the path to the ramfs image.
     """
     ramfs_img = paths.test_out() / "cpython-rootfs.img"
-    ramfs_cache = paths.out_dir() / "_ramfs_cache"
-
-    # Build fresh ramfs.
-    paths.out_dir().mkdir(parents=True, exist_ok=True)
-    if ramfs_cache.exists():
-        shutil.rmtree(ramfs_cache)
-
-    # Copy sysroot from test staging.
-    sysroot_src = paths.test_out()
-    sysroot_dst = ramfs_cache
     if ramfs_img.is_file():
         ramfs_img.unlink()
-    shutil.copytree(sysroot_src, sysroot_dst)
 
-    # Create /tmp for tempfile.gettempdir().
-    (sysroot_dst / "tmp").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="cpython_test_ramfs_") as temporary:
+        staging_dir = Path(temporary).resolve()
+        output_dir = paths.out_dir().resolve()
+        if staging_dir.is_relative_to(output_dir):
+            raise RuntimeError(
+                f"test rootfs scratch directory {staging_dir} must be outside "
+                f"out_dir {output_dir}"
+            )
+        sysroot_dst = staging_dir / "rootfs"
+        shutil.copytree(paths.test_out(), sysroot_dst)
 
-    # Trim and build ramfs image (keep tests for test pipeline).
-    ramfs_mod.trim_and_build(
-        ramfs_cache,
-        args.sysroot,
-        ramfs_img,
-        keep_tests=True,
-    )
+        # Create /tmp for tempfile.gettempdir().
+        (sysroot_dst / "tmp").mkdir(exist_ok=True)
+
+        # Trim and build ramfs image (keep tests for test pipeline).
+        ramfs_mod.trim_and_build(
+            sysroot_dst,
+            args.sysroot,
+            ramfs_img,
+            keep_tests=True,
+        )
 
     return ramfs_img
 

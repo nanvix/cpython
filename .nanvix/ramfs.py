@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from nanvix_zutil import paths
@@ -115,12 +116,21 @@ def build_image(
     # Create a temporary image, then move it into place. Prevents cycles.
     if not staging.is_dir():
         raise FileNotFoundError(f"{staging} does not exist")
-    prog = [str(mkramfs), "-o", str(paths.out_dir() / "tmp.img"), str(staging)]
-    subprocess.run(
-        prog,
-        check=True,
-    )
-    shutil.move(paths.out_dir() / "tmp.img", output)
+    with tempfile.TemporaryDirectory(prefix="cpython_ramfs_") as temporary:
+        temporary_image = Path(temporary) / "ramfs.img"
+        scratch_dir = temporary_image.parent.resolve()
+        output_dir = paths.out_dir().resolve()
+        if scratch_dir.is_relative_to(output_dir):
+            raise RuntimeError(
+                f"ramfs scratch directory {scratch_dir} must be outside "
+                f"out_dir {output_dir}"
+            )
+        prog = [str(mkramfs), "-o", str(temporary_image), str(staging)]
+        subprocess.run(
+            prog,
+            check=True,
+        )
+        shutil.move(temporary_image, output)
 
     size = output.stat().st_size
     human = _human_size(size)

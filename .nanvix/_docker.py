@@ -1,7 +1,7 @@
 # Copyright(c) The Maintainers of Nanvix.
 # Licensed under the MIT License.
 
-"""Docker host mode for Windows cross-compilation.
+"""Isolated Docker mode for case-insensitive host workspaces.
 
 Replaces docker-host.mk and sync-sources.sh. Handles tar-based source
 sync, CRLF normalization, named Docker volume management, and container
@@ -14,6 +14,7 @@ import dataclasses
 import hashlib
 import os
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,15 +25,65 @@ if TYPE_CHECKING:
 import config
 
 
+def _workspace_volume_key(path: str) -> str:
+    """Normalize equivalent native Windows and WSL workspace paths."""
+    forward = path.replace("\\", "/")
+    if len(forward) >= 2 and forward[1] == ":":
+        drive = forward[0].lower()
+        rest = forward[2:].lstrip("/")
+        return f"/mnt/{drive}/{rest}".casefold()
+    parts = forward.split("/")
+    if len(parts) >= 4 and parts[1].casefold() == "mnt" and len(parts[2]) == 1:
+        drive = parts[2].lower()
+        rest = "/".join(parts[3:])
+        return f"/mnt/{drive}/{rest}".casefold()
+    return forward
+
+
 def _workspace_id(workspace: Path) -> str:
     """Generate a deterministic volume suffix from the workspace path."""
     # Use a short hash to match the old cksum-based approach.
-    h = hashlib.md5(str(workspace.resolve()).encode()).hexdigest()[:8]
+    key = _workspace_volume_key(str(workspace.resolve()))
+    h = hashlib.md5(key.encode()).hexdigest()[:8]
     return h
 
 
 def _volume_name(workspace: Path) -> str:
     return f"cpython-nanvix-build-{_workspace_id(workspace)}"
+
+
+def _volume_aliases(workspace: Path) -> set[str]:
+    """Return Docker volume names for native Windows and WSL views of a checkout."""
+    current = str(workspace.resolve())
+    workspace_paths = {current}
+    forward = current.replace("\\", "/")
+    if len(forward) >= 2 and forward[1] == ":":
+        drive = forward[0].lower()
+        workspace_paths.add(f"/mnt/{drive}/{forward[2:].lstrip('/')}")
+    else:
+        parts = forward.split("/")
+        if len(parts) >= 4 and parts[1] == "mnt" and len(parts[2]) == 1:
+            workspace_paths.add(f"{parts[2].upper()}:\\" + "\\".join(parts[3:]))
+    canonical_paths = {_workspace_volume_key(path) for path in workspace_paths}
+    workspace_paths.update(canonical_paths)
+    return {
+        f"cpython-nanvix-build-{hashlib.md5(path.encode()).hexdigest()[:8]}"
+        for path in workspace_paths
+    }
+
+
+def remove_build_volume(workspace: Path) -> None:
+    """Remove the persistent isolated build workspace when it exists."""
+    if shutil.which("docker") is None:
+        return
+    for volume in sorted(_volume_aliases(workspace)):
+        inspect = subprocess.run(
+            ["docker", "volume", "inspect", volume],
+            capture_output=True,
+            check=False,
+        )
+        if inspect.returncode == 0:
+            subprocess.run(["docker", "volume", "rm", "--force", volume], check=False)
 
 
 def _docker_mount_source(path: Path) -> str:
@@ -62,14 +113,11 @@ def _docker_run_base(
 ) -> list[str]:
     """Build the common ``docker run`` prefix."""
     volume = _volume_name(workspace)
-    uid = getattr(os, "getuid", lambda: 1000)()
-    gid = getattr(os, "getgid", lambda: 1000)()
-    return [
+    # A fresh Windows named volume is root-owned; the image user must initialize it.
+    command = [
         "docker",
         "run",
         "--rm",
-        "--user",
-        f"{uid}:{gid}",
         "-v",
         f"{volume}:{config.DOCKER_WORKSPACE_PATH}",
         "-v",
@@ -84,8 +132,21 @@ def _docker_run_base(
         f"HOME={config.DOCKER_WORKSPACE_PATH}/.nanvix/container-home",
         "-e",
         f"TMPDIR={config.DOCKER_WORKSPACE_PATH}/.nanvix/container-tmp",
-        image,
     ]
+    if hasattr(os, "getuid") and hasattr(os, "getgid"):
+        command.extend(
+            ["-e", f"HOST_UID={os.getuid()}", "-e", f"HOST_GID={os.getgid()}"]
+        )
+    command.append(image)
+    return command
+
+
+def _restore_owner(path: str, *, recursive: bool = False) -> str:
+    option = "-R " if recursive else ""
+    return (
+        'if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then '
+        f'chown {option}"$HOST_UID:$HOST_GID" {shlex.quote(path)} || true; fi'
+    )
 
 
 def sync_sources(
@@ -104,7 +165,7 @@ def sync_sources(
 
     # CRLF normalization commands.
     crlf_cmds = " && ".join(
-        f'[ -f "{build_dir}/{f}" ] && sed -i "s/\\r$//" "{build_dir}/{f}" || true'
+        f'if [ -f "{build_dir}/{f}" ]; then ' f'sed -i "s/\\r$//" "{build_dir}/{f}"; fi'
         for f in config.DOCKER_CRLF_FILES
     )
 
@@ -116,8 +177,7 @@ def sync_sources(
 
     return (
         f"if command -v rsync >/dev/null 2>&1; then {rsync_cmd}; "
-        f"else {tar_cmd}; fi && "
-        f"{crlf_cmds}"
+        f"else {tar_cmd}; fi && {crlf_cmds}"
     )
 
 
@@ -127,7 +187,7 @@ def docker_build(
     *,
     install_destdir: Path | None = None,
 ) -> None:
-    """Run cross-compilation inside Docker (Windows host mode).
+    """Run cross-compilation in an isolated Docker workspace.
 
     Syncs sources into a named Docker volume, runs configure+build,
     and copies outputs back to the host workspace.
@@ -176,7 +236,7 @@ def docker_build(
     )
 
     shell_cmd = (
-        f"{sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
+        f"set -e; {sync} && cd {config.DOCKER_WORKSPACE_PATH} && "
         f"mkdir -p .nanvix/container-home .nanvix/container-tmp && "
         f"{build_inputs_check} && "
         f"{_generate_setup_local_cmd()} && "
@@ -206,24 +266,34 @@ def docker_build(
             f"{_args.install_prefix}/bin/{config.python_binary()}"
         )
         strip_install = (
-            f'[ -x "{strip_bin}" ] && [ -f "{install_bin}" ] && '
+            f'if [ -x "{strip_bin}" ] && [ -f "{install_bin}" ]; then '
             f'"{strip_bin}" --strip-all "{install_bin}" && '
-            f'echo "Stripped installed {config.python_binary()}"'
+            f'echo "Stripped installed {config.python_binary()}"; fi'
         )
 
+        host_dest = f"/mnt/host-workspace/{rel_dest}"
+        host_temporary = f"{host_dest}.tmp"
+        host_backup = f"{host_dest}.old"
         install_copy = (
-            f"rm -rf /mnt/host-workspace/{rel_dest} && "
-            f"mkdir -p /mnt/host-workspace/{rel_dest} && "
-            f"cp -a {config.DOCKER_WORKSPACE_PATH}/_install_staging/* "
-            f"/mnt/host-workspace/{rel_dest}/"
+            f"{{ rm -rf {shlex.quote(host_temporary)} {shlex.quote(host_backup)}; "
+            f"mkdir -p {shlex.quote(host_temporary)}; "
+            f"cp -a {config.DOCKER_WORKSPACE_PATH}/_install_staging/. "
+            f"{shlex.quote(host_temporary)}/; "
+            f"{_restore_owner(host_temporary, recursive=True)}; "
+            f"if [ -e {shlex.quote(host_dest)} ]; then "
+            f"mv {shlex.quote(host_dest)} {shlex.quote(host_backup)}; fi; "
+            f"if mv {shlex.quote(host_temporary)} {shlex.quote(host_dest)}; then "
+            f"rm -rf {shlex.quote(host_backup)}; else copy_rc=$?; "
+            f"if [ -e {shlex.quote(host_backup)} ]; then "
+            f"mv {shlex.quote(host_backup)} {shlex.quote(host_dest)}; fi; "
+            f"exit $copy_rc; fi; }}"
         )
         shell_cmd += (
             f" && {clean_install_staging} && {_args.to_string()}"
-            f" && {strip_install}; rc=$?; "
-            f"{copy_back}; {install_copy}; exit $rc"
+            f" && {strip_install} && {copy_back} && {install_copy}"
         )
     else:
-        shell_cmd += f"; rc=$?; {copy_back}; exit $rc"
+        shell_cmd += f" && {copy_back}"
 
     subprocess.run(
         [*base, "sh", "-c", shell_cmd],
@@ -259,8 +329,11 @@ def _copy_outputs_cmd() -> str:
     """Build shell command to copy build outputs back to host workspace."""
     copies: list[str] = []
     for f in config.DOCKER_OUTPUT_FILES:
+        source = f"{config.DOCKER_WORKSPACE_PATH}/{f}"
+        destination = f"/mnt/host-workspace/{f}"
         copies.append(
-            f"[ -f {config.DOCKER_WORKSPACE_PATH}/{f} ] && "
-            f"cp -f {config.DOCKER_WORKSPACE_PATH}/{f} /mnt/host-workspace/{f}"
+            f"if [ -f {shlex.quote(source)} ] && [ ! -d {shlex.quote(destination)} ]; "
+            f"then cp -f {shlex.quote(source)} {shlex.quote(destination)}; "
+            f"{_restore_owner(destination)}; fi"
         )
-    return " ; ".join(copies)
+    return "{ " + "; ".join(copies) + "; }"
