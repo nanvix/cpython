@@ -38,14 +38,14 @@ class MakeArgs:
     memory_size: str = config.DEFAULT_MEMORY_SIZE
     install_prefix: str = config.DEFAULT_INSTALL_PREFIX
     sysroot: Path = field(default_factory=lambda: paths.sysroot())
-    buildroot: Path = field(default_factory=lambda: paths.buildroot())
+    buildroot: Path = field(default_factory=lambda: paths.sysroot())
     run_fn: Any = None
     docker: bool = False
 
     def to_list(self) -> list[str]:
         """Convert to a list suitable to pass to a process runner."""
         buildroot = (
-            config.DOCKER_BUILDROOT_PATH if self.docker else self.buildroot.resolve()
+            config.DOCKER_SYSROOT_PATH if self.docker else self.buildroot.resolve()
         )
         return [
             "make",
@@ -98,7 +98,7 @@ def build(
         docker_mod.docker_build(paths.repo_root(), args, install_destdir=dest_dir)
     else:
         buildroot_for_setup = (
-            Path(config.DOCKER_BUILDROOT_PATH) if _args.docker else args.buildroot
+            Path(config.DOCKER_SYSROOT_PATH) if _args.docker else args.buildroot
         )
         lxml_mod.generate_setup_local(paths.repo_root(), buildroot_for_setup)
         _args.run(cwd=paths.repo_root())

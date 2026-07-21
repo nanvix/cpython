@@ -47,12 +47,12 @@ def clear_setup_local(repo_root: Path) -> None:
 
 
 def stage_lxml_runtime(pkg_root: Path) -> None:
-    """Copy lxml Python files from buildroot into the test/package sysroot.
+    """Copy lxml Python files from the staging area into the test/package sysroot.
 
-    Looks for lxml in ``.nanvix/buildroot/python-packages/lxml/``.
+    Looks for lxml in ``.nanvix/sysroot/python-packages/lxml/``.
     Skips gracefully when the python-packages directory is not available.
     """
-    lxml_src = paths.nanvix_root() / "buildroot" / "python-packages" / "lxml"
+    lxml_src = paths.nanvix_root() / "sysroot" / "python-packages" / "lxml"
     if not lxml_src.is_dir():
         print(
             f"[lxml] Staged lxml package not found at {lxml_src}; "

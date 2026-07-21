@@ -8,7 +8,7 @@ Usage:
     ./z build      # Cross-compile python.elf and libpython.a
     ./z test       # Run test suite (hello-world on nanvixd.elf)
     ./z benchmark  # Run hello-world benchmark with release ramfs
-    ./z release    # Package release tarballs (sysroot + buildroot)
+    ./z release    # Package release tarballs
     ./z clean      # Remove build artifacts
 
 Options:
@@ -109,7 +109,7 @@ class CPythonBuild(ZScript):
         back to the path persisted in ``.nanvix/env.json``.
 
         Build-time headers and libraries intentionally remain owned by the SDK
-        and dependency buildroot.
+        and the sysroot.
         """
         nanvix_path = os.environ.get("WITH_NANVIX") or self.config.get(
             _CFG_LOCAL_NANVIX, ""
@@ -174,7 +174,7 @@ class CPythonBuild(ZScript):
         use_docker = with_docker and self.docker is not None
         return build_mod.MakeArgs(
             sysroot=sysroot,
-            buildroot=paths.buildroot(),
+            buildroot=paths.sysroot(),
             targets=list(targets),
             platform=self.config.machine,
             process_mode=self.config.deployment_mode,
@@ -190,11 +190,7 @@ class CPythonBuild(ZScript):
         )
 
     def setup(self) -> bool:
-        """Download the Nanvix sysroot and dependencies.
-
-        Downloads a runtime-only sysroot and installs build-time dependencies
-        into the separate buildroot.
-        """
+        """Download the Nanvix sysroot and dependencies."""
         # Base class handles: sysroot download, WITH_NANVIX overlay,
         # dependency installation, Windows binaries, and verification.
         if self._with_nanvix_path:
@@ -202,14 +198,6 @@ class CPythonBuild(ZScript):
             self.config.set(_CFG_LOCAL_NANVIX, local_nanvix)
 
         used_fallback = super().setup()
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if sysroot:
-            sysroot_path = Path(sysroot)
-            for build_dir in ("include", "lib"):
-                path = sysroot_path / build_dir
-                if path.is_dir():
-                    shutil.rmtree(path)
-
         self._install_lxml_runtime_payload()
         self._overlay_local_nanvix()
         self.config.save()
@@ -276,7 +264,7 @@ class CPythonBuild(ZScript):
         return relative
 
     def _install_lxml_runtime_payload(self) -> None:
-        """Install the exact lxml release's Python payload into the buildroot."""
+        """Install the exact lxml release's Python payload into the sysroot staging area."""
         cache_dir = nanvix_root() / "cache"
         # Magic-path naming: lxml-{host}-{arch}-{machine}-{mode}-{mem}-dev.{ext}.
         # Match any host/arch pair for the current machine + memory + mode.
@@ -291,7 +279,7 @@ class CPythonBuild(ZScript):
             )
 
         archive = max(candidates, key=lambda path: path.stat().st_mtime_ns)
-        destination = nanvix_root() / "buildroot" / "python-packages"
+        destination = nanvix_root() / "sysroot" / "python-packages"
         if destination.is_dir():
             shutil.rmtree(destination)
         destination.mkdir(parents=True)
