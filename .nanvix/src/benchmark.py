@@ -18,7 +18,6 @@ class BenchmarkMixin(LibMixin):
 
     def benchmark(self) -> None:
         """Run hello-world benchmark with a release-style ramfs."""
-        self._overlay_local_nanvix()
         self.args = self.make_args(release=False)
         self.run_benchmark(nanvixd_extra=["-allow-host-networking"])
 

@@ -12,7 +12,6 @@ not have to be threaded through every helper signature.
 
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 import subprocess
@@ -23,20 +22,14 @@ from typing import Any
 import src.ramfs as ramfs_mod
 
 from nanvix_zutil import (
-    CFG_SYSROOT,
-    EXIT_MISSING_DEP,
     ZScript,
-    log,
     paths,
     run,
 )
 
 import src.config as config
 
-__all__ = ("CFG_LOCAL_NANVIX", "LibMixin", "MakeArgs")
-
-# Config key for persisting the --with-nanvix path in env.json.
-CFG_LOCAL_NANVIX = "local_nanvix_path"
+__all__ = ("LibMixin", "MakeArgs")
 
 
 @dataclass
@@ -147,10 +140,9 @@ class LibMixin(ZScript):
         ``build()`` MUST leave ``with_docker=False``; ``self.docker`` is
         ignored for those steps.
         """
-        sysroot = self._get_host_sysroot()
         use_docker = with_docker and self.docker is not None
         return MakeArgs(
-            sysroot=sysroot,
+            sysroot=paths.sysroot(),
             buildroot=paths.sysroot(),
             targets=list(targets),
             platform=self.config.machine,
@@ -165,66 +157,6 @@ class LibMixin(ZScript):
                 else None
             ),
         )
-
-    # ------------------------------------------------------------------
-    # Sysroot overlay
-    # ------------------------------------------------------------------
-
-    def _overlay_local_nanvix(self) -> None:
-        """Re-overlay local Nanvix runtime binaries into the runtime sysroot.
-
-        Called before build/test/release so that local changes are
-        picked up even after the initial ``setup()`` run.  Reads the
-        ``WITH_NANVIX`` environment variable (set by ``z.sh``) or falls
-        back to the path persisted in ``.nanvix/env.json``.
-
-        Build-time headers and libraries intentionally remain owned by the SDK
-        and the sysroot.
-        """
-        nanvix_path = os.environ.get("WITH_NANVIX") or self.config.get(
-            CFG_LOCAL_NANVIX, ""
-        )
-        if not nanvix_path:
-            return
-
-        nanvix_path = os.path.abspath(os.path.expanduser(nanvix_path))
-        if not os.path.isdir(nanvix_path):
-            log.warning(f"--with-nanvix path no longer exists: {nanvix_path}")
-            return
-
-        # Persist so subsequent commands reuse the same path.
-        if self.config.get(CFG_LOCAL_NANVIX, "") != nanvix_path:
-            self.config.set(CFG_LOCAL_NANVIX, nanvix_path)
-            self.config.save()
-
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot:
-            return
-
-        source = Path(nanvix_path) / "bin"
-        if not source.is_dir():
-            log.warning(f"No bin/ runtime artifacts found in {nanvix_path}")
-            return
-
-        destination = Path(sysroot) / "bin"
-        destination.mkdir(parents=True, exist_ok=True)
-        count = 0
-        for artifact in source.iterdir():
-            if artifact.is_file():
-                shutil.copy2(artifact, destination / artifact.name)
-                count += 1
-        log.info(f"Overlaid {count} local runtime artifact(s) from {nanvix_path}")
-
-    def _get_host_sysroot(self) -> Path:
-        """Return the configured runtime sysroot host path."""
-        sysroot = self.config.get(CFG_SYSROOT, "")
-        if not sysroot:
-            log.fatal(
-                f"{CFG_SYSROOT} is not set.",
-                code=EXIT_MISSING_DEP,
-                hint="Run `./z setup` first to download the sysroot.",
-            )
-        return Path(sysroot)
 
     # ------------------------------------------------------------------
     # Initrd creation helper (standalone mode)

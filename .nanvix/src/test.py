@@ -35,7 +35,6 @@ class TestMixin(LibMixin):
 
     def test(self) -> None:
         """Run the CPython test suite (hello + regrtest)."""
-        self._overlay_local_nanvix()
         self.args = self.make_args(release=False)
         nanvixd_extra = ["-allow-host-networking"]
         ramfs_img = paths.test_out() / "cpython-rootfs.img"

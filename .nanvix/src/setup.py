@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import tarfile
 import zipfile
@@ -14,7 +13,7 @@ from pathlib import Path
 from nanvix_zutil import log
 from nanvix_zutil.paths import nanvix_root
 
-from src.lib import CFG_LOCAL_NANVIX, LibMixin
+from src.lib import LibMixin
 
 
 class SetupMixin(LibMixin):
@@ -24,13 +23,8 @@ class SetupMixin(LibMixin):
         """Download the Nanvix sysroot and dependencies."""
         # Base class handles: sysroot download, WITH_NANVIX overlay,
         # dependency installation, Windows binaries, and verification.
-        if self._with_nanvix_path:
-            local_nanvix = os.path.abspath(os.path.expanduser(self._with_nanvix_path))
-            self.config.set(CFG_LOCAL_NANVIX, local_nanvix)
-
         used_fallback = super().setup()
         self._install_lxml_runtime_payload()
-        self._overlay_local_nanvix()
         self.config.save()
         return used_fallback
 
