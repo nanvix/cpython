@@ -16,6 +16,7 @@ import os
 import shutil
 import tempfile
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -295,6 +296,99 @@ class LibMixin(ZScript):
         return output
 
     # ------------------------------------------------------------------
+    # nanvixd script runner
+    # ------------------------------------------------------------------
+
+    def run_nanvixd_script(
+        self,
+        staging: Path,
+        script_name: str,
+        *,
+        nanvixd_extra: list[str] | None = None,
+        ramfs_img: Path | None = None,
+        timeout: int = 120,
+        label: str = "script",
+    ) -> tuple[int, str, int]:
+        """Run a Python script on nanvixd and return (returncode, output, elapsed_ms).
+
+        This is the low-level execution primitive shared by the hello-world
+        test and the benchmark.
+        """
+        resolved_extra: list[str] = (
+            nanvixd_extra
+            if nanvixd_extra is not None
+            else config.PLATFORM_NANVIXD_ARGS.get(self.args.platform, [])
+        )
+        # On Windows, CreateProcess searches for the executable relative to the
+        # *parent's* CWD, not the child's cwd. Use an absolute path to avoid this.
+        nanvixd = str((self.args.sysroot / "bin" / config.nanvixd_binary()).resolve())
+
+        if ramfs_img is None:
+            raise ValueError("ramfs_img is required")
+
+        # Copy host tools and daemon ELFs into the staging sysroot.
+        # mkramfs is needed for ramfs generation; mkimage and the daemons
+        # (procd, memd, vfsd) are needed for initrd creation.
+        # Daemons are *guest* binaries — always .elf, even on
+        # Windows.  Only host tools use the platform extension.
+        _staging_bins = [
+            config.mkramfs_binary(),
+            config.mkimage_binary(),
+            "procd.elf",
+            "memd.elf",
+            "vfsd.elf",
+        ]
+        for name in _staging_bins:
+            src = self.args.sysroot / "bin" / name
+            if src.is_file():
+                shutil.copy2(src, staging / "bin" / name)
+
+        # Standalone: bundle python binary with system daemons into an
+        # initrd image.  Env vars are passed via app_env so the kernel's
+        # split_cmdline sees them after the bare ';' separator.
+        bin_dir = staging / "bin"
+        app_path = staging / "bin" / config.python_binary()
+        app_args = ["-B", f"./{script_name}"]
+        app_env = (
+            f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
+            f" _PYTHON_SYSCONFIGDATA_NAME={config.SYSCONFIGDATA_NAME}"
+        )
+        initrd_img = self.create_initrd(
+            bin_dir, app_path, app_args=app_args, app_env=app_env
+        )
+
+        cmd = [
+            nanvixd,
+            "-bin-dir",
+            str(bin_dir),
+            "-ramfs",
+            str(ramfs_img),
+            *resolved_extra,
+            "--",
+            str(initrd_img),
+        ]
+
+        start = time.monotonic()
+        try:
+            result = subprocess.run(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=staging,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"{label} timed out after {timeout}s")
+        finally:
+            if initrd_img.exists():
+                initrd_img.unlink()
+
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+        output = (result.stdout + "\n" + result.stderr).strip()
+        return result.returncode, output, elapsed_ms
+
+    # ------------------------------------------------------------------
     # Staging
     # ------------------------------------------------------------------
 
@@ -452,3 +546,22 @@ class LibMixin(ZScript):
             )
 
         return ramfs_img
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def cleanup(self) -> None:
+        """Clean up transient test artifacts (log files).
+
+        The build output at ``paths.test_out()`` is *not* removed — that is
+        a build artifact owned by ``./z build`` / ``./z clean``.
+        """
+        for name in [
+            "cpython_test.log",
+            "cpython_regrtest.log",
+            "cpython_regrtest_batch.log",
+        ]:
+            p = paths.nanvix_root() / name
+            if p.is_file():
+                p.unlink()
