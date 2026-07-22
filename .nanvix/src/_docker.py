@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import build as build_mod
+    import src.build as build_mod
 
-import config
+import src.config as config
 
 
 def _workspace_volume_key(path: str) -> str:

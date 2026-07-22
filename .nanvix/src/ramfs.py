@@ -16,7 +16,7 @@ from pathlib import Path
 
 from nanvix_zutil import paths
 
-import config
+import src.config as config
 
 
 def trim_sysroot(

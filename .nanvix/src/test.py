@@ -25,10 +25,10 @@ import urllib.request
 
 from nanvix_zutil import paths
 
-import build as build_mod
-import config
-import lxml as lxml_mod
-import ramfs as ramfs_mod
+import src.build as build_mod
+import src.config as config
+import src.lxml as lxml_mod
+import src.ramfs as ramfs_mod
 
 _DOWNLOADED_RELEASE_MARKER = ".downloaded-release"
 
@@ -744,7 +744,7 @@ def run_regrtest(
         else config.PLATFORM_NANVIXD_ARGS.get(args.platform, [])
     )
 
-    run_tests_script = paths.nanvix_root() / "run-tests.py"
+    run_tests_script = paths.nanvix_root() / "src" / "run-tests.py"
 
     env = os.environ.copy()
     env["NANVIX_TEST_BATCH_SIZE"] = str(batch_size)

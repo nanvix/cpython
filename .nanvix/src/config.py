@@ -21,7 +21,7 @@ from typing import cast
 
 def _manifest_sdk_image() -> str:
     """Return the canonical immutable build image from nanvix.toml."""
-    with Path(__file__).with_name("nanvix.toml").open("rb") as manifest_file:
+    with Path(__file__).parent.with_name("nanvix.toml").open("rb") as manifest_file:
         manifest: dict[str, object] = tomllib.load(manifest_file)
     raw_toolchain = manifest.get("toolchain")
     if not isinstance(raw_toolchain, dict):
