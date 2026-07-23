@@ -51,7 +51,6 @@ class BuildMixin(CleanMixin):
 
     def build(self) -> None:
         """Cross-compile python.elf and libpython.a for Nanvix."""
-        self._overlay_local_nanvix()
 
         # Two separate builds: first release -> out/release/, then test -> out/test/.
         self.args = self.make_args(release=True, with_docker=True)
