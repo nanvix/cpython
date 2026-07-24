@@ -7,10 +7,9 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from nanvix_zutil import paths
+from nanvix_zutil import paths, remove_build_volume
 
 import src.config as config
-import src._docker as docker_mod
 
 from src.lib import LibMixin
 
@@ -50,5 +49,7 @@ class CleanMixin(LibMixin):
                 cwd=paths.repo_root(),
                 check=False,
             )
-        else:
-            docker_mod.remove_build_volume(paths.repo_root())
+        elif self.docker is not None:
+            volume = self.docker.volume_name()
+            if volume is not None:
+                remove_build_volume(volume)
