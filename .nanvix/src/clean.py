@@ -49,7 +49,8 @@ class CleanMixin(LibMixin):
                 cwd=paths.repo_root(),
                 check=False,
             )
-        elif self.docker is not None:
-            volume = self.docker.volume_name()
+        else:
+            docker_cfg = self.docker or self.docker_config(config.DOCKER_IMAGE)
+            volume = docker_cfg.volume_name()
             if volume is not None:
                 remove_build_volume(volume)
