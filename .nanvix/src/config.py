@@ -363,6 +363,7 @@ DOCKER_TAR_EXCLUDES: list[str] = [
     ".nanvix/cache",
     ".nanvix/sysroot",
     ".nanvix/buildroot",
+    ".nanvix/out",
     "Doc",
     "Lib/idlelib",
     "Lib/tkinter",
