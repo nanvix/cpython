@@ -158,7 +158,7 @@ class BuildMixin(CleanMixin):
             f"|| true; }}"
         )
         return (
-            f"{build_str} && {strip_build} && rm -rf {staging} && "
+            f"{build_str} && {strip_build} && rm -rf \"{staging}\" && "
             f"{install_str} && {strip_install}"
         )
 
