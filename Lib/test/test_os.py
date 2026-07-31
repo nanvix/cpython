@@ -2372,9 +2372,6 @@ class TestInvalidFD(unittest.TestCase):
                 "Unable to acquire a range of invalid file descriptors")
         self.assertEqual(os.closerange(fd, fd + i-1), None)
 
-    # NSKIP030 https://github.com/nanvix/cpython/issues/510
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP030: os.dup2() accepts invalid fd silently")
     @unittest.skipUnless(hasattr(os, 'dup2'), 'test needs os.dup2()')
     def test_dup2(self):
         self.check(os.dup2, 20)
@@ -2384,9 +2381,6 @@ class TestInvalidFD(unittest.TestCase):
         support.is_emscripten,
         "dup2() with negative fds is broken on Emscripten (see gh-102179)"
     )
-    # NSKIP030 https://github.com/nanvix/cpython/issues/510
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP030: os.dup2() accepts invalid fd silently")
     def test_dup2_negative_fd(self):
         valid_fd = os.open(__file__, os.O_RDONLY)
         self.addCleanup(os.close, valid_fd)
