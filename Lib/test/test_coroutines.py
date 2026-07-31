@@ -2120,8 +2120,6 @@ class CoroutineTest(unittest.TestCase):
         finally:
             aw.close()
 
-    # NSKIP017 https://github.com/nanvix/cpython/issues/485
-    @unittest.skipIf(support.is_nanvix, "NSKIP017: event loop interferes with coro warning in standalone")
     def test_fatal_coro_warning(self):
         # Issue 27811
         async def func(): pass
