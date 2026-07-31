@@ -244,8 +244,6 @@ class UnicodeTest(string_tests.CommonTest,
     # Override of CommonTest.test_adaptive_find — the inherited fixture
     # builds a multi-MB haystack/needle that MemoryErrors on Nanvix's
     # 32 MB sysalloc heap.  See vault findings_standalone.md (wave 3).
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP004: 32-bit integer overflow")  # detail: haystack + needle build trips MemoryError on 32 MB heap
     def test_adaptive_find(self):
         super().test_adaptive_find()
 
@@ -2284,9 +2282,6 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertRaises(ValueError, complex, "\ud800")
         self.assertRaises(ValueError, complex, "\udf00")
 
-    # NSKIP004 https://github.com/nanvix/cpython/issues/472
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP004: 32-bit integer overflow")  # detail: ''.join(map(chr, range(0,0xd800)+...)) MemoryError on 32 MB heap
     def test_codecs(self):
         # Encoding
         self.assertEqual('hello'.encode('ascii'), b'hello')
