@@ -1526,9 +1526,6 @@ class TestPosixDirFd(unittest.TestCase):
             self.addCleanup(posix.unlink, fullname)
             yield (dir_fd, name, fullname)
 
-    # NSKIP039 https://github.com/nanvix/cpython/issues/519
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP039: *at() syscalls return wrong errno with dir_fd on Nanvix")
     @unittest.skipUnless(os.access in os.supports_dir_fd, "test needs dir_fd support for os.access()")
     def test_access_dir_fd(self):
         with self.prepare_file() as (dir_fd, name, fullname):
@@ -1627,9 +1624,6 @@ class TestPosixDirFd(unittest.TestCase):
             self.assertEqual(posix.stat(fullname)[1],
                 posix.stat(fulllinkname)[1])
 
-    # NSKIP039 https://github.com/nanvix/cpython/issues/519
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP039: *at() syscalls return wrong errno with dir_fd on Nanvix")
     @unittest.skipUnless(os.mkdir in os.supports_dir_fd, "test needs dir_fd support in os.mkdir()")
     def test_mkdir_dir_fd(self):
         with self.prepare() as (dir_fd, name, fullname):
@@ -1680,9 +1674,6 @@ class TestPosixDirFd(unittest.TestCase):
             self.addCleanup(posix.unlink, fullname)
             self.assertEqual(posix.readlink(name, dir_fd=dir_fd), 'symlink')
 
-    # NSKIP039 https://github.com/nanvix/cpython/issues/519
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP039: *at() syscalls return wrong errno with dir_fd on Nanvix")
     @unittest.skipUnless(os.rename in os.supports_dir_fd, "test needs dir_fd support in os.rename()")
     def test_rename_dir_fd(self):
         with self.prepare_file() as (dir_fd, name, fullname), \
@@ -1702,9 +1693,6 @@ class TestPosixDirFd(unittest.TestCase):
             self.addCleanup(posix.unlink, fullname)
             self.assertEqual(posix.readlink(fullname), 'symlink')
 
-    # NSKIP039 https://github.com/nanvix/cpython/issues/519
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP039: *at() syscalls return wrong errno with dir_fd on Nanvix")
     @unittest.skipUnless(os.unlink in os.supports_dir_fd, "test needs dir_fd support in os.unlink()")
     def test_unlink_dir_fd(self):
         with self.prepare() as (dir_fd, name, fullname):
