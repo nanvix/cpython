@@ -575,9 +575,6 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'dup'),
                          'test needs posix.dup()')
-    # NSKIP035 https://github.com/nanvix/cpython/issues/515
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP035: os.dup() raises ENOTSUP via fcntl(F_DUPFD_CLOEXEC)")
     @unittest.skipIf(support.is_wasi, "WASI does not have dup()")
     def test_dup(self):
         fp = open(os_helper.TESTFN)
