@@ -192,9 +192,6 @@ class PosixTester(unittest.TestCase):
         finally:
             fp.close()
 
-    # NSKIP037 https://github.com/nanvix/cpython/issues/517
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP037: os.truncate() not supported")
     @unittest.skipUnless(hasattr(posix, 'truncate'), "test needs posix.truncate()")
     def test_truncate(self):
         with open(os_helper.TESTFN, 'w') as fp:
