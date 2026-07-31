@@ -3995,9 +3995,6 @@ class TermsizeTests(unittest.TestCase):
         self.assertGreaterEqual(size.columns, 0)
         self.assertGreaterEqual(size.lines, 0)
 
-    # NSKIP003 https://github.com/nanvix/cpython/issues/471
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP003: no subprocess support")
     def test_stty_match(self):
         """Check if stty returns the same results
 
