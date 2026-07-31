@@ -161,9 +161,6 @@ class GenericTest:
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
-    # NSKIP023 https://github.com/nanvix/cpython/issues/503
-    @unittest.skipIf(support.is_nanvix_standalone,
-                     "NSKIP023: os.pipe() ENOSYS in standalone mode")
     def test_exists_fd(self):
         r, w = os.pipe()
         try:

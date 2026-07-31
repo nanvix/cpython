@@ -919,9 +919,6 @@ class PosixTester(unittest.TestCase):
     def test_strerror(self):
         self.assertTrue(posix.strerror(0))
 
-    # NSKIP023 https://github.com/nanvix/cpython/issues/503
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP023: os.pipe() ENOSYS in standalone mode")
     @unittest.skipUnless(hasattr(posix, 'pipe'), 'test needs posix.pipe()')
     def test_pipe(self):
         reader, writer = posix.pipe()
