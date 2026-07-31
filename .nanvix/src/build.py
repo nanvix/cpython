@@ -14,7 +14,7 @@ import dataclasses
 import subprocess
 from pathlib import Path
 
-from nanvix_zutil import DockerConfig, EXIT_INVALID_ARGS, log, paths
+from nanvix_zutil import DockerConfig, paths
 
 import src.config as config
 import src.lxml as lxml_mod
@@ -29,17 +29,12 @@ __all__ = ("BuildMixin", "MakeArgs")
 class BuildMixin(CleanMixin):
     """``./z build`` — cross-compile python.elf and libpython.a for Nanvix."""
 
-    def docker_config(self, image: str) -> DockerConfig:
-        """Configure the immutable SDK container plus isolated tar-copy build."""
-        if image != config.DOCKER_IMAGE:
-            log.fatal(
-                f"Unsupported SDK image: {image}",
-                code=EXIT_INVALID_ARGS,
-                hint=f"Use the pinned SDK image: {config.DOCKER_IMAGE}",
-            )
-        docker = super().docker_config(image)
-        # Feed the isolated (case-insensitive / Windows) tar-copy build. The
-        # per-phase copy-back outputs (DESTDIR install tree) are set in
+    def build(self, docker: DockerConfig) -> None:
+        """Cross-compile python.elf and libpython.a for Nanvix."""
+        # Docker is scoped to build (zutils#235). Apply CPython's isolated
+        # tar-copy customisations to the config we were handed and stash it
+        # so the shared helpers (make_args, _docker_build) can reach it.
+        # Per-phase copy-back outputs (DESTDIR install tree) are set in
         # ``_docker_build`` because the destination differs per build.
         docker.tar_excludes = config.DOCKER_TAR_EXCLUDES
         docker.crlf_files = config.DOCKER_CRLF_FILES
@@ -52,10 +47,7 @@ class BuildMixin(CleanMixin):
         # isolated (/tmp/build) and non-isolated (/mnt/workspace) paths, so use
         # /tmp, which the container always provides.
         docker.extra_env.update({"TMPDIR": "/tmp"})
-        return docker
-
-    def build(self) -> None:
-        """Cross-compile python.elf and libpython.a for Nanvix."""
+        self.docker = docker
 
         # Two separate builds: first release -> out/release/, then test -> out/test/.
         self.args = self.make_args(release=True, with_docker=True)
@@ -158,7 +150,7 @@ class BuildMixin(CleanMixin):
             f"|| true; }}"
         )
         return (
-            f"{build_str} && {strip_build} && rm -rf \"{staging}\" && "
+            f'{build_str} && {strip_build} && rm -rf "{staging}" && '
             f"{install_str} && {strip_install}"
         )
 
