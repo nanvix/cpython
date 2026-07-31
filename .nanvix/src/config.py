@@ -194,6 +194,7 @@ NANVIX_TEST_LIST: list[str] = [
     "test_shutil",
     "test_largefile",
     "test_zipfile64",
+    "test_ioctl",
     "test_zipfile",
     "test_zipapp",
     "test_zipimport",
