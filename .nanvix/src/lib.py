@@ -22,6 +22,7 @@ from typing import Any
 import src.ramfs as ramfs_mod
 
 from nanvix_zutil import (
+    DockerConfig,
     ZScript,
     paths,
     run,
@@ -105,6 +106,12 @@ class LibMixin(ZScript):
     # Populated lazily via the ``args`` property; lifecycle mixins that
     # need a variant (release / docker) assign to ``self.args`` directly.
     _args: MakeArgs | None = None
+
+    # Docker is scoped to the build step (zutils#235): ``build`` receives a
+    # :class:`DockerConfig` and stashes it here so the shared helpers
+    # (``make_args``, ``_docker_build``) can reach it without threading it
+    # through every signature.  ``None`` outside ``build``.
+    docker: DockerConfig | None = None
 
     # ------------------------------------------------------------------
     # Make args

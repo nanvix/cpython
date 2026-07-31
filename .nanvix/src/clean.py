@@ -19,6 +19,9 @@ class CleanMixin(LibMixin):
 
     def clean(self) -> None:
         """Remove build artifacts."""
+        # Docker is scoped to build (zutils#235); the base hook reconstructs
+        # the standard config to drop the persistent build volume.
+        super().clean()
         self.clean_impl()
 
     def clean_impl(
@@ -49,8 +52,9 @@ class CleanMixin(LibMixin):
                 cwd=paths.repo_root(),
                 check=False,
             )
-        else:
-            docker_cfg = self.docker or self.docker_config(config.DOCKER_IMAGE)
-            volume = docker_cfg.volume_name()
+        elif self.docker is not None:
+            # Reached from ``build`` (Docker in scope); ``clean`` proper drops
+            # the volume via ``super().clean()`` above.
+            volume = self.docker.volume_name()
             if volume is not None:
                 remove_build_volume(volume)
