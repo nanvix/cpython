@@ -2450,9 +2450,6 @@ class TestInvalidFD(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, 'get_blocking'),
                          'needs os.get_blocking() and os.set_blocking()')
-    # NSKIP031 https://github.com/nanvix/cpython/issues/511
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP031: os.set_blocking() accepts invalid fd silently")  # detail: no-op on Nanvix
     def test_blocking(self):
         self.check(os.get_blocking)
         self.check(os.set_blocking, True)
@@ -4427,9 +4424,6 @@ class PathTConverterTests(unittest.TestCase):
                      'needs os.get_blocking() and os.set_blocking()')
 @unittest.skipIf(support.is_emscripten, "Cannot unset blocking flag")
 @unittest.skipIf(sys.platform == 'win32', 'Windows only supports blocking on pipes')
-# NSKIP031 https://github.com/nanvix/cpython/issues/511
-@unittest.skipIf(support.is_nanvix,
-                 "NSKIP031: os.set_blocking() is a no-op on Nanvix")
 class BlockingTests(unittest.TestCase):
     def test_blocking(self):
         fd = os.open(__file__, os.O_RDONLY)
