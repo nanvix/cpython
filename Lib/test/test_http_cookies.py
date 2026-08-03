@@ -5,12 +5,6 @@ import unittest
 import doctest
 from http import cookies
 import pickle
-from test import support
-
-_skip_pickle = unittest.skipIf(
-    support.is_nanvix,
-    "NSKIP056: pickle corrupt on Nanvix 32-bit newlib"
-)
 
 
 class CookieTests(unittest.TestCase):
@@ -207,7 +201,6 @@ class CookieTests(unittest.TestCase):
             self.assertEqual(dict(C), {})
             self.assertEqual(C.output(), '')
 
-    @_skip_pickle
     def test_pickle(self):
         rawdata = 'Customer="WILE_E_COYOTE"; Path=/acme; Version=1'
         expected_output = 'Set-Cookie: %s' % rawdata
@@ -432,7 +425,6 @@ class MorselTests(unittest.TestCase):
         self.assertRaises(TypeError, morsel.update)
         self.assertRaises(TypeError, morsel.update, 0)
 
-    @_skip_pickle
     def test_pickle(self):
         morsel_a = cookies.Morsel()
         morsel_a.set('foo', 'bar', 'baz')
