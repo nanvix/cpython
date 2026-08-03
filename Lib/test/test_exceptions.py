@@ -430,8 +430,6 @@ class ExceptionTests(unittest.TestCase):
         with self.assertRaisesRegex(OSError, 'Windows Error 0x%x' % code):
             ctypes.pythonapi.PyErr_SetFromWindowsErr(code)
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix, "NSKIP001: pickle corrupt on 32-bit")
     def testAttributes(self):
         # test that exception attributes are happy
 
@@ -1959,8 +1957,6 @@ class ImportErrorTests(unittest.TestCase):
             exc = ImportError(arg)
             self.assertEqual(str(arg), str(exc))
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix, "NSKIP001: pickle corrupt on 32-bit")
     def test_copy_pickle(self):
         for kwargs in (dict(),
                        dict(name='somename'),

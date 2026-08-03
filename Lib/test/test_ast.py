@@ -898,8 +898,6 @@ class AST_Tests(unittest.TestCase):
         x = ast.Sub()
         self.assertEqual(x._fields, ())
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix, "NSKIP001: pickle corrupt on 32-bit")
     def test_pickling(self):
         import pickle
 

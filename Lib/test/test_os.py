@@ -619,9 +619,6 @@ class StatAttributeTests(unittest.TestCase):
             self.skipTest("cannot encode %a for the filesystem" % self.fname)
         self.check_stat_attributes(fname)
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP001: pickle proto 0 corrupt on 32-bit Nanvix")
     def test_stat_result_pickle(self):
         result = os.stat(self.fname)
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
