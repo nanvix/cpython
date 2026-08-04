@@ -89,8 +89,6 @@ class ContextManagerTestCase(unittest.TestCase):
                 raise ZeroDivisionError()
         self.assertEqual(state, [1, 42, 999])
 
-    # NSKIP006 https://github.com/nanvix/cpython/issues/474
-    @unittest.skipIf(support.is_nanvix, "NSKIP006: traceback source line formatting differs")
     def test_contextmanager_traceback(self):
         @contextmanager
         def f():
@@ -838,8 +836,6 @@ class TestBaseExitStack:
             stack.push(lambda *exc: True)
             1/0
 
-    # NSKIP006 https://github.com/nanvix/cpython/issues/474
-    @unittest.skipIf(support.is_nanvix, "NSKIP006: traceback source line formatting differs")
     def test_exit_exception_traceback(self):
         # This test captures the current behavior of ExitStack so that we know
         # if we ever unintendedly change it. It is not a statement of what the
