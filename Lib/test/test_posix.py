@@ -453,9 +453,6 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'posix_fadvise'),
         "test needs posix.posix_fadvise()")
-    # NSKIP038 https://github.com/nanvix/cpython/issues/518
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP038: os.posix_fadvise() not implemented on Nanvix")
     def test_posix_fadvise_errno(self):
         try:
             posix.posix_fadvise(-42, 0, 0, posix.POSIX_FADV_WILLNEED)
