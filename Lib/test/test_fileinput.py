@@ -882,9 +882,6 @@ class Test_hook_compressed(unittest.TestCase):
         self.do_test_use_builtin_open_text("abcd", "r")
 
     @unittest.skipUnless(gzip, "Requires gzip and zlib")
-    # NSKIP028 https://github.com/nanvix/cpython/issues/508
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP028: locale.getencoding() returns garbage on Nanvix standalone")
     def test_gz_ext_fake(self):
         original_open = gzip.open
         gzip.open = self.fake_open
@@ -907,9 +904,6 @@ class Test_hook_compressed(unittest.TestCase):
         self.assertEqual(list(result), ['Ex-binary string'])
 
     @unittest.skipUnless(bz2, "Requires bz2")
-    # NSKIP028 https://github.com/nanvix/cpython/issues/508
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP028: locale.getencoding() returns garbage on Nanvix standalone")
     def test_bz2_ext_fake(self):
         original_open = bz2.BZ2File
         bz2.BZ2File = self.fake_open
