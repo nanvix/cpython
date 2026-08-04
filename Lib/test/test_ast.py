@@ -1083,8 +1083,6 @@ class AST_Tests(unittest.TestCase):
         enum._test_simple_enum(_Precedence, ast._Precedence)
 
     @unittest.skipIf(support.is_wasi, "exhausts limited stack on WASI")
-    # NSKIP007 https://github.com/nanvix/cpython/issues/475
-    @unittest.skipIf(support.is_nanvix, "NSKIP007: deep recursion crashes 32-bit VM")
     @support.cpython_only
     def test_ast_recursion_limit(self):
         fail_depth = support.C_RECURSION_LIMIT + 1
