@@ -1796,8 +1796,6 @@ class ExceptionTests(unittest.TestCase):
 
             gc_collect()
 
-    # NSKIP003 https://github.com/nanvix/cpython/issues/471
-    @unittest.skipIf(support.is_nanvix, "NSKIP003: no subprocess support")
     def test_memory_error_in_subinterp(self):
         # gh-109894: subinterpreters shouldn't count on last resort memory error
         # when MemoryError is raised through PyErr_NoMemory() call,
@@ -2073,8 +2071,6 @@ class SyntaxErrorTests(unittest.TestCase):
                     self.assertIn(expected, err.getvalue())
                     the_exception = exc
 
-    # NSKIP003 https://github.com/nanvix/cpython/issues/471
-    @unittest.skipIf(support.is_nanvix, "NSKIP003: no subprocess support")
     def test_encodings(self):
         source = (
             '# -*- coding: cp437 -*-\n'
@@ -2104,8 +2100,6 @@ class SyntaxErrorTests(unittest.TestCase):
         finally:
             unlink(TESTFN)
 
-    # NSKIP003 https://github.com/nanvix/cpython/issues/471
-    @unittest.skipIf(support.is_nanvix, "NSKIP003: no subprocess support")
     def test_non_utf8(self):
         # Check non utf-8 characters
         try:
