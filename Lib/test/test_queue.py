@@ -647,8 +647,6 @@ class CSimpleQueueTest(BaseSimpleQueueTest, unittest.TestCase):
         self.assertIs(self.type2test, self.queue.SimpleQueue)
         self.assertIs(self.type2test, self.queue.SimpleQueue)
 
-    # NSKIP018 https://github.com/nanvix/cpython/issues/486
-    @unittest.skipIf(support.is_nanvix, "NSKIP018: OOM from leak — circular __del__ not collected")
     def test_reentrancy(self):
         # bpo-14976: put() may be called reentrantly in an asynchronous
         # callback.
