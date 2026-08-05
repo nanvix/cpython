@@ -596,9 +596,6 @@ class PosixTester(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(posix, 'dup2'),
                          'test needs posix.dup2()')
-    # NSKIP030 https://github.com/nanvix/cpython/issues/510
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP030: os.dup2() accepts invalid fd silently")
     @unittest.skipIf(support.is_wasi, "WASI does not have dup2()")
     def test_dup2(self):
         fp1 = open(os_helper.TESTFN)
