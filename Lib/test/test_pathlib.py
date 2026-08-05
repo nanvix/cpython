@@ -713,9 +713,6 @@ class _BasePurePathTest(object):
         self.assertFalse(p.is_relative_to(''))
         self.assertFalse(p.is_relative_to(P('a')))
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP001: pickle proto 0 produces corrupt output on Nanvix 32-bit")
     def test_pickling_common(self):
         P = self.cls
         p = P('/a/b')
@@ -2689,9 +2686,6 @@ class _BasePathTest(object):
         self.assertIs(self.cls(f'{os.devnull}\udfff').is_char_device(), False)
         self.assertIs(self.cls(f'{os.devnull}\x00').is_char_device(), False)
 
-    # NSKIP001 https://github.com/nanvix/cpython/issues/469
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP001: pickle proto 0 produces corrupt output on Nanvix 32-bit")
     def test_pickling_common(self):
         p = self.cls(BASE, 'fileA')
         for proto in range(0, pickle.HIGHEST_PROTOCOL + 1):
