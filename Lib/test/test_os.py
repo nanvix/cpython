@@ -2402,16 +2402,10 @@ class TestInvalidFD(unittest.TestCase):
                         os.dup2(fd, fd2)
                     self.assertEqual(ctx.exception.errno, errno.EBADF)
 
-    # NSKIP029 https://github.com/nanvix/cpython/issues/509
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP029: os.fchmod/fchown accepts invalid fd silently")  # detail: os.fchmod
     @unittest.skipUnless(hasattr(os, 'fchmod'), 'test needs os.fchmod()')
     def test_fchmod(self):
         self.check(os.fchmod, 0)
 
-    # NSKIP029 https://github.com/nanvix/cpython/issues/509
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP029: os.fchmod/fchown accepts invalid fd silently")  # detail: os.fchown
     @unittest.skipUnless(hasattr(os, 'fchown'), 'test needs os.fchown()')
     def test_fchown(self):
         self.check(os.fchown, -1, -1)
