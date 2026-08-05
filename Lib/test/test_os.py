@@ -193,9 +193,6 @@ class FileTests(unittest.TestCase):
     @unittest.skipIf(
         support.is_wasi, "WASI does not support dup."
     )
-    # NSKIP035 https://github.com/nanvix/cpython/issues/515
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP035: os.dup() raises ENOTSUP via fcntl(F_DUPFD_CLOEXEC)")
     def test_closerange(self):
         first = os.open(os_helper.TESTFN, os.O_CREAT|os.O_RDWR)
         # We must allocate two consecutive file descriptors, otherwise

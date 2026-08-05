@@ -438,9 +438,6 @@ class TestMkstempInner(TestBadTempdir, BaseTestCase):
         with self.assertRaises(TypeError):
             self.do_create(dir=dir_b, pre=b"", suf="").write(b"blat")
 
-    # NSKIP035 https://github.com/nanvix/cpython/issues/515
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP035: os.dup() raises ENOTSUP via fcntl(F_DUPFD_CLOEXEC)")  # detail: leads to EMFILE in tight tempfile loops
     def test_basic_many(self):
         # _mkstemp_inner can create many files (stochastic)
         extant = list(range(TEST_FILES))
@@ -781,9 +778,6 @@ class TestMkdtemp(TestBadTempdir, BaseTestCase):
         with self.assertRaises(TypeError):
             os.rmdir(self.do_create(dir="", pre=b"aa", suf=b".txt"))
 
-    # NSKIP035 https://github.com/nanvix/cpython/issues/515
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP035: os.dup() raises ENOTSUP via fcntl(F_DUPFD_CLOEXEC)")  # detail: leads to EMFILE in tight tempfile loops
     def test_basic_many(self):
         # mkdtemp can create many directories (stochastic)
         extant = list(range(TEST_FILES))
