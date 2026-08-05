@@ -580,8 +580,6 @@ class COtherFileTests(OtherFileTests, unittest.TestCase):
     modulename = '_io'
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def testInvalidFd_overflow(self):
         # Issue 15989
         import _testcapi

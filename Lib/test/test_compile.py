@@ -603,6 +603,8 @@ class TestSpecifics(unittest.TestCase):
 
     @support.cpython_only
     @unittest.skipIf(support.is_wasi, "exhausts limited stack on WASI")
+    # NSKIP019 https://github.com/nanvix/cpython/issues/487
+    @unittest.skipIf(support.is_nanvix, "NSKIP019: deep compile recursion exceeds Nanvix heap")
     def test_compiler_recursion_limit(self):
         # Expected limit is C_RECURSION_LIMIT * 2
         # Duplicating the limit here is a little ugly.

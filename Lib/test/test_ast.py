@@ -2882,8 +2882,6 @@ class ModuleStateTests(unittest.TestCase):
                 import _ast
                 self.assertIs(_ast, lazy_mod)
 
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def test_subinterpreter(self):
         # bpo-41631: Importing and using the _ast module in a subinterpreter
         # must not crash.
