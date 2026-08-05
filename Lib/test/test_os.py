@@ -1179,9 +1179,6 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
                                   stdout=subprocess.PIPE, text=True)
             self.assertEqual(proc.stdout.rstrip(), repr(None))
 
-    # NSKIP033 https://github.com/nanvix/cpython/issues/513
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP033: os.putenv() accepts invalid input silently")  # detail: empty name, =name, embedded NUL etc. do not raise
     # On OS X < 10.6, unsetenv() doesn't return a value (bpo-13415).
     @support.requires_mac_ver(10, 6)
     def test_putenv_unsetenv_error(self):
