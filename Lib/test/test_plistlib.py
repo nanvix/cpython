@@ -551,9 +551,6 @@ class TestPlistlib(unittest.TestCase):
     def test_uid_index(self):
         self.assertEqual(operator.index(UID(1)), 1)
 
-    # NSKIP056 https://github.com/nanvix/cpython/issues/555
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP056: Newlib %zd format directive leaks into _pickle output")
     def test_uid_pickle(self):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             self.assertEqual(pickle.loads(pickle.dumps(UID(19), protocol=proto)), UID(19))

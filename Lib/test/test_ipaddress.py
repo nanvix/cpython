@@ -13,13 +13,6 @@ import pickle
 import ipaddress
 import weakref
 from test.support import LARGEST, SMALLEST
-# NSKIP056 https://github.com/nanvix/cpython/issues/327
-# Newlib %zd format directive leaks into _pickle output on Nanvix.
-from test import support
-_skip_pickle = unittest.skipIf(
-    support.is_nanvix,
-    "NSKIP056: pickle corrupt on Nanvix 32-bit newlib"
-)
 
 
 class BaseTestCase(unittest.TestCase):
@@ -304,7 +297,6 @@ class AddressTestCase_v4(BaseTestCase, CommonTestMixin_v4):
         assertBadOctet("257.0.0.0", 257)
         assertBadOctet("192.168.0.999", 999)
 
-    @_skip_pickle
     def test_pickle(self):
         self.pickle_test('192.0.2.1')
 
@@ -549,7 +541,6 @@ class AddressTestCase_v6(BaseTestCase, CommonTestMixin_v6):
         assertBadPart("02001:db8::%scope", "02001")
         assertBadPart('2001:888888::1%scope', "888888")
 
-    @_skip_pickle
     def test_pickle(self):
         self.pickle_test('2001:db8::')
         self.pickle_test('2001:db8::%scope')
@@ -647,7 +638,6 @@ class NetmaskTestMixin_v4(CommonTestMixin_v4):
         assertBadNetmask("1.1.1.1", -1)
         assertBadNetmask("1.1.1.1", 33)
 
-    @_skip_pickle
     def test_pickle(self):
         self.pickle_test('192.0.2.0/27')
         self.pickle_test('192.0.2.0/31')  # IPV4LENGTH - 1
@@ -809,7 +799,6 @@ class NetmaskTestMixin_v6(CommonTestMixin_v6):
         assertBadNetmask("::1", 129)
         assertBadNetmask("::1%scope", 129)
 
-    @_skip_pickle
     def test_pickle(self):
         self.pickle_test('2001:db8::1000/124')
         self.pickle_test('2001:db8::1000/127')  # IPV6LENGTH - 1

@@ -227,9 +227,6 @@ class UnicodeTest(string_tests.CommonTest,
                 tuple(iterator)
                 self.assertRaises(StopIteration, next, iterator)
 
-    # NSKIP056 https://github.com/nanvix/cpython/issues/555
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP056: Newlib %zd format directive leaks into _pickle output")
     def test_pickle_iterator(self):
         cases = ['abc', '🚀🚀🚀', "\u1111\u2222\u3333"]
         for case in cases:
