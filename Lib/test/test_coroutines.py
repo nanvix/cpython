@@ -2446,8 +2446,6 @@ class UnawaitedWarningDuringShutdownTest(unittest.TestCase):
         assert_python_ok("-c", code)
 
 
-# NSKIP002 https://github.com/nanvix/cpython/issues/470
-@unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
 @support.cpython_only
 class CAPITest(unittest.TestCase):
 

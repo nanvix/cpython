@@ -26,13 +26,7 @@ from test import support
 if support.is_nanvix and not support.is_nanvix_standalone:
     raise unittest.SkipTest("NSKIP050: hosted Nanvix unable to run this module cleanly (rmdir errno 88 cascade and/or other linuxd VFS issues)")  # detail: not bisected, see #530
 from unittest import mock
-try:
-    import _testinternalcapi
-except ImportError:
-    # NSKIP002: _testinternalcapi not available on Nanvix
-    if support.is_nanvix:
-        raise unittest.SkipTest("NSKIP002: _testinternalcapi not available on Nanvix")
-    raise
+import _testinternalcapi
 import _imp
 
 from test.support import os_helper

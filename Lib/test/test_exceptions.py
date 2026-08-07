@@ -334,8 +334,6 @@ class ExceptionTests(unittest.TestCase):
             compile(src, '<fragment>', 'exec')
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def testSettingException(self):
         # test that setting an exception at the C level works even if the
         # exception object can't be constructed.
@@ -1524,8 +1522,6 @@ class ExceptionTests(unittest.TestCase):
             self.assertIn(b'MemoryError', err)
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def test_MemoryError(self):
         # PyErr_NoMemory always raises the same exception instance.
         # Check that the traceback is not doubled.
@@ -1545,8 +1541,6 @@ class ExceptionTests(unittest.TestCase):
         self.assertEqual(tb1, tb2)
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def test_exception_with_doc(self):
         import _testcapi
         doc2 = "This is a test docstring."
@@ -1587,8 +1581,6 @@ class ExceptionTests(unittest.TestCase):
         self.assertEqual(error5.__doc__, "")
 
     @cpython_only
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix, "NSKIP002: _testcapi not available")
     def test_memory_error_cleanup(self):
         # Issue #5437: preallocated MemoryError instances should not keep
         # traceback objects alive.

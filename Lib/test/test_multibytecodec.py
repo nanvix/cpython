@@ -212,9 +212,6 @@ class Test_IncrementalEncoder(unittest.TestCase):
         self.assertEqual(encoder.encode('\xff'), b'\\xff')
         self.assertEqual(encoder.encode('\n'), b'\n')
 
-    # NSKIP002 https://github.com/nanvix/cpython/issues/470
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP002: _testcapi not available")  # detail: _testcapi / _testinternalcapi not built on Nanvix
     @support.cpython_only
     def test_subinterp(self):
         # bpo-42846: Test a CJK codec in a subinterpreter
