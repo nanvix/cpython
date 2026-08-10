@@ -23,9 +23,6 @@ from test.test_py_compile import without_source_date_epoch
 from test.test_py_compile import SourceDateEpochTestMeta
 
 
-# NSKIP021 https://github.com/nanvix/cpython/issues/501
-if support.is_nanvix_standalone:
-    raise unittest.SkipTest("NSKIP021: FAT VFS rename() hangs the kernel")
 # NSKIP055 https://github.com/nanvix/cpython/issues/552
 if support.is_nanvix and not support.is_nanvix_standalone:
     raise unittest.SkipTest(

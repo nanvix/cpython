@@ -122,9 +122,6 @@ class DirCompareTestCase(unittest.TestCase):
         self.assertEqual(sorted(actual), sorted(expected))
 
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_dircmp(self):
         # Check attributes for comparison of two identical directories
         left_dir, right_dir = self.dir, self.dir_same

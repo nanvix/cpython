@@ -49,9 +49,7 @@ class TestImport(unittest.TestCase):
         with open(self.module_path, 'w', encoding='utf-8') as f:
             f.write(contents)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     # NSKIP055 https://github.com/nanvix/cpython/issues/552
-    @unittest.skipIf(support.is_nanvix_standalone, "NSKIP021: FAT VFS rename() hangs the kernel")
     @unittest.skipIf(support.is_nanvix and not support.is_nanvix_standalone,
                      "NSKIP055: linuxd rename()/replace() hangs the kernel on hosted Nanvix")
     def test_package_import__semantics(self):

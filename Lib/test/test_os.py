@@ -295,9 +295,6 @@ class FileTests(unittest.TestCase):
         self.fdopen_helper('r')
         self.fdopen_helper('r', 100)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_replace(self):
         TESTFN2 = os_helper.TESTFN + ".2"
         self.addCleanup(os_helper.unlink, os_helper.TESTFN)
@@ -1488,9 +1485,6 @@ class WalkTests(unittest.TestCase):
             self.assertRaises(FileNotFoundError, next, walk_it)
         self.assertRaises(StopIteration, next, walk_it)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_walk_bad_dir(self):
         # Walk top-down.
         errors = []
@@ -4155,9 +4149,6 @@ class OSErrorTests(unittest.TestCase):
 
         self.filenames = self.bytes_filenames + self.unicode_filenames
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_oserror_filename(self):
         funcs = [
             (self.filenames, os.chdir,),

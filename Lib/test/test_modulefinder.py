@@ -383,9 +383,6 @@ class ModuleFinderTest(unittest.TestCase):
     def test_same_name_as_bad(self):
         self._do_test(same_name_as_bad_test)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: py_compile.compile( uses os.replace)
     def test_bytecode(self):
         base_path = os.path.join(self.test_dir, 'a')
         source_path = base_path + importlib.machinery.SOURCE_SUFFIXES[0]

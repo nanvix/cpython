@@ -2500,31 +2500,28 @@ class TestMove(BaseTest, unittest.TestCase):
         self.assertEqual(contents, sorted(os.listdir(real_dst)))
         self.assertFalse(os.path.exists(src))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
     def test_move_file(self):
         # Move a file to another location on the same filesystem.
         self._check_move_file(self.src_file, self.dst_file, self.dst_file)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_file_to_dir(self):
         # Move a file inside an existing dir on the same filesystem.
         self._check_move_file(self.src_file, self.dst_dir, self.dst_file)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_file_to_dir_pathlike_src(self):
         # Move a pathlike file to another location on the same filesystem.
         src = pathlib.Path(self.src_file)
         self._check_move_file(src, self.dst_dir, self.dst_file)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_file_to_dir_pathlike_dst(self):
         # Move a file to another pathlike location on the same filesystem.
         dst = pathlib.Path(self.dst_dir)
@@ -2543,9 +2540,6 @@ class TestMove(BaseTest, unittest.TestCase):
         # Move a file to another location on another filesystem.
         self.test_move_file_to_dir()
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
     def test_move_dir(self):
         # Move a dir to another location on the same filesystem.
         dst_dir = tempfile.mktemp(dir=self.mkdtemp())
@@ -2559,9 +2553,9 @@ class TestMove(BaseTest, unittest.TestCase):
         # Move a dir to another location on another filesystem.
         self.test_move_dir()
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_dir_to_dir(self):
         # Move a dir inside an existing dir on the same filesystem.
         self._check_move_dir(self.src_dir, self.dst_dir,
@@ -2575,9 +2569,9 @@ class TestMove(BaseTest, unittest.TestCase):
         # Move a dir inside an existing dir on another filesystem.
         self.test_move_dir_to_dir()
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_dir_sep_to_dir(self):
         self._check_move_dir(self.src_dir + os.path.sep, self.dst_dir,
             os.path.join(self.dst_dir, os.path.basename(self.src_dir)))
@@ -2587,18 +2581,18 @@ class TestMove(BaseTest, unittest.TestCase):
         self._check_move_dir(self.src_dir + os.path.altsep, self.dst_dir,
             os.path.join(self.dst_dir, os.path.basename(self.src_dir)))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_existing_file_inside_dest_dir(self):
         # A file with the same name inside the destination dir already exists.
         with open(self.dst_file, "wb"):
             pass
         self.assertRaises(shutil.Error, shutil.move, self.src_file, self.dst_dir)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_dont_move_dir_in_itself(self):
         # Moving a dir inside itself raises an Error.
         dst = os.path.join(self.src_dir, "bar")
@@ -2671,17 +2665,14 @@ class TestMove(BaseTest, unittest.TestCase):
         self.assertTrue(os.path.islink(dst_link))
         self.assertTrue(os.path.samefile(src, dst_link))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP022 https://github.com/nanvix/cpython/issues/502
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP022: FAT VFS returns identical st_ino/st_dev for all files")  # detail: _samefile() misfire in shutil.move
     def test_move_return_value(self):
         rv = shutil.move(self.src_file, self.dst_dir)
         self.assertEqual(rv,
                 os.path.join(self.dst_dir, os.path.basename(self.src_file)))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
     def test_move_as_rename_return_value(self):
         rv = shutil.move(self.src_file, os.path.join(self.dst_dir, 'bar'))
         self.assertEqual(rv, os.path.join(self.dst_dir, 'bar'))
@@ -2710,9 +2701,9 @@ class TestMove(BaseTest, unittest.TestCase):
         shutil.move(self.src_dir, self.dst_dir, copy_function=_copy)
         self.assertEqual(len(moved), 3)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
+    # NSKIP043 https://github.com/nanvix/cpython/issues/523
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: shutil.move uses rename
+                     "NSKIP043: FAT VFS case-insensitivity / 8.3 short-name retention")
     def test_move_dir_caseinsensitive(self):
         # Renames a folder to the same name
         # but a different case.
