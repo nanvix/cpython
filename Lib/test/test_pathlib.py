@@ -2418,9 +2418,6 @@ class _BasePathTest(object):
         self.assertEqual(p.stat().st_ctime, st_ctime_first)
 
     @unittest.skipIf(is_emscripten, "FS root cannot be modified on Emscripten.")
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir('/' returns ENOENT not EEXIST)
     def test_mkdir_exist_ok_root(self):
         # Issue #25803: A drive root could raise PermissionError on Windows.
         self.cls('/').resolve().mkdir(exist_ok=True)
@@ -2437,9 +2434,6 @@ class _BasePathTest(object):
         with self.assertRaises(OSError):
             (p / 'child' / 'path').mkdir(parents=True)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir-over-file returns EINVAL not EEXIST
     def test_mkdir_with_child_file(self):
         p = self.cls(BASE, 'dirB', 'fileB')
         self.assertTrue(p.exists())
@@ -2452,9 +2446,6 @@ class _BasePathTest(object):
             p.mkdir(parents=True, exist_ok=True)
         self.assertEqual(cm.exception.errno, errno.EEXIST)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: mkdir-over-file returns EINVAL not EEXIST
     def test_mkdir_no_parents_file(self):
         p = self.cls(BASE, 'fileA')
         self.assertTrue(p.exists())

@@ -4734,9 +4734,6 @@ class TestScandir(unittest.TestCase):
                     st = os.stat(entry.name, dir_fd=fd, follow_symlinks=False)
                     self.assertEqual(entry.stat(follow_symlinks=False), st)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: scandir('' returns EINVAL not FileNotFoundError)
     @unittest.skipIf(support.is_wasi, "WASI maps '' to cwd")
     def test_empty_path(self):
         self.assertRaises(FileNotFoundError, os.scandir, '')

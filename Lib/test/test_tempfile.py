@@ -362,9 +362,6 @@ class TestBadTempdir:
                 with self.assertRaises(FileNotFoundError):
                     self.make_temp()
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: path-under-file returns EINVAL not NotADirectoryError
     def test_non_directory(self):
         with _inside_empty_temp_dir():
             tempdir = os.path.join(tempfile.tempdir, 'file')
