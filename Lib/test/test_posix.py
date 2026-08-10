@@ -854,9 +854,6 @@ class PosixTester(unittest.TestCase):
         self._test_all_chown_common(posix.lchown, os_helper.TESTFN,
                                     getattr(posix, 'lstat', None))
 
-    # NSKIP036 https://github.com/nanvix/cpython/issues/516
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP036: os.chdir() succeeds on non-directory targets")
     @unittest.skipUnless(hasattr(posix, 'chdir'), 'test needs posix.chdir()')
     def test_chdir(self):
         posix.chdir(os.curdir)
