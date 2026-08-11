@@ -399,9 +399,6 @@ class PosixTester(unittest.TestCase):
         finally:
             os.close(fd)
 
-    # NSKIP040 https://github.com/nanvix/cpython/issues/520
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP040: os.pwritev() with overflow-sized iovecs hangs on Nanvix")
     @unittest.skipUnless(hasattr(posix, 'pwritev'), "test needs posix.pwritev()")
     @requires_32b
     def test_pwritev_overflow_32bits(self):
@@ -524,9 +521,6 @@ class PosixTester(unittest.TestCase):
         finally:
             os.close(fd)
 
-    # NSKIP041 https://github.com/nanvix/cpython/issues/521
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP041: os.writev() not supported")  # detail: ENOSPC instead of EINVAL on overflow
     @unittest.skipUnless(hasattr(posix, 'writev'), "test needs posix.writev()")
     @requires_32b
     def test_writev_overflow_32bits(self):
