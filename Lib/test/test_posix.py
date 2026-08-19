@@ -1422,9 +1422,6 @@ class PosixTester(unittest.TestCase):
                 # http://lists.freebsd.org/pipermail/freebsd-amd64/2012-January/014332.html
                 raise unittest.SkipTest("OSError raised!")
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_path_error2(self):
         """
         Test functions that call path_error2(), providing two filenames in their exceptions.

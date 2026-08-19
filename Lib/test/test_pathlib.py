@@ -1688,16 +1688,13 @@ class _BasePathTest(object):
             env['HOME'] = os.path.join(BASE, 'home')
             self._test_home(self.cls.home())
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_with_segments(self):
         class P(_BasePurePathSubclass, self.cls):
             pass
         p = P(BASE, session_id=42)
         self.assertEqual(42, p.absolute().session_id)
         self.assertEqual(42, p.resolve().session_id)
-        if not is_wasi:  # WASI has no user accounts.
+        if not is_wasi and not support.is_nanvix:  # WASI/Nanvix have no user accounts.
             self.assertEqual(42, p.with_segments('~').expanduser().session_id)
         self.assertEqual(42, (p / 'fileA').rename(p / 'fileB').session_id)
         self.assertEqual(42, (p / 'fileB').replace(p / 'fileA').session_id)
@@ -2277,9 +2274,6 @@ class _BasePathTest(object):
         with self.assertRaises(NotImplementedError):
             q.hardlink_to(p)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_rename(self):
         P = self.cls(BASE)
         p = P / 'fileA'
@@ -2297,9 +2291,6 @@ class _BasePathTest(object):
         self.assertEqual(os.stat(r).st_size, size)
         self.assertFileNotFound(q.stat)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")  # detail: os.rename / os.replace
     def test_replace(self):
         P = self.cls(BASE)
         p = P / 'fileA'
@@ -2930,9 +2921,6 @@ class WalkTests(unittest.TestCase):
                 self.assertIn("link", dirs)
                 break
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP021: FAT VFS rename() hangs the kernel")
     def test_walk_bad_dir(self):
         errors = []
         walk_it = self.walk_path.walk(on_error=errors.append)

@@ -246,9 +246,7 @@ class FindSpecTests:
         # None is returned upon failure to find a loader.
         self.assertIsNone(self.util.find_spec('nevergoingtofindthismodule'))
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     # NSKIP055 https://github.com/nanvix/cpython/issues/552
-    @unittest.skipIf(support.is_nanvix_standalone, "NSKIP021: FAT VFS rename() hangs the kernel")
     @unittest.skipIf(support.is_nanvix and not support.is_nanvix_standalone,
                      "NSKIP055: linuxd rename()/replace() hangs the kernel on hosted Nanvix")
     def test_find_submodule(self):
@@ -264,9 +262,7 @@ class FindSpecTests:
             spec_again = self.util.find_spec(fullname)
             self.assertEqual(spec_again, spec)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     # NSKIP055 https://github.com/nanvix/cpython/issues/552
-    @unittest.skipIf(support.is_nanvix_standalone, "NSKIP021: FAT VFS rename() hangs the kernel")
     @unittest.skipIf(support.is_nanvix and not support.is_nanvix_standalone,
                      "NSKIP055: linuxd rename()/replace() hangs the kernel on hosted Nanvix")
     def test_find_submodule_parent_already_imported(self):
@@ -283,9 +279,7 @@ class FindSpecTests:
             spec_again = self.util.find_spec(fullname)
             self.assertEqual(spec_again, spec)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     # NSKIP055 https://github.com/nanvix/cpython/issues/552
-    @unittest.skipIf(support.is_nanvix_standalone, "NSKIP021: FAT VFS rename() hangs the kernel")
     @unittest.skipIf(support.is_nanvix and not support.is_nanvix_standalone,
                      "NSKIP055: linuxd rename()/replace() hangs the kernel on hosted Nanvix")
     def test_find_relative_module(self):
@@ -302,9 +296,7 @@ class FindSpecTests:
             spec_again = self.util.find_spec(fullname)
             self.assertEqual(spec_again, spec)
 
-    # NSKIP021 https://github.com/nanvix/cpython/issues/501
     # NSKIP055 https://github.com/nanvix/cpython/issues/552
-    @unittest.skipIf(support.is_nanvix_standalone, "NSKIP021: FAT VFS rename() hangs the kernel")
     @unittest.skipIf(support.is_nanvix and not support.is_nanvix_standalone,
                      "NSKIP055: linuxd rename()/replace() hangs the kernel on hosted Nanvix")
     def test_find_relative_module_missing_package(self):
