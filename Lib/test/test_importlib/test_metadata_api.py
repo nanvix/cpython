@@ -92,8 +92,6 @@ class APITests(
                 ][0]
                 self.assertEqual(top_level.read_text(), expect_content)
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points(self):
         eps = entry_points()
         assert 'entries' in eps.groups
@@ -103,8 +101,6 @@ class APITests(
         self.assertEqual(ep.value, 'mod:main')
         self.assertEqual(ep.extras, [])
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points_distribution(self):
         entries = entry_points(group='entries')
         for entry in ("main", "ns:sub"):
@@ -112,8 +108,6 @@ class APITests(
             self.assertIn(ep.dist.name, ('distinfo-pkg', 'egginfo-pkg'))
             self.assertEqual(ep.dist.version, "1.0.0")
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points_unique_packages_normalized(self):
         """
         Entry points should only be exposed for the first package
@@ -142,19 +136,13 @@ class APITests(
         # ns:sub doesn't exist in alt_pkg
         assert 'ns:sub' not in entries.names
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points_missing_name(self):
         with self.assertRaises(KeyError):
             entry_points(group='entries')['missing']
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points_missing_group(self):
         assert entry_points(group='missing') == ()
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_entry_points_allows_no_attributes(self):
         ep = entry_points().select(group='entries', name='main')
         with self.assertRaises(AttributeError):
@@ -216,13 +204,9 @@ class APITests(
         self._test_files(files('egg_with_no_modules-pkg'))
         self._test_files(files('sources_fallback-pkg'))
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_version_egg_info_file(self):
         self.assertEqual(version('egginfo-file'), '0.1')
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(is_nanvix_standalone, "NSKIP026: FAT VFS returns wrong errno for path-edge cases")
     def test_requires_egg_info_file(self):
         requirements = requires('egginfo-file')
         self.assertIsNone(requirements)

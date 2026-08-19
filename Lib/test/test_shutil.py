@@ -1539,9 +1539,6 @@ class TestCopy(BaseTest, unittest.TestCase):
         # Make sure file is not corrupted.
         self.assertEqual(read_file(src_file), 'foo')
 
-    # NSKIP026 https://github.com/nanvix/cpython/issues/506
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP026: FAT VFS returns wrong errno for path-edge cases")  # detail: shutil.copyfile to nonexistent dst dir does not raise FileNotFoundError
     @unittest.skipIf(MACOS or SOLARIS or _winapi, 'On MACOS, Solaris and Windows the errors are not confusing (though different)')
     # gh-92670: The test uses a trailing slash to force the OS consider
     # the path as a directory, but on AIX the trailing slash has no effect
