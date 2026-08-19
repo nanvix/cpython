@@ -928,18 +928,12 @@ class UtimeTests(unittest.TestCase):
         self.assertAlmostEqual(st.st_mtime, current,
                                delta=delta, msg=msg)
 
-    # NSKIP049 https://github.com/nanvix/cpython/issues/529
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP049: os.utime(path, None) raises EINVAL on Nanvix (utimensat NULL gap)")
     def test_utime_current(self):
         def set_time(filename):
             # Set to the current time in the new way
             os.utime(self.fname)
         self._test_utime_current(set_time)
 
-    # NSKIP049 https://github.com/nanvix/cpython/issues/529
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP049: os.utime(path, None) raises EINVAL on Nanvix (utimensat NULL gap)")
     def test_utime_current_old(self):
         def set_time(filename):
             # Set to the current time in the old explicit way.
