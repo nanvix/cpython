@@ -481,9 +481,6 @@ class PosixTester(unittest.TestCase):
         finally:
             os.close(fd)
 
-    # NSKIP034 https://github.com/nanvix/cpython/issues/514
-    @unittest.skipIf(support.is_nanvix_standalone,
-                     "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
     @unittest.skipUnless(os.utime in os.supports_follow_symlinks, "test needs follow_symlinks support in os.utime")
     def test_utime_nofollow_symlinks(self):
         now = time.time()
@@ -1550,8 +1547,7 @@ class TestPosixDirFd(unittest.TestCase):
                     posix.stat, name, dir_fd=10**20)
 
     # NSKIP034 https://github.com/nanvix/cpython/issues/514
-    @unittest.skipIf(support.is_nanvix_standalone,
-                     "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")
+    @unittest.skip("NSKIP034: test may generate a timestamp outside the FAT range")
     @unittest.skipUnless(os.utime in os.supports_dir_fd, "test needs dir_fd support in os.utime()")
     def test_utime_dir_fd(self):
         with self.prepare_file() as (dir_fd, name, fullname):
