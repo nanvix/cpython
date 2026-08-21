@@ -7270,7 +7270,6 @@ AS_CASE([$ac_sys_system],
   [FreeBSD*], [PY_STDLIB_MOD_SET_NA([_scproxy], [spwd])],
   [Nanvix*], [
     PY_STDLIB_MOD_SET_NA(
-      [_lsprof],
       [_multiprocessing],
       [audioop],
       [_posixshmem],
