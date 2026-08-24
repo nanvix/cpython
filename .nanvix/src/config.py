@@ -249,6 +249,11 @@ NANVIX_TEST_LIST: list[str] = [
     # #323 wave 8 — regex and plistlib
     "test_re",
     "test_plistlib",
+    "test_pyexpat",
+    "test_xml_etree",
+    "test_xml_etree_c",
+    "test_minidom",
+    "test_xml_dom_minicompat",
     # #600 — lxml built-in smoke test
     "test_nanvix_lxml",
     # #526 — _lzma stdlib enablement
