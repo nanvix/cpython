@@ -114,6 +114,9 @@ class GenericTest:
         create_file(filename, b'Hello World!')
         self.assertEqual(self.pathmodule.getsize(filename), 12)
 
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP034: FAT creation and modification times use different resolutions")
     def test_filetime(self):
         filename = os_helper.TESTFN
         self.addCleanup(os_helper.unlink, filename)

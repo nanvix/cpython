@@ -1756,6 +1756,9 @@ class _BasePathTest(object):
         p = P('~/a:b')
         self.assertEqual(p.expanduser(), P(os.path.expanduser('~'), './a:b'))
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_exists(self):
         P = self.cls
         p = P(BASE)
@@ -2512,6 +2515,9 @@ class _BasePathTest(object):
         self.assertTrue(link.is_dir())
         self.assertTrue(list(link.iterdir()))
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_dir(self):
         P = self.cls(BASE)
         self.assertTrue((P / 'dirA').is_dir())
@@ -2525,6 +2531,9 @@ class _BasePathTest(object):
         self.assertIs((P / 'dirA\udfff').is_dir(), False)
         self.assertIs((P / 'dirA\x00').is_dir(), False)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_file(self):
         P = self.cls(BASE)
         self.assertTrue((P / 'fileA').is_file())
@@ -2556,6 +2565,9 @@ class _BasePathTest(object):
             self.assertFalse((P / 'linkA').is_mount())
         self.assertIs((R / '\udfff').is_mount(), False)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_symlink(self):
         P = self.cls(BASE)
         self.assertFalse((P / 'fileA').is_symlink())
@@ -2579,6 +2591,9 @@ class _BasePathTest(object):
             self.assertEqual(P.is_junction(), P._flavour.isjunction.return_value)
             P._flavour.isjunction.assert_called_once_with(P)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_fifo_false(self):
         P = self.cls(BASE)
         self.assertFalse((P / 'fileA').is_fifo())
@@ -2604,6 +2619,9 @@ class _BasePathTest(object):
         self.assertIs(self.cls(BASE, 'myfifo\udfff').is_fifo(), False)
         self.assertIs(self.cls(BASE, 'myfifo\x00').is_fifo(), False)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_socket_false(self):
         P = self.cls(BASE)
         self.assertFalse((P / 'fileA').is_socket())
@@ -2639,6 +2657,9 @@ class _BasePathTest(object):
         self.assertIs(self.cls(BASE, 'mysock\udfff').is_socket(), False)
         self.assertIs(self.cls(BASE, 'mysock\x00').is_socket(), False)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_block_device_false(self):
         P = self.cls(BASE)
         self.assertFalse((P / 'fileA').is_block_device())
@@ -2648,6 +2669,9 @@ class _BasePathTest(object):
         self.assertIs((P / 'fileA\udfff').is_block_device(), False)
         self.assertIs((P / 'fileA\x00').is_block_device(), False)
 
+    # NSKIP058 https://github.com/nanvix/cpython/issues/893
+    @unittest.skipIf(support.is_nanvix,
+                     "NSKIP058: stat below a regular file returns EINVAL instead of ENOTDIR")
     def test_is_char_device_false(self):
         P = self.cls(BASE)
         self.assertFalse((P / 'fileA').is_char_device())
