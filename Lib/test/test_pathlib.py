@@ -1738,9 +1738,6 @@ class _BasePathTest(object):
         self.assertEqual(p.stat(), os.stat('.'))
 
     @unittest.skipIf(is_wasi, "WASI has no user accounts.")
-    # NSKIP025 https://github.com/nanvix/cpython/issues/505
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP025: no HOME env var and no pwd module on Nanvix")
     def test_expanduser_common(self):
         P = self.cls
         p = P('~')

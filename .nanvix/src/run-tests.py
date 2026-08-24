@@ -121,7 +121,7 @@ def run_batch(
         ]
         app_env = (
             f"PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1"
-            f" TMPDIR=/tmp"
+            f" HOME=/tmp TMPDIR=/tmp"
             f" NANVIX_STANDALONE=1"
             f" _PYTHON_SYSCONFIGDATA_NAME={SYSCONFIGDATA_NAME}"
         )
