@@ -724,9 +724,9 @@ class MiscReadTestBase(CommonReadTest):
         finally:
             os_helper.rmtree(DIR)
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: extractall via pathlike name
+                     "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")  # detail: extractall via pathlike name
     def test_extractall_pathlike_name(self):
         DIR = pathlib.Path(TEMPDIR) / "extractall"
         with os_helper.temp_dir(DIR), \
@@ -737,9 +737,9 @@ class MiscReadTestBase(CommonReadTest):
                 path = DIR / tarinfo.name
                 self.assertEqual(os.path.getmtime(path), tarinfo.mtime)
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
+    # NSKIP034 https://github.com/nanvix/cpython/issues/514
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: extract via pathlike name
+                     "NSKIP034: os.utime(times) does not modify mtime/atime on FAT VFS")  # detail: extract via pathlike name
     def test_extract_pathlike_name(self):
         dirtype = "ustar/dirtype"
         DIR = pathlib.Path(TEMPDIR) / "extractall"
@@ -1239,9 +1239,6 @@ class WriteTestBase(TarTest):
         self.assertFalse(fobj.closed)
         self.assertEqual(data, fobj.getvalue())
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: read truncated unexpectedly
     def test_eof_marker(self):
         # Make sure an end of archive marker is written (two zero blocks).
         # tarfile insists on aligning archives to a 20 * 512 byte recordsize.
@@ -1360,9 +1357,9 @@ class WriteTest(WriteTestBase, unittest.TestCase):
 
     @unittest.skipUnless(hasattr(os, "link"),
                          "Missing hardlink implementation")
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
+    # NSKIP024 https://github.com/nanvix/cpython/issues/504
     @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: link member size handling
+                     "NSKIP024: os.link()/symlink()/readlink() not supported on FAT VFS")  # detail: link member size handling
     def test_link_size(self):
         link = os.path.join(TEMPDIR, "link")
         target = os.path.join(TEMPDIR, "link_target")
@@ -1588,9 +1585,6 @@ class StreamWriteTest(WriteTestBase, unittest.TestCase):
     prefix = "w|"
     decompressor = None
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: stream padding read truncated
     def test_stream_padding(self):
         # Test for bug #1543303.
         tar = tarfile.open(tmpname, self.mode)
@@ -4167,9 +4161,6 @@ class TestExtractionFilters(unittest.TestCase):
             self.expect_exception(TypeError)  # errorlevel is not int
 
 
-# NSKIP044 https://github.com/nanvix/cpython/issues/524
-@unittest.skipIf(support.is_nanvix,
-                 "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: overwrite tests fail on FAT VFS quirks
 class OverwriteTests(archiver_tests.OverwriteTests, unittest.TestCase):
     testdir = os.path.join(TEMPDIR, "testoverwrite")
 

@@ -1578,9 +1578,6 @@ class TestArchives(BaseTest, unittest.TestCase):
 
     ### shutil.make_archive
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: deferred to Wave 6
     @support.requires_zlib()
     def test_make_tarball(self):
         # creating something to tar
@@ -2002,9 +1999,6 @@ class TestArchives(BaseTest, unittest.TestCase):
                 ('Python 3.14', DeprecationWarning)):
             self.check_unpack_archive(format)
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: deferred to Wave 6
     def test_unpack_archive_tar(self):
         self.check_unpack_tarball('tar')
 
@@ -2012,9 +2006,6 @@ class TestArchives(BaseTest, unittest.TestCase):
     def test_unpack_archive_gztar(self):
         self.check_unpack_tarball('gztar')
 
-    # NSKIP044 https://github.com/nanvix/cpython/issues/524
-    @unittest.skipIf(support.is_nanvix,
-                     "NSKIP044: tarfile/archive workflow corruption on Nanvix VFS")  # detail: deferred to Wave 6
     @support.requires_bz2()
     def test_unpack_archive_bztar(self):
         self.check_unpack_tarball('bztar')
