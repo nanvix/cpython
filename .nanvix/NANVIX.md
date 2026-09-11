@@ -193,7 +193,7 @@ To start an interactive CPython session on Nanvix (standalone/microvm):
 cd .nanvix/out/test && \
   ./bin/nanvixd.elf -bin-dir ./bin -ramfs ./cpython-rootfs.img \
     -- ./bin/python3.12 \
-    "-i;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
+    "-i;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 HOME=/tmp _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```
 
 This launches `nanvixd` in standalone interactive mode with the CPython ramfs image
@@ -217,7 +217,7 @@ To run a one-shot script instead of the REPL:
 cd .nanvix/out/test && \
   ./bin/nanvixd.elf -bin-dir ./bin -ramfs ./cpython-rootfs.img \
     -- ./bin/python3.12 \
-    "-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
+    "-B ./test_hello.py;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 HOME=/tmp _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```
 
 ### Running Individual Modules
@@ -228,7 +228,7 @@ To run a single test module inside the Nanvix VM:
 cd .nanvix/out/test && \
   ./bin/nanvixd.elf -bin-dir ./bin -ramfs ./cpython-rootfs.img \
     -- ./bin/python3.12 \
-    "-B -m test --verbose test_int;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 NANVIX_STANDALONE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
+    "-B -m test --verbose test_int;PYTHONHOME=/ PYTHONDONTWRITEBYTECODE=1 HOME=/tmp NANVIX_STANDALONE=1 _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__nanvix_"
 ```
 
 ### Test Suite Status
