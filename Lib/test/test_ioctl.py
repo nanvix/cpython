@@ -68,6 +68,9 @@ class IoctlTests(unittest.TestCase):
         # Test with a larger buffer, just for the record.
         self._check_ioctl_mutate_len(2048)
 
+    # NSKIP059 https://github.com/nanvix/cpython/issues/912
+    @unittest.skipIf(is_nanvix,
+                     "NSKIP059: Nanvix does not support pseudo-terminals")
     def test_ioctl_signed_unsigned_code_param(self):
         if not pty:
             raise unittest.SkipTest('pty module required')
