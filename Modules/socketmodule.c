@@ -485,24 +485,6 @@ _Py_nanvix_inet_addr(const char *cp)
 }
 #define inet_addr(cp) _Py_nanvix_inet_addr(cp)
 
-/* Nanvix libc's inet_ntop() is a stub that always returns ENOSYS.
-   Provide a simple replacement for AF_INET. */
-static const char *
-_Py_nanvix_inet_ntop(int af, const void *src, char *dst, socklen_t size)
-{
-    if (af == AF_INET) {
-        const unsigned char *b = (const unsigned char *)src;
-        int n = snprintf(dst, size, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
-        if (n < 0 || (socklen_t)n >= size) {
-            errno = ENOSPC;
-            return NULL;
-        }
-        return dst;
-    }
-    errno = EAFNOSUPPORT;
-    return NULL;
-}
-#define inet_ntop(af, src, dst, size) _Py_nanvix_inet_ntop(af, src, dst, size)
 #endif /* __nanvix__ */
 
 #ifdef MS_WINDOWS
